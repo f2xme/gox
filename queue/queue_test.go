@@ -22,6 +22,10 @@ func newMockQueue() *mockQueue {
 }
 
 func (q *mockQueue) Publish(ctx context.Context, topic string, body []byte) error {
+	return q.PublishWithOptions(ctx, topic, body, queue.PublishOptions{})
+}
+
+func (q *mockQueue) PublishWithOptions(ctx context.Context, topic string, body []byte, opts queue.PublishOptions) error {
 	if q.closed {
 		return queue.ErrClosed
 	}
@@ -30,7 +34,14 @@ func (q *mockQueue) Publish(ctx context.Context, topic string, body []byte) erro
 	handlers := q.subs[topic]
 	q.mu.RUnlock()
 
-	msg := &queue.Message{Topic: topic, Body: body}
+	msg := &queue.Message{
+		Topic:      topic,
+		Body:       body,
+		Tags:       opts.Tags,
+		Keys:       opts.Keys,
+		Properties: opts.Properties,
+		DelayLevel: opts.DelayLevel,
+	}
 	for _, h := range handlers {
 		if err := h(ctx, msg); err != nil {
 			return err
@@ -56,7 +67,11 @@ func (s *mockSub) Unsubscribe() error {
 	return nil
 }
 
-func (q *mockQueue) Subscribe(_ context.Context, topic string, handler queue.Handler) (queue.Subscription, error) {
+func (q *mockQueue) Subscribe(ctx context.Context, topic string, handler queue.Handler) (queue.Subscription, error) {
+	return q.SubscribeWithOptions(ctx, topic, handler, queue.SubscribeOptions{})
+}
+
+func (q *mockQueue) SubscribeWithOptions(ctx context.Context, topic string, handler queue.Handler, opts queue.SubscribeOptions) (queue.Subscription, error) {
 	if q.closed {
 		return nil, queue.ErrClosed
 	}

@@ -43,6 +43,11 @@ func New(opts ...Option) queue.Queue {
 // Publish sends a message to all subscribers of the specified topic.
 // Returns queue.ErrClosed if the queue has been closed.
 func (q *memQueue) Publish(ctx context.Context, topic string, body []byte) error {
+	return q.PublishWithOptions(ctx, topic, body, queue.PublishOptions{})
+}
+
+// PublishWithOptions sends a message with additional options.
+func (q *memQueue) PublishWithOptions(ctx context.Context, topic string, body []byte, opts queue.PublishOptions) error {
 	if q.closed.Load() {
 		return queue.ErrClosed
 	}
@@ -64,8 +69,12 @@ func (q *memQueue) Publish(ctx context.Context, topic string, body []byte) error
 	q.mu.RUnlock()
 
 	msg := &queue.Message{
-		Topic: topic,
-		Body:  bodyCopy,
+		Topic:      topic,
+		Body:       bodyCopy,
+		Tags:       opts.Tags,
+		Keys:       opts.Keys,
+		Properties: opts.Properties,
+		DelayLevel: opts.DelayLevel,
 	}
 
 	for _, sub := range subsCopy {
@@ -82,6 +91,11 @@ func (q *memQueue) Publish(ctx context.Context, topic string, body []byte) error
 // Subscribe registers a handler for the specified topic.
 // Returns queue.ErrClosed if the queue has been closed.
 func (q *memQueue) Subscribe(ctx context.Context, topic string, handler queue.Handler) (queue.Subscription, error) {
+	return q.SubscribeWithOptions(ctx, topic, handler, queue.SubscribeOptions{})
+}
+
+// SubscribeWithOptions registers a handler with additional options.
+func (q *memQueue) SubscribeWithOptions(ctx context.Context, topic string, handler queue.Handler, opts queue.SubscribeOptions) (queue.Subscription, error) {
 	if q.closed.Load() {
 		return nil, queue.ErrClosed
 	}
