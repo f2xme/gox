@@ -19,7 +19,7 @@ func main() {
 	fmt.Println("=== queue 包使用示例 ===")
 
 	// 创建内存队列
-	q := memadapter.New()
+	q := mem.New()
 	ctx := context.Background()
 
 	// 示例 1: 发布消息
