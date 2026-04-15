@@ -2,6 +2,12 @@ package rocketmq
 
 import "time"
 
+// 消费模式常量
+const (
+	ConsumerModelClustering  = "clustering"  // 集群消费模式
+	ConsumerModelBroadcasting = "broadcasting" // 广播消费模式
+)
+
 // Options 定义 RocketMQ 队列的配置选项
 type Options struct {
 	// NameServers RocketMQ name server 地址列表
@@ -29,7 +35,7 @@ func defaultOptions() Options {
 		GroupName:     "DEFAULT_PRODUCER_GROUP",
 		Retries:       2,
 		SendTimeout:   3 * time.Second,
-		ConsumerModel: "clustering",
+		ConsumerModel: ConsumerModelClustering,
 	}
 }
 

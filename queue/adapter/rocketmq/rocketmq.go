@@ -16,15 +16,17 @@ import (
 
 // rocketmqQueue 是 RocketMQ 队列实现
 type rocketmqQueue struct {
-	cfg      Options
-	producer rocketmq.Producer
-	mu       sync.RWMutex
-	subs     map[string]*subscription
-	closed   atomic.Bool
+	cfg         Options
+	credentials primitive.Credentials
+	producer    rocketmq.Producer
+	mu          sync.RWMutex
+	subs        map[string]*subscription
+	closed      atomic.Bool
 }
 
 // subscription 表示对主题的活动订阅
 type subscription struct {
+	key      string // topic:consumerGroup 复合键
 	topic    string
 	consumer rocketmq.PushConsumer
 	q        *rocketmqQueue
@@ -38,16 +40,19 @@ func New(opts ...Option) (queue.Queue, error) {
 		opt(&cfg)
 	}
 
+	// 创建认证凭证（复用）
+	credentials := primitive.Credentials{
+		AccessKey: cfg.AccessKey,
+		SecretKey: cfg.SecretKey,
+	}
+
 	// Create producer
 	p, err := rocketmq.NewProducer(
 		producer.WithNameServer(cfg.NameServers),
 		producer.WithRetry(cfg.Retries),
 		producer.WithGroupName(cfg.GroupName),
 		producer.WithNamespace(cfg.Namespace),
-		producer.WithCredentials(primitive.Credentials{
-			AccessKey: cfg.AccessKey,
-			SecretKey: cfg.SecretKey,
-		}),
+		producer.WithCredentials(credentials),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create producer: %w", err)
@@ -58,9 +63,10 @@ func New(opts ...Option) (queue.Queue, error) {
 	}
 
 	return &rocketmqQueue{
-		cfg:      cfg,
-		producer: p,
-		subs:     make(map[string]*subscription),
+		cfg:         cfg,
+		credentials: credentials,
+		producer:    p,
+		subs:        make(map[string]*subscription),
 	}, nil
 }
 
@@ -134,14 +140,11 @@ func (q *rocketmqQueue) SubscribeWithOptions(ctx context.Context, topic string, 
 		consumer.WithNameServer(q.cfg.NameServers),
 		consumer.WithGroupName(opts.ConsumerGroup),
 		consumer.WithNamespace(q.cfg.Namespace),
-		consumer.WithCredentials(primitive.Credentials{
-			AccessKey: q.cfg.AccessKey,
-			SecretKey: q.cfg.SecretKey,
-		}),
+		consumer.WithCredentials(q.credentials),
 	}
 
 	// Set consumer model
-	if q.cfg.ConsumerModel == "broadcasting" {
+	if q.cfg.ConsumerModel == ConsumerModelBroadcasting {
 		consumerOpts = append(consumerOpts, consumer.WithConsumerModel(consumer.BroadCasting))
 	} else {
 		consumerOpts = append(consumerOpts, consumer.WithConsumerModel(consumer.Clustering))
@@ -197,14 +200,17 @@ func (q *rocketmqQueue) SubscribeWithOptions(ctx context.Context, topic string, 
 		return nil, fmt.Errorf("failed to start consumer: %w", err)
 	}
 
+	// 使用 topic:consumerGroup 作为复合键
+	key := topic + ":" + opts.ConsumerGroup
 	sub := &subscription{
+		key:      key,
 		topic:    topic,
 		consumer: c,
 		q:        q,
 	}
 
 	q.mu.Lock()
-	q.subs[topic] = sub
+	q.subs[key] = sub
 	q.mu.Unlock()
 
 	return sub, nil
@@ -217,7 +223,7 @@ func (s *subscription) Unsubscribe() error {
 	}
 
 	s.q.mu.Lock()
-	delete(s.q.subs, s.topic)
+	delete(s.q.subs, s.key)
 	s.q.mu.Unlock()
 
 	return s.consumer.Shutdown()
@@ -238,7 +244,7 @@ func (q *rocketmqQueue) Close() error {
 			_ = sub.consumer.Shutdown()
 		}
 	}
-	q.subs = make(map[string]*subscription)
+	q.subs = nil
 
 	// Shutdown producer
 	return q.producer.Shutdown()
