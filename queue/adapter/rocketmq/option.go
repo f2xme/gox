@@ -1,44 +1,44 @@
-package rocketmqadapter
+package rocketmq
 
 import "time"
 
-// Options holds the configuration for RocketMQ queue.
+// Options 定义 RocketMQ 队列的配置选项
 type Options struct {
-	// NameServers is the list of RocketMQ name server addresses.
+	// NameServers RocketMQ name server 地址列表
 	NameServers []string
-	// AccessKey for authentication (optional).
+	// AccessKey 认证访问密钥（可选）
 	AccessKey string
-	// SecretKey for authentication (optional).
+	// SecretKey 认证密钥（可选）
 	SecretKey string
-	// Namespace for message isolation (optional).
+	// Namespace 消息隔离命名空间（可选）
 	Namespace string
-	// GroupName is the default producer group name.
+	// GroupName 默认生产者组名称
 	GroupName string
-	// Retries is the number of retry attempts for failed sends.
+	// Retries 发送失败重试次数
 	Retries int
-	// SendTimeout is the timeout for sending messages.
+	// SendTimeout 发送消息超时时间
 	SendTimeout time.Duration
-	// ConsumerModel specifies clustering or broadcasting mode.
+	// ConsumerModel 消费模式（集群或广播）
 	ConsumerModel string
 }
 
-// defaultOptions returns default configuration.
+// defaultOptions 返回默认配置
 func defaultOptions() Options {
 	return Options{
-		NameServers: []string{"127.0.0.1:9876"},
-		GroupName:   "DEFAULT_PRODUCER_GROUP",
-		Retries:     2,
-		SendTimeout: 3 * time.Second,
+		NameServers:   []string{"127.0.0.1:9876"},
+		GroupName:     "DEFAULT_PRODUCER_GROUP",
+		Retries:       2,
+		SendTimeout:   3 * time.Second,
 		ConsumerModel: "clustering",
 	}
 }
 
-// Option is a function that modifies Options.
+// Option 配置选项函数
 type Option func(*Options)
 
-// WithNameServers sets the RocketMQ name server addresses.
+// WithNameServers 设置 RocketMQ name server 地址
 //
-// Example:
+// 示例：
 //
 //	rocketmq.New(rocketmq.WithNameServers([]string{"localhost:9876"}))
 func WithNameServers(addrs []string) Option {
@@ -47,9 +47,9 @@ func WithNameServers(addrs []string) Option {
 	}
 }
 
-// WithCredentials sets the access key and secret key for authentication.
+// WithCredentials 设置认证的访问密钥和密钥
 //
-// Example:
+// 示例：
 //
 //	rocketmq.New(rocketmq.WithCredentials("myAccessKey", "mySecretKey"))
 func WithCredentials(accessKey, secretKey string) Option {
@@ -59,9 +59,9 @@ func WithCredentials(accessKey, secretKey string) Option {
 	}
 }
 
-// WithNamespace sets the namespace for message isolation.
+// WithNamespace 设置消息隔离的命名空间
 //
-// Example:
+// 示例：
 //
 //	rocketmq.New(rocketmq.WithNamespace("dev"))
 func WithNamespace(namespace string) Option {
@@ -70,9 +70,9 @@ func WithNamespace(namespace string) Option {
 	}
 }
 
-// WithGroupName sets the producer group name.
+// WithGroupName 设置生产者组名称
 //
-// Example:
+// 示例：
 //
 //	rocketmq.New(rocketmq.WithGroupName("my-producer-group"))
 func WithGroupName(groupName string) Option {
@@ -81,9 +81,9 @@ func WithGroupName(groupName string) Option {
 	}
 }
 
-// WithRetries sets the number of retry attempts for failed sends.
+// WithRetries 设置发送失败的重试次数
 //
-// Example:
+// 示例：
 //
 //	rocketmq.New(rocketmq.WithRetries(3))
 func WithRetries(retries int) Option {
@@ -95,9 +95,9 @@ func WithRetries(retries int) Option {
 	}
 }
 
-// WithSendTimeout sets the timeout for sending messages.
+// WithSendTimeout 设置发送消息的超时时间
 //
-// Example:
+// 示例：
 //
 //	rocketmq.New(rocketmq.WithSendTimeout(5 * time.Second))
 func WithSendTimeout(timeout time.Duration) Option {
@@ -109,9 +109,9 @@ func WithSendTimeout(timeout time.Duration) Option {
 	}
 }
 
-// WithConsumerModel sets the consumer model (clustering or broadcasting).
+// WithConsumerModel 设置消费模式（集群或广播）
 //
-// Example:
+// 示例：
 //
 //	rocketmq.New(rocketmq.WithConsumerModel("broadcasting"))
 func WithConsumerModel(model string) Option {

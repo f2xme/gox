@@ -1,4 +1,4 @@
-package rocketmqadapter
+package rocketmq
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/f2xme/gox/queue"
 )
 
-// rocketmqQueue is a RocketMQ queue implementation.
+// rocketmqQueue 是 RocketMQ 队列实现
 type rocketmqQueue struct {
 	cfg      Options
 	producer rocketmq.Producer
@@ -23,7 +23,7 @@ type rocketmqQueue struct {
 	closed   atomic.Bool
 }
 
-// subscription represents an active subscription to a topic.
+// subscription 表示对主题的活动订阅
 type subscription struct {
 	topic    string
 	consumer rocketmq.PushConsumer
@@ -31,7 +31,7 @@ type subscription struct {
 	closed   atomic.Bool
 }
 
-// New creates a new RocketMQ queue with the given options.
+// New 使用给定选项创建新的 RocketMQ 队列
 func New(opts ...Option) (queue.Queue, error) {
 	cfg := defaultOptions()
 	for _, opt := range opts {
@@ -64,12 +64,12 @@ func New(opts ...Option) (queue.Queue, error) {
 	}, nil
 }
 
-// Publish sends a message to the specified topic.
+// Publish 向指定主题发送消息
 func (q *rocketmqQueue) Publish(ctx context.Context, topic string, body []byte) error {
 	return q.PublishWithOptions(ctx, topic, body, queue.PublishOptions{})
 }
 
-// PublishWithOptions sends a message with additional options.
+// PublishWithOptions 使用额外选项发送消息
 func (q *rocketmqQueue) PublishWithOptions(ctx context.Context, topic string, body []byte, opts queue.PublishOptions) error {
 	if q.closed.Load() {
 		return queue.ErrClosed
@@ -111,7 +111,7 @@ func (q *rocketmqQueue) PublishWithOptions(ctx context.Context, topic string, bo
 	return nil
 }
 
-// Subscribe registers a handler for the specified topic.
+// Subscribe 为指定主题注册处理函数
 func (q *rocketmqQueue) Subscribe(ctx context.Context, topic string, handler queue.Handler) (queue.Subscription, error) {
 	return q.SubscribeWithOptions(ctx, topic, handler, queue.SubscribeOptions{
 		ConsumerGroup: "DEFAULT_CONSUMER_GROUP",
@@ -119,7 +119,7 @@ func (q *rocketmqQueue) Subscribe(ctx context.Context, topic string, handler que
 	})
 }
 
-// SubscribeWithOptions registers a handler with additional options.
+// SubscribeWithOptions 使用额外选项注册处理函数
 func (q *rocketmqQueue) SubscribeWithOptions(ctx context.Context, topic string, handler queue.Handler, opts queue.SubscribeOptions) (queue.Subscription, error) {
 	if q.closed.Load() {
 		return nil, queue.ErrClosed
@@ -210,7 +210,7 @@ func (q *rocketmqQueue) SubscribeWithOptions(ctx context.Context, topic string, 
 	return sub, nil
 }
 
-// Unsubscribe stops receiving messages and releases resources.
+// Unsubscribe 停止接收消息并释放资源
 func (s *subscription) Unsubscribe() error {
 	if s.closed.Swap(true) {
 		return nil
@@ -223,7 +223,7 @@ func (s *subscription) Unsubscribe() error {
 	return s.consumer.Shutdown()
 }
 
-// Close stops all subscriptions and releases resources.
+// Close 停止所有订阅并释放资源
 func (q *rocketmqQueue) Close() error {
 	if q.closed.Swap(true) {
 		return nil

@@ -1,4 +1,4 @@
-package rocketmqadapter
+package rocketmq
 
 import (
 	"context"

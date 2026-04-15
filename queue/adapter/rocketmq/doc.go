@@ -1,9 +1,9 @@
 /*
-Package rocketmqadapter 提供 RocketMQ 消息队列适配器。
+Package rocketmq 提供 RocketMQ 消息队列适配器。
 
 # 概述
 
-rocketmqadapter 是基于 Apache RocketMQ Go 客户端的队列实现，支持分布式消息队列的发布和订阅。
+rocketmq 是基于 Apache RocketMQ Go 客户端的队列实现，支持分布式消息队列的发布和订阅。
 
 # 特性
 
@@ -205,4 +205,4 @@ RocketMQ 支持延迟消息（18 个延迟级别）：
   - 延迟消息只支持固定的 18 个延迟级别
   - 广播模式下消息不会重试
 */
-package rocketmqadapter
+package rocketmq

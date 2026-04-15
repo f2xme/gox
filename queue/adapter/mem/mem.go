@@ -1,15 +1,14 @@
-package memadapter
+package mem
 
 import (
 	"context"
 	"sync"
 	"sync/atomic"
 
-	goxconfig "github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/queue"
 )
 
-// memQueue is an in-memory queue implementation using Go channels.
+// memQueue 是使用 Go channel 实现的内存队列
 type memQueue struct {
 	mu     sync.RWMutex
 	cfg    Options
@@ -17,7 +16,7 @@ type memQueue struct {
 	closed atomic.Bool
 }
 
-// subscription represents an active subscription to a topic.
+// subscription 表示对主题的活动订阅
 type subscription struct {
 	topic   string
 	handler queue.Handler
@@ -27,7 +26,7 @@ type subscription struct {
 	closed  atomic.Bool
 }
 
-// New creates a new in-memory queue with the given options.
+// New 使用给定选项创建新的内存队列
 func New(opts ...Option) queue.Queue {
 	cfg := defaultOptions()
 	for _, opt := range opts {
@@ -40,13 +39,13 @@ func New(opts ...Option) queue.Queue {
 	}
 }
 
-// Publish sends a message to all subscribers of the specified topic.
-// Returns queue.ErrClosed if the queue has been closed.
+// Publish 向指定主题的所有订阅者发送消息
+// 如果队列已关闭，返回 queue.ErrClosed
 func (q *memQueue) Publish(ctx context.Context, topic string, body []byte) error {
 	return q.PublishWithOptions(ctx, topic, body, queue.PublishOptions{})
 }
 
-// PublishWithOptions sends a message with additional options.
+// PublishWithOptions 使用额外选项发送消息
 func (q *memQueue) PublishWithOptions(ctx context.Context, topic string, body []byte, opts queue.PublishOptions) error {
 	if q.closed.Load() {
 		return queue.ErrClosed
@@ -88,13 +87,13 @@ func (q *memQueue) PublishWithOptions(ctx context.Context, topic string, body []
 	return nil
 }
 
-// Subscribe registers a handler for the specified topic.
-// Returns queue.ErrClosed if the queue has been closed.
+// Subscribe 为指定主题注册处理函数
+// 如果队列已关闭，返回 queue.ErrClosed
 func (q *memQueue) Subscribe(ctx context.Context, topic string, handler queue.Handler) (queue.Subscription, error) {
 	return q.SubscribeWithOptions(ctx, topic, handler, queue.SubscribeOptions{})
 }
 
-// SubscribeWithOptions registers a handler with additional options.
+// SubscribeWithOptions 使用额外选项注册处理函数
 func (q *memQueue) SubscribeWithOptions(ctx context.Context, topic string, handler queue.Handler, opts queue.SubscribeOptions) (queue.Subscription, error) {
 	if q.closed.Load() {
 		return nil, queue.ErrClosed
@@ -118,7 +117,7 @@ func (q *memQueue) SubscribeWithOptions(ctx context.Context, topic string, handl
 	return sub, nil
 }
 
-// consume processes messages from the subscription channel.
+// consume 从订阅通道处理消息
 func (s *subscription) consume(ctx context.Context) {
 	for {
 		select {
@@ -135,7 +134,7 @@ func (s *subscription) consume(ctx context.Context) {
 	}
 }
 
-// Unsubscribe stops receiving messages and removes the subscription.
+// Unsubscribe 停止接收消息并移除订阅
 func (s *subscription) Unsubscribe() error {
 	if s.closed.Swap(true) {
 		return nil // Already unsubscribed
@@ -158,7 +157,7 @@ func (s *subscription) Unsubscribe() error {
 	return nil
 }
 
-// Close stops all subscriptions and releases resources.
+// Close 停止所有订阅并释放资源
 func (q *memQueue) Close() error {
 	if q.closed.Swap(true) {
 		return nil
@@ -180,15 +179,3 @@ func (q *memQueue) Close() error {
 	return nil
 }
 
-// NewWithConfig creates a new in-memory queue with configuration from config.Config.
-// Configuration keys:
-//   - queue.mem.bufferSize (int): channel buffer size per topic (default: 64)
-func NewWithConfig(cfg goxconfig.Config) queue.Queue {
-	opts := []Option{}
-
-	if bufferSize := cfg.GetInt("queue.mem.bufferSize"); bufferSize > 0 {
-		opts = append(opts, WithBufferSize(bufferSize))
-	}
-
-	return New(opts...)
-}

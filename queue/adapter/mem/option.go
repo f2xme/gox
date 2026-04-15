@@ -1,26 +1,26 @@
-package memadapter
+package mem
 
-// Options holds the configuration for memory queue.
+// Options 定义内存队列的配置选项
 type Options struct {
-	// BufferSize is the channel buffer size for each topic subscription.
-	// Default is 64.
+	// BufferSize 每个主题订阅的通道缓冲区大小
+	// 默认值为 64
 	BufferSize int
 }
 
-// defaultOptions returns default configuration.
+// defaultOptions 返回默认配置
 func defaultOptions() Options {
 	return Options{
 		BufferSize: 64,
 	}
 }
 
-// Option is a function that modifies Options.
+// Option 配置选项函数
 type Option func(*Options)
 
-// WithBufferSize sets the channel buffer size for each topic subscription.
-// A value <= 0 defaults to 64.
+// WithBufferSize 设置每个主题订阅的通道缓冲区大小
+// 值 <= 0 时默认为 64
 //
-// Example:
+// 示例：
 //
 //	mem.New(mem.WithBufferSize(128))
 func WithBufferSize(size int) Option {

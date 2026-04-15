@@ -1,4 +1,4 @@
-package rocketmqadapter_test
+package rocketmq_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"log"
 
 	"github.com/f2xme/gox/queue"
-	rocketmqadapter "github.com/f2xme/gox/queue/adapter/rocketmq"
+	"github.com/f2xme/gox/queue/adapter/rocketmq"
 )
 
 // Order 示例订单结构
@@ -21,9 +21,9 @@ func Example() {
 	ctx := context.Background()
 
 	// 创建 RocketMQ 队列
-	q, err := rocketmqadapter.New(
-		rocketmqadapter.WithNameServers([]string{"localhost:9876"}),
-		rocketmqadapter.WithGroupName("example-group"),
+	q, err := rocketmq.New(
+		rocketmq.WithNameServers([]string{"localhost:9876"}),
+		rocketmq.WithGroupName("example-group"),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create queue: %v", err)
@@ -41,12 +41,12 @@ func Example() {
 
 func ExampleNew_withOptions() {
 	// 创建带完整配置的 RocketMQ 队列
-	q, err := rocketmqadapter.New(
-		rocketmqadapter.WithNameServers([]string{"localhost:9876"}),
-		rocketmqadapter.WithCredentials("access-key", "secret-key"),
-		rocketmqadapter.WithNamespace("production"),
-		rocketmqadapter.WithGroupName("order-service"),
-		rocketmqadapter.WithRetries(3),
+	q, err := rocketmq.New(
+		rocketmq.WithNameServers([]string{"localhost:9876"}),
+		rocketmq.WithCredentials("access-key", "secret-key"),
+		rocketmq.WithNamespace("production"),
+		rocketmq.WithGroupName("order-service"),
+		rocketmq.WithRetries(3),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create queue: %v", err)
@@ -59,9 +59,9 @@ func ExampleNew_withOptions() {
 
 func ExampleQueue_PublishWithOptions() {
 	ctx := context.Background()
-	q, _ := rocketmqadapter.New(
-		rocketmqadapter.WithNameServers([]string{"localhost:9876"}),
-		rocketmqadapter.WithGroupName("example-group"),
+	q, _ := rocketmq.New(
+		rocketmq.WithNameServers([]string{"localhost:9876"}),
+		rocketmq.WithGroupName("example-group"),
 	)
 
 	// 发布带标签和延迟的消息
@@ -86,9 +86,9 @@ func ExampleQueue_PublishWithOptions() {
 
 func ExampleQueue_Subscribe() {
 	ctx := context.Background()
-	q, _ := rocketmqadapter.New(
-		rocketmqadapter.WithNameServers([]string{"localhost:9876"}),
-		rocketmqadapter.WithGroupName("example-group"),
+	q, _ := rocketmq.New(
+		rocketmq.WithNameServers([]string{"localhost:9876"}),
+		rocketmq.WithGroupName("example-group"),
 	)
 
 	// 订阅消息

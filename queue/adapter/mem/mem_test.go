@@ -1,4 +1,4 @@
-package memadapter
+package mem
 
 import (
 	"context"

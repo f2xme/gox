@@ -1,55 +1,71 @@
-// Package memadapter provides an in-memory queue implementation.
+// Package mem 提供内存队列实现。
 //
-// This package implements the queue.Queue interface with an in-memory pub/sub backend
-// using Go channels. It supports multiple topics and concurrent subscribers with
-// configurable buffer sizes.
+// 本包使用 Go channel 作为后端实现了 queue.Queue 接口。
+// 支持多个主题和并发订阅者，可配置缓冲区大小。
 //
-// Basic usage:
+// # 功能特性
 //
-//	q := memadapter.New()
-//	defer q.Close()
+//   - 进程内消息传递
+//   - 零外部依赖
+//   - 高性能（纳秒级延迟）
+//   - 支持多主题和多订阅者
+//   - 线程安全
+//   - 可配置缓冲区大小
 //
-//	ctx := context.Background()
+// # 快速开始
 //
-//	// Subscribe to a topic
-//	sub, err := q.Subscribe(ctx, "events", func(ctx context.Context, msg *queue.Message) error {
-//		fmt.Printf("Received: %s\n", msg.Body)
-//		return nil
-//	})
-//	if err != nil {
-//		log.Fatal(err)
+// 基本使用：
+//
+//	package main
+//
+//	import (
+//		"context"
+//		"fmt"
+//		"log"
+//
+//		"github.com/f2xme/gox/queue"
+//		"github.com/f2xme/gox/queue/adapter/mem"
+//	)
+//
+//	func main() {
+//		ctx := context.Background()
+//
+//		// 创建内存队列
+//		q := mem.New()
+//		defer q.(queue.Closer).Close()
+//
+//		// 订阅主题
+//		sub, err := q.Subscribe(ctx, "events", func(ctx context.Context, msg *queue.Message) error {
+//			fmt.Printf("收到消息: %s\n", msg.Body)
+//			return nil
+//		})
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//		defer sub.Unsubscribe()
+//
+//		// 发布消息
+//		err = q.Publish(ctx, "events", []byte("hello"))
+//		if err != nil {
+//			log.Fatal(err)
+//		}
 //	}
-//	defer sub.Unsubscribe()
 //
-//	// Publish a message
-//	err = q.Publish(ctx, "events", []byte("hello"))
+// # 配置选项
 //
-// Configuration options:
+// 使用 Option 函数配置：
 //
-//	// Using Option functions
-//	q := memadapter.New(
-//		memadapter.WithBufferSize(128), // Set channel buffer size
+//	q := mem.New(
+//		mem.WithBufferSize(128), // 设置通道缓冲区大小
 //	)
 //
-//	// Or using Options struct directly
-//	q := memadapter.New(
-//		func(o *memadapter.Options) {
-//			o.BufferSize = 128
-//		},
-//	)
+// # 线程安全
 //
-// The queue uses Go channels internally for message delivery. Each subscription
-// gets its own buffered channel. Messages are delivered to all active subscribers
-// of a topic concurrently.
+// 所有操作都是线程安全的，可以从多个 goroutine 并发调用。
+// 队列使用读写锁保护内部状态。
 //
-// Thread Safety:
+// # 资源管理
 //
-// All operations are thread-safe and can be called concurrently from multiple
-// goroutines. The queue uses read-write locks to protect internal state.
-//
-// Resource Management:
-//
-// Always call Close() when done to properly clean up all subscriptions and
-// release resources. Subscriptions should also call Unsubscribe() when no
-// longer needed.
-package memadapter
+// 使用完毕后务必调用 Close() 清理所有订阅并释放资源。
+// 订阅不再需要时也应调用 Unsubscribe()。
+package mem
