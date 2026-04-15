@@ -1,0 +1,130 @@
+# gox - Go eXtended utilities
+
+## Project Overview
+A collection of wrapped Go third-party libraries providing unified API style and out-of-the-box configuration.
+Focuses on improving development efficiency and code consistency. Each package is built on top of mature open-source libraries.
+
+Repository: github.com/f2xme/gox
+
+## Architecture
+- Multi-package utility library, each top-level directory is an independent package
+- Packages are independent and do not depend on each other
+- Uses adapter pattern to wrap third-party libraries
+- Unified error handling and configuration style
+
+## Package List
+
+### cache - Cache Management
+- adapter/memadapter - Memory cache adapter
+- adapter/redisadapter - Redis cache adapter
+
+### captcha - CAPTCHA Generation and Verification
+- Digit, audio, math, and string captcha types
+- Memory and Redis storage support
+
+### config - Configuration Management
+- adapter/viperadapter - Viper configuration adapter
+
+### database - Database Operations
+- adapter/mysqldb - MySQL adapter (based on GORM)
+- adapter/pgsqldb - PostgreSQL adapter (based on GORM)
+- adapter/sqlitedb - SQLite adapter (based on GORM)
+
+### encrypt - Encryption Tools
+- AES, RSA, Hash and other encryption algorithms
+
+### errorx - Enhanced Error Handling
+- Structured error handling
+- Error chain tracing
+
+### graceful - Graceful Shutdown
+- Application lifecycle management
+- Signal handling and resource cleanup
+
+### httpx - HTTP Utilities
+- adapter/ginadapter - Gin framework adapter
+- HTTP client and server utilities
+
+### idgen - ID Generator
+- Snowflake, UUID and other ID generation algorithms
+
+### jwt - JWT Token Handling
+- HMAC, RSA, ECDSA signing algorithms
+- Token generation, validation, revocation
+- Redis revoker support
+
+### logx - Logging Wrapper
+- adapter/zapadapter - Zap logger adapter
+- Structured logging and context propagation
+
+### metrics - Metrics Monitoring
+- Prometheus metrics wrapper
+- Counter, gauge, histogram support
+
+### email - Email Services
+- SMTP email client (gomail)
+- Plain text and HTML email support
+
+### sms - SMS Services
+- aliyun - Alibaba Cloud SMS adapter
+- tencent - Tencent Cloud SMS adapter
+- volcengine - Volcengine SMS adapter
+
+### oss - Object Storage
+- adapter/aliossadapter - Alibaba Cloud OSS adapter
+- adapter/minioossadapter - MinIO adapter
+- adapter/qiniuossadapter - Qiniu Cloud adapter
+
+### pager - Pagination Utilities
+- Unified pagination parameters and result handling
+
+### payment - Payment Services
+- Payment gateway integrations
+- Unified payment interface
+
+### queue - Queue Wrapper
+- adapter/memadapter - In-memory queue adapter
+- adapter/redisadapter - Redis queue adapter
+
+### ratelimit - Rate Limiting
+- Token bucket and sliding window algorithms
+- Distributed rate limiting support
+
+### timex - Time Utilities
+- Time formatting and parsing tools
+
+### trace - Distributed Tracing
+- adapter/jaegeradapter - Jaeger adapter
+- Distributed tracing support
+
+### validator - Data Validation
+- Struct validation wrapper
+- Custom validation rules support
+
+## Code Conventions
+- Exported functions and types must have doc comments
+- Errors should be returned, not panicked. Use fmt.Errorf with %w for wrapping
+- Packages should be small and focused on a single concern
+- Packages remain independent, no cross-imports within library
+- Table-driven tests are preferred
+
+## Build & Test
+```bash
+go build ./...           # Build all packages
+go test ./...            # Run all tests
+go test -v ./...         # Verbose output
+go test -race ./...      # Race detection
+gofmt -w .               # Format code
+```
+
+## Import Usage
+```go
+import "github.com/f2xme/gox/<package>"
+import "github.com/f2xme/gox/<package>/adapter/<adapter>"
+```
+
+## Design Patterns
+- Adapter Pattern: Unified wrapping of third-party libraries
+- Factory Pattern: New/MustNew constructor functions
+- Options Pattern: Optional configuration parameters
+- Interface Segregation: Minimal interface dependencies

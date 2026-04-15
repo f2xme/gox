@@ -1,0 +1,14 @@
+server:
+  port: 8080
+  host: "localhost"
+
+log:
+  level: "info"
+  outputs:
+    - "stdout"
+    - "file"
+
+database:
+  max_connections: 100
+  timeout: "30s"
+  enabled: true

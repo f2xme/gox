@@ -1,0 +1,31 @@
+# 忽略示例编译产物
+*/main
+jwt/jwt
+metrics/metrics
+logx/logx
+database/database
+trace/trace
+validator/validator
+cache/cache
+idgen/idgen
+sms/sms
+config/config
+graceful/graceful
+errorx/errorx
+payment/payment
+captcha/captcha
+ratelimit/ratelimit
+httpx/httpx
+oss/oss
+queue/queue
+timex/timex
+encrypt/encrypt
+pager/pager
+
+# 忽略临时文件
+*.db
+*.sqlite
+*.log
+config.yaml
+config.json
+*.tmp

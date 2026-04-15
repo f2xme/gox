@@ -1,0 +1,47 @@
+# Go workspace
+go.work
+go.work.sum
+
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go build cache
+.cache/
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+.trace/
+.qoder/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Claude Code
+.worktrees/
+worktrees/
+.claude/
+CLAUDE.md
+.planning/
+
+# Documentation (generated)
+docs/
