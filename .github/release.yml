@@ -26,9 +26,3 @@ changelog:
     - title: ⚠️ 破坏性变更
       labels:
         - breaking-change
-    - title: 🔒 安全更新
-      labels:
-        - security
-    - title: 其他变更
-      labels:
-        - "*"
