@@ -52,33 +52,28 @@ if [ -n "$PREVIOUS_VERSION" ]; then
     echo "上一个版本: $PREVIOUS_VERSION"
 fi
 
-# 生成变更日志
-echo -e "\n${YELLOW}生成变更日志...${NC}"
-if [ -n "$PREVIOUS_VERSION" ]; then
-    CHANGELOG=$(git log --pretty=format:"- %s (%h)" "$PREVIOUS_VERSION"..HEAD)
-else
-    CHANGELOG=$(git log --pretty=format:"- %s (%h)")
-fi
+# 生成 Release 说明
+echo -e "\n${YELLOW}生成 Release 说明...${NC}"
+TEMP_FILE=$(mktemp)
 
-# 读取模板
-TEMPLATE_FILE=".github/RELEASE_TEMPLATE.md"
-if [ -f "$TEMPLATE_FILE" ]; then
-    RELEASE_NOTES=$(cat "$TEMPLATE_FILE")
-    # 替换占位符
-    RELEASE_NOTES="${RELEASE_NOTES//\{\{VERSION\}\}/$VERSION}"
-    RELEASE_NOTES="${RELEASE_NOTES//\{\{PREVIOUS_VERSION\}\}/$PREVIOUS_VERSION}"
+# 使用智能生成脚本
+if [ -f ".github/generate-release-notes.sh" ]; then
+    bash .github/generate-release-notes.sh "$VERSION" "$PREVIOUS_VERSION" > "$TEMP_FILE"
 else
-    RELEASE_NOTES="## $VERSION\n\n### 变更内容\n\n$CHANGELOG"
+    # 降级方案：简单的变更日志
+    if [ -n "$PREVIOUS_VERSION" ]; then
+        CHANGELOG=$(git log --pretty=format:"- %s (%h)" "$PREVIOUS_VERSION"..HEAD)
+    else
+        CHANGELOG=$(git log --pretty=format:"- %s (%h)")
+    fi
+    echo -e "## $VERSION\n\n### 变更内容\n\n$CHANGELOG" > "$TEMP_FILE"
 fi
 
 # 如果提供了自定义说明，添加到开头
 if [ -n "$NOTES" ]; then
-    RELEASE_NOTES="$NOTES\n\n$RELEASE_NOTES"
+    echo -e "$NOTES\n" | cat - "$TEMP_FILE" > "$TEMP_FILE.tmp"
+    mv "$TEMP_FILE.tmp" "$TEMP_FILE"
 fi
-
-# 创建临时文件
-TEMP_FILE=$(mktemp)
-echo -e "$RELEASE_NOTES" > "$TEMP_FILE"
 
 # 显示预览
 echo -e "\n${YELLOW}Release 说明预览:${NC}"
