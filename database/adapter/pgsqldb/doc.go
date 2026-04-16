@@ -40,4 +40,9 @@
 //			o.TablePrefix = "app_"
 //		},
 //	)
+//
+//	// 使用 config.Config 接口从配置文件读取
+//	import "github.com/f2xme/gox/config/adapter/viper"
+//	cfg, _ := viper.New("config.yaml")
+//	db, err := pgsqldb.NewWithConfig(dsn, cfg)
 package pgsqldb
