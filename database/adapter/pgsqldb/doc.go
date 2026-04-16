@@ -43,6 +43,12 @@
 //
 //	// 使用 config.Config 接口从配置文件读取
 //	import "github.com/f2xme/gox/config/adapter/viper"
-//	cfg, _ := viper.New("config.yaml")
+//	cfg, err := viper.New("config.yaml")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
 //	db, err := pgsqldb.NewWithConfig(dsn, cfg)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
 package pgsqldb
