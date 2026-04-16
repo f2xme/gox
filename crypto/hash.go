@@ -1,4 +1,3 @@
-// Package crypto provides cryptographic utilities including password hashing and digital signatures.
 package crypto
 
 import (
@@ -10,7 +9,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// HashPassword hashes a password using bcrypt with default cost.
+// HashPassword 使用 bcrypt 算法哈希密码，使用默认 cost。
+//
+// 参数：
+//   - password: 待哈希的明文密码
+//
+// 返回值：
+//   - string: bcrypt 哈希字符串
+//   - error: 哈希失败时返回错误
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -19,22 +25,41 @@ func HashPassword(password string) (string, error) {
 	return string(hash), nil
 }
 
-// VerifyPassword verifies a password against a bcrypt hash.
+// VerifyPassword 验证密码是否匹配 bcrypt 哈希。
+//
+// 参数：
+//   - password: 待验证的明文密码
+//   - hash: bcrypt 哈希字符串
+//
+// 返回值：
+//   - bool: 密码匹配返回 true，否则返回 false
 func VerifyPassword(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
 
-// Argon2Params defines parameters for Argon2id hashing.
+// Argon2Params 定义 Argon2id 哈希算法的参数。
 type Argon2Params struct {
-	Memory      uint32
-	Iterations  uint32
+	// Memory 内存使用量（KB），推荐 64MB 以上
+	Memory uint32
+	// Iterations 迭代次数，推荐 3 次以上
+	Iterations uint32
+	// Parallelism 并行度，推荐 2 以上
 	Parallelism uint8
-	SaltLength  uint32
-	KeyLength   uint32
+	// SaltLength 盐的长度（字节），推荐 16 字节
+	SaltLength uint32
+	// KeyLength 生成密钥的长度（字节），推荐 32 字节
+	KeyLength uint32
 }
 
-// DefaultArgon2Params returns recommended Argon2id parameters.
+// DefaultArgon2Params 返回推荐的 Argon2id 参数配置。
+//
+// 默认配置：
+//   - 内存：64 MB
+//   - 迭代次数：3
+//   - 并行度：2
+//   - 盐长度：16 字节
+//   - 密钥长度：32 字节
 func DefaultArgon2Params() *Argon2Params {
 	return &Argon2Params{
 		Memory:      64 * 1024, // 64 MB
@@ -45,7 +70,15 @@ func DefaultArgon2Params() *Argon2Params {
 	}
 }
 
-// HashPasswordArgon2 hashes a password using Argon2id.
+// HashPasswordArgon2 使用 Argon2id 算法哈希密码。
+//
+// 参数：
+//   - password: 待哈希的明文密码
+//   - params: Argon2id 参数，传 nil 使用默认参数
+//
+// 返回值：
+//   - string: Argon2id 哈希字符串，格式：$argon2id$v=19$m=65536,t=3,p=2$salt$hash
+//   - error: 哈希失败时返回错误
 func HashPasswordArgon2(password string, params *Argon2Params) (string, error) {
 	if params == nil {
 		params = DefaultArgon2Params()
@@ -71,7 +104,15 @@ func HashPasswordArgon2(password string, params *Argon2Params) (string, error) {
 	return encoded, nil
 }
 
-// VerifyPasswordArgon2 verifies a password against an Argon2id hash.
+// VerifyPasswordArgon2 验证密码是否匹配 Argon2id 哈希。
+//
+// 参数：
+//   - password: 待验证的明文密码
+//   - encodedHash: Argon2id 哈希字符串
+//
+// 返回值：
+//   - bool: 密码匹配返回 true，否则返回 false
+//   - error: 哈希格式无效或解码失败时返回错误
 func VerifyPasswordArgon2(password, encodedHash string) (bool, error) {
 	var version int
 	var memory, iterations uint32
