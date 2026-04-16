@@ -1,4 +1,3 @@
-// Package serializer 提供统一的序列化接口和多种格式适配器
 package serializer
 
 import "io"
