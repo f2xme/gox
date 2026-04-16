@@ -44,22 +44,28 @@ func (s Set[T]) ToSlice() []T {
 
 // Union 返回两个集合的并集。
 func (s Set[T]) Union(other Set[T]) Set[T] {
-	result := NewSet[T]()
+	result := make(Set[T], len(s)+len(other))
 	for item := range s {
-		result.Add(item)
+		result[item] = struct{}{}
 	}
 	for item := range other {
-		result.Add(item)
+		result[item] = struct{}{}
 	}
 	return result
 }
 
 // Intersection 返回两个集合的交集。
 func (s Set[T]) Intersection(other Set[T]) Set[T] {
-	result := NewSet[T]()
-	for item := range s {
-		if other.Contains(item) {
-			result.Add(item)
+	// 遍历较小的集合以提高效率
+	smaller, larger := s, other
+	if len(other) < len(s) {
+		smaller, larger = other, s
+	}
+
+	result := make(Set[T], len(smaller))
+	for item := range smaller {
+		if _, exists := larger[item]; exists {
+			result[item] = struct{}{}
 		}
 	}
 	return result
@@ -67,10 +73,10 @@ func (s Set[T]) Intersection(other Set[T]) Set[T] {
 
 // Difference 返回两个集合的差集（在 s 中但不在 other 中）。
 func (s Set[T]) Difference(other Set[T]) Set[T] {
-	result := NewSet[T]()
+	result := make(Set[T], len(s))
 	for item := range s {
-		if !other.Contains(item) {
-			result.Add(item)
+		if _, exists := other[item]; !exists {
+			result[item] = struct{}{}
 		}
 	}
 	return result

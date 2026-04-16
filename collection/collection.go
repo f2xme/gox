@@ -3,7 +3,7 @@ package collection
 
 // Filter 过滤切片元素，返回满足条件的新切片。
 func Filter[T any](slice []T, predicate func(T) bool) []T {
-	result := make([]T, 0, len(slice))
+	result := make([]T, 0)
 	for _, item := range slice {
 		if predicate(item) {
 			result = append(result, item)
