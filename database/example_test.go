@@ -33,14 +33,14 @@ func Example_basicCRUD() {
 	if err := db.Create(ctx, user); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Created user ID: %d\n", user.ID)
+	fmt.Println("Created user ID:", user.ID)
 
 	// 查询记录
 	var result User
 	if err := db.First(ctx, &result, "name = ?", "Alice"); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Found user: %s, age: %d\n", result.Name, result.Age)
+	fmt.Println("Found user:", result.Name, ", age:", result.Age)
 
 	// 更新记录
 	if err := db.Update(ctx, &result, "age", 26); err != nil {
@@ -54,7 +54,7 @@ func Example_basicCRUD() {
 
 	// Output:
 	// Created user ID: 1
-	// Found user: Alice, age: 25
+	// Found user: Alice , age: 25
 }
 
 // Example_chainQuery 演示链式查询
@@ -86,17 +86,17 @@ func Example_chainQuery() {
 		Find(ctx, &results)
 
 	for _, u := range results {
-		fmt.Printf("%s: %d\n", u.Name, u.Age)
+		fmt.Println(u.Name, ":", u.Age)
 	}
 
 	// 统计
 	var count int64
 	db.Model(&User{}).Where("age > ?", 20).Count(ctx, &count)
-	fmt.Printf("Count: %d\n", count)
+	fmt.Println("Count:", count)
 
 	// Output:
-	// Bob: 30
-	// Alice: 25
+	// Bob : 30
+	// Alice : 25
 	// Count: 2
 }
 
@@ -133,7 +133,7 @@ func Example_transaction() {
 	// 验证
 	var count int64
 	db.Model(&User{}).Count(ctx, &count)
-	fmt.Printf("Total users: %d\n", count)
+	fmt.Println("Total users:", count)
 
 	// Output:
 	// Total users: 2
@@ -192,13 +192,13 @@ func Example_rawSQL() {
 	db.Raw("SELECT * FROM users WHERE age > ?", 20).Scan(ctx, &results)
 
 	for _, u := range results {
-		fmt.Printf("%s: %d\n", u.Name, u.Age)
+		fmt.Println(u.Name, ":", u.Age)
 	}
 
 	// 原生执行
 	db.Exec(ctx, "UPDATE users SET age = age + 1 WHERE name = ?", "Alice")
 
 	// Output:
-	// Alice: 25
-	// Bob: 30
+	// Alice : 25
+	// Bob : 30
 }
