@@ -41,7 +41,7 @@ func (s *ProtobufSerializer) Encode(w io.Writer, v any) error {
 }
 
 func (s *ProtobufSerializer) Decode(r io.Reader, v any) error {
-	data, err := io.ReadAll(r)
+	data, err := io.ReadAll(io.LimitReader(r, 10<<20)) // 限制 10MB
 	if err != nil {
 		return err
 	}

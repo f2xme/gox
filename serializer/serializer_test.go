@@ -70,4 +70,26 @@ func testSerializer(t *testing.T, s Serializer, name string) {
 			t.Fatal("ContentType returned empty string")
 		}
 	})
+
+	t.Run(name+"_EmptyStruct", func(t *testing.T) {
+		obj := testStruct{}
+		data, err := s.Marshal(obj)
+		if err != nil {
+			t.Fatalf("Marshal empty struct failed: %v", err)
+		}
+		var result testStruct
+		err = s.Unmarshal(data, &result)
+		if err != nil {
+			t.Fatalf("Unmarshal empty struct failed: %v", err)
+		}
+	})
+
+	t.Run(name+"_InvalidUnmarshal", func(t *testing.T) {
+		invalidData := []byte("invalid data")
+		var result testStruct
+		err := s.Unmarshal(invalidData, &result)
+		if err == nil {
+			t.Fatal("Expected error for invalid data, got nil")
+		}
+	})
 }
