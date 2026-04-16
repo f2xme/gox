@@ -211,6 +211,18 @@ func (r *redisCache) Lock(ctx context.Context, key string, ttl time.Duration) (f
 	}
 }
 
+// Increment 原子性地增加键的值，并返回增加后的值。
+// 如果键不存在，则初始化为 0 后再增加。
+func (r *redisCache) Increment(ctx context.Context, key string, delta int64) (int64, error) {
+	return r.client.IncrBy(ctx, key, delta).Result()
+}
+
+// IncrementFloat 原子性地增加键的浮点值，并返回增加后的值。
+// 如果键不存在，则初始化为 0.0 后再增加。
+func (r *redisCache) IncrementFloat(ctx context.Context, key string, delta float64) (float64, error) {
+	return r.client.IncrByFloat(ctx, key, delta).Result()
+}
+
 // generateToken 为锁所有权生成一个唯一的随机令牌。
 func generateToken() (string, error) {
 	b := make([]byte, 16)

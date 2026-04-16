@@ -60,3 +60,17 @@ type Closer interface {
 	// Close 释放缓存持有的所有资源。
 	Close() error
 }
+
+// Counter 提供原子计数器操作。
+// 适用于需要原子递增/递减的场景，如计数器、限流器等。
+type Counter interface {
+	// Increment 原子性地增加键的值，并返回增加后的值。
+	// 如果键不存在，则初始化为 0 后再增加。
+	// delta 可以是正数（递增）或负数（递减）。
+	Increment(ctx context.Context, key string, delta int64) (int64, error)
+
+	// IncrementFloat 原子性地增加键的浮点值，并返回增加后的值。
+	// 如果键不存在，则初始化为 0.0 后再增加。
+	// delta 可以是正数（递增）或负数（递减）。
+	IncrementFloat(ctx context.Context, key string, delta float64) (float64, error)
+}

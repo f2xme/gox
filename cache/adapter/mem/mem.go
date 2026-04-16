@@ -2,6 +2,8 @@ package mem
 
 import (
 	"context"
+	"encoding/binary"
+	"math"
 	"sync"
 	"time"
 
@@ -218,3 +220,83 @@ func (c *memCache) cleanup() {
 		entry.mu.Unlock()
 	}
 }
+
+// Increment 原子性地增加键的值，并返回增加后的值。
+// 如果键不存在，则初始化为 0 后再增加。
+func (c *memCache) Increment(ctx context.Context, key string, delta int64) (int64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	itm, exists := c.items[key]
+	var currentValue int64
+	var expiration int64
+
+	isValid := exists && !itm.isExpired()
+	if isValid {
+		if len(itm.value) == 8 {
+			currentValue = int64(binary.BigEndian.Uint64(itm.value))
+		}
+		expiration = itm.expiration
+	}
+
+	newValue := currentValue + delta
+
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(newValue))
+
+	c.items[key] = &item{
+		value:      buf,
+		expiration: expiration,
+	}
+
+	if c.eviction != nil {
+		if isValid {
+			c.eviction.onAccess(key)
+		} else {
+			c.eviction.onSet(key)
+		}
+	}
+
+	return newValue, nil
+}
+
+// IncrementFloat 原子性地增加键的浮点值，并返回增加后的值。
+// 如果键不存在，则初始化为 0.0 后再增加。
+func (c *memCache) IncrementFloat(ctx context.Context, key string, delta float64) (float64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	itm, exists := c.items[key]
+	var currentValue float64
+	var expiration int64
+
+	isValid := exists && !itm.isExpired()
+	if isValid {
+		if len(itm.value) == 8 {
+			bits := binary.BigEndian.Uint64(itm.value)
+			currentValue = math.Float64frombits(bits)
+		}
+		expiration = itm.expiration
+	}
+
+	newValue := currentValue + delta
+
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, math.Float64bits(newValue))
+
+	c.items[key] = &item{
+		value:      buf,
+		expiration: expiration,
+	}
+
+	if c.eviction != nil {
+		if isValid {
+			c.eviction.onAccess(key)
+		} else {
+			c.eviction.onSet(key)
+		}
+	}
+
+	return newValue, nil
+}
+
