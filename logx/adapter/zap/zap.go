@@ -1,6 +1,7 @@
 package zap
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"time"
@@ -42,13 +43,13 @@ func (l *zapLogger) Fatal(err error, metas ...logx.Meta) {
 func (l *zapLogger) Flush() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	var lastErr error
+	errs := make([]error, 0, len(l.bufferedWriters))
 	for _, bw := range l.bufferedWriters {
 		if err := bw.Sync(); err != nil {
-			lastErr = err
+			errs = append(errs, err)
 		}
 	}
-	return lastErr
+	return errors.Join(errs...)
 }
 
 func (l *zapLogger) Sync() error {
@@ -58,13 +59,13 @@ func (l *zapLogger) Sync() error {
 func (l *zapLogger) Stop() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	var lastErr error
+	errs := make([]error, 0, len(l.bufferedWriters))
 	for _, bw := range l.bufferedWriters {
 		if err := bw.Stop(); err != nil {
-			lastErr = err
+			errs = append(errs, err)
 		}
 	}
-	return lastErr
+	return errors.Join(errs...)
 }
 
 func toFields(metas []logx.Meta) []gozap.Field {
