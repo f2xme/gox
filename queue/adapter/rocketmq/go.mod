@@ -1,6 +1,6 @@
 module github.com/f2xme/gox/queue/adapter/rocketmq
 
-go 1.24.2
+go 1.25.7
 
 require (
 	github.com/apache/rocketmq-client-go/v2 v2.1.2

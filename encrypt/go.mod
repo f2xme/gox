@@ -1,6 +1,6 @@
 module github.com/f2xme/gox/encrypt
 
-go 1.24.2
+go 1.25.7
 
 require github.com/zeebo/blake3 v0.2.4
 
