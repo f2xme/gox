@@ -1,10 +1,11 @@
 package pgsqldb
 
 import (
+	"gorm.io/driver/postgres"
+
 	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/database"
 	"github.com/f2xme/gox/database/adapter/gormbase"
-	"gorm.io/driver/postgres"
 )
 
 // New 创建由 PostgreSQL 支持的 database.DB
