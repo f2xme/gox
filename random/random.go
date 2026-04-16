@@ -49,7 +49,7 @@ func String(length int, charset string) (string, error) {
 	return string(result), nil
 }
 
-// Digits 生成指定长度的随机数字字符串
+// Numeric 生成指定长度的随机数字字符串
 func Numeric(length int) (string, error) {
 	return String(length, Digits)
 }
@@ -69,7 +69,7 @@ func AlphaUpper(length int) (string, error) {
 	return String(length, UpperLetters)
 }
 
-// Alphanumeric 生成指定长度的随机字母数字字符串
+// AlphaNumeric 生成指定长度的随机字母数字字符串
 func AlphaNumeric(length int) (string, error) {
 	return String(length, Alphanumeric)
 }

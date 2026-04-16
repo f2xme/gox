@@ -41,76 +41,38 @@ func TestString(t *testing.T) {
 }
 
 func TestNumeric(t *testing.T) {
-	result, err := Numeric(10)
-	if err != nil {
-		t.Fatalf("Numeric() error = %v", err)
-	}
-	if len(result) != 10 {
-		t.Errorf("Numeric() length = %v, want 10", len(result))
-	}
-	for _, c := range result {
-		if !strings.ContainsRune(Digits, c) {
-			t.Errorf("Numeric() contains non-digit char %c", c)
-		}
-	}
+	testCharsetFunc(t, "Numeric", Numeric, Digits)
 }
 
 func TestAlpha(t *testing.T) {
-	result, err := Alpha(10)
-	if err != nil {
-		t.Fatalf("Alpha() error = %v", err)
-	}
-	if len(result) != 10 {
-		t.Errorf("Alpha() length = %v, want 10", len(result))
-	}
-	for _, c := range result {
-		if !strings.ContainsRune(Letters, c) {
-			t.Errorf("Alpha() contains non-letter char %c", c)
-		}
-	}
+	testCharsetFunc(t, "Alpha", Alpha, Letters)
 }
 
 func TestAlphaLower(t *testing.T) {
-	result, err := AlphaLower(10)
-	if err != nil {
-		t.Fatalf("AlphaLower() error = %v", err)
-	}
-	if len(result) != 10 {
-		t.Errorf("AlphaLower() length = %v, want 10", len(result))
-	}
-	for _, c := range result {
-		if !strings.ContainsRune(LowerLetters, c) {
-			t.Errorf("AlphaLower() contains non-lowercase char %c", c)
-		}
-	}
+	testCharsetFunc(t, "AlphaLower", AlphaLower, LowerLetters)
 }
 
 func TestAlphaUpper(t *testing.T) {
-	result, err := AlphaUpper(10)
-	if err != nil {
-		t.Fatalf("AlphaUpper() error = %v", err)
-	}
-	if len(result) != 10 {
-		t.Errorf("AlphaUpper() length = %v, want 10", len(result))
-	}
-	for _, c := range result {
-		if !strings.ContainsRune(UpperLetters, c) {
-			t.Errorf("AlphaUpper() contains non-uppercase char %c", c)
-		}
-	}
+	testCharsetFunc(t, "AlphaUpper", AlphaUpper, UpperLetters)
 }
 
 func TestAlphaNumeric(t *testing.T) {
-	result, err := AlphaNumeric(10)
+	testCharsetFunc(t, "AlphaNumeric", AlphaNumeric, Alphanumeric)
+}
+
+// testCharsetFunc 测试字符集函数的通用逻辑
+func testCharsetFunc(t *testing.T, name string, fn func(int) (string, error), charset string) {
+	t.Helper()
+	result, err := fn(10)
 	if err != nil {
-		t.Fatalf("AlphaNumeric() error = %v", err)
+		t.Fatalf("%s() error = %v", name, err)
 	}
 	if len(result) != 10 {
-		t.Errorf("AlphaNumeric() length = %v, want 10", len(result))
+		t.Errorf("%s() length = %v, want 10", name, len(result))
 	}
 	for _, c := range result {
-		if !strings.ContainsRune(Alphanumeric, c) {
-			t.Errorf("AlphaNumeric() contains invalid char %c", c)
+		if !strings.ContainsRune(charset, c) {
+			t.Errorf("%s() contains invalid char %c", name, c)
 		}
 	}
 }
@@ -118,7 +80,7 @@ func TestAlphaNumeric(t *testing.T) {
 func TestRandomness(t *testing.T) {
 	// 生成多个字符串，验证它们不完全相同（概率极低）
 	results := make(map[string]bool)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		s, err := AlphaNumeric(20)
 		if err != nil {
 			t.Fatalf("AlphaNumeric() error = %v", err)
@@ -132,19 +94,19 @@ func TestRandomness(t *testing.T) {
 }
 
 func BenchmarkString(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = String(32, Alphanumeric)
 	}
 }
 
 func BenchmarkNumeric(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = Numeric(32)
 	}
 }
 
 func BenchmarkAlphaNumeric(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = AlphaNumeric(32)
 	}
 }
