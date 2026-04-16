@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 
@@ -137,15 +138,9 @@ func VerifyPasswordArgon2(password, encodedHash string) (bool, error) {
 
 	computedHash := argon2.IDKey([]byte(password), saltBytes, iterations, memory, parallelism, uint32(len(hashBytes)))
 
-	if len(computedHash) != len(hashBytes) {
-		return false, nil
+	// 使用常量时间比较防止时序攻击
+	if subtle.ConstantTimeCompare(computedHash, hashBytes) == 1 {
+		return true, nil
 	}
-
-	for i := range computedHash {
-		if computedHash[i] != hashBytes[i] {
-			return false, nil
-		}
-	}
-
-	return true, nil
+	return false, nil
 }

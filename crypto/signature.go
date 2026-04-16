@@ -11,6 +11,11 @@ import (
 	"fmt"
 )
 
+// hashData 计算数据的 SHA-256 哈希值
+func hashData(data []byte) [32]byte {
+	return sha256.Sum256(data)
+}
+
 // GenerateRSAKeyPair 生成指定位数的 RSA 密钥对。
 //
 // 参数：
@@ -40,7 +45,7 @@ func GenerateRSAKeyPair(bits int) (*rsa.PrivateKey, error) {
 //   - []byte: 签名字节
 //   - error: 签名失败时返回错误
 func SignRSA(privateKey *rsa.PrivateKey, data []byte) ([]byte, error) {
-	hash := sha256.Sum256(data)
+	hash := hashData(data)
 	signature, err := rsa.SignPSS(rand.Reader, privateKey, crypto.SHA256, hash[:], nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign data: %w", err)
@@ -58,7 +63,7 @@ func SignRSA(privateKey *rsa.PrivateKey, data []byte) ([]byte, error) {
 // 返回值：
 //   - error: 签名无效时返回错误，有效时返回 nil
 func VerifyRSA(publicKey *rsa.PublicKey, data, signature []byte) error {
-	hash := sha256.Sum256(data)
+	hash := hashData(data)
 	err := rsa.VerifyPSS(publicKey, crypto.SHA256, hash[:], signature, nil)
 	if err != nil {
 		return fmt.Errorf("signature verification failed: %w", err)
@@ -89,7 +94,7 @@ func GenerateECDSAKeyPair() (*ecdsa.PrivateKey, error) {
 //   - []byte: ASN.1 DER 编码的签名
 //   - error: 签名失败时返回错误
 func SignECDSA(privateKey *ecdsa.PrivateKey, data []byte) ([]byte, error) {
-	hash := sha256.Sum256(data)
+	hash := hashData(data)
 	signature, err := ecdsa.SignASN1(rand.Reader, privateKey, hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign data: %w", err)
@@ -107,7 +112,7 @@ func SignECDSA(privateKey *ecdsa.PrivateKey, data []byte) ([]byte, error) {
 // 返回值：
 //   - bool: 签名有效返回 true，否则返回 false
 func VerifyECDSA(publicKey *ecdsa.PublicKey, data, signature []byte) bool {
-	hash := sha256.Sum256(data)
+	hash := hashData(data)
 	return ecdsa.VerifyASN1(publicKey, hash[:], signature)
 }
 
