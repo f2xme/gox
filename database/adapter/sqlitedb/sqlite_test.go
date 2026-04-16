@@ -33,26 +33,26 @@ func TestNew(t *testing.T) {
 	}
 }
 
-// TestEngine 测试获取底层 GORM 引擎
-func TestEngine(t *testing.T) {
+// TestUnwrap 测试获取底层 GORM 引擎
+func TestUnwrap(t *testing.T) {
 	db, err := sqlitedb.New(":memory:")
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
 	defer db.Close()
 
-	engine := db.Engine()
+	engine := db.Unwrap()
 	if engine == nil {
-		t.Fatal("Engine() returned nil")
+		t.Fatal("Unwrap() returned nil")
 	}
 
 	gormDB, ok := engine.(*gorm.DB)
 	if !ok {
-		t.Fatalf("Engine() type = %T, want *gorm.DB", engine)
+		t.Fatalf("Unwrap() type = %T, want *gorm.DB", engine)
 	}
 
 	if gormDB == nil {
-		t.Error("Engine() returned nil *gorm.DB")
+		t.Error("Unwrap() returned nil *gorm.DB")
 	}
 }
 
@@ -70,8 +70,7 @@ func TestTransaction_Success(t *testing.T) {
 
 	ctx := context.Background()
 	err = db.Transaction(ctx, func(tx database.DB) error {
-		gormTx := tx.Engine().(*gorm.DB)
-		return gormTx.Create(&TestUser{Name: "Alice"}).Error
+		return tx.Create(ctx, &TestUser{Name: "Alice"})
 	})
 
 	if err != nil {
@@ -79,9 +78,10 @@ func TestTransaction_Success(t *testing.T) {
 	}
 
 	// Verify the record was committed
-	gormDB := db.Engine().(*gorm.DB)
 	var count int64
-	gormDB.Model(&TestUser{}).Count(&count)
+	if err := db.Model(&TestUser{}).Count(ctx, &count); err != nil {
+		t.Fatalf("Count() error = %v", err)
+	}
 	if count != 1 {
 		t.Errorf("expected 1 record after commit, got %d", count)
 	}
@@ -102,8 +102,7 @@ func TestTransaction_Rollback(t *testing.T) {
 	ctx := context.Background()
 	expectedErr := errors.New("rollback test")
 	err = db.Transaction(ctx, func(tx database.DB) error {
-		gormTx := tx.Engine().(*gorm.DB)
-		if createErr := gormTx.Create(&TestUser{Name: "Bob"}).Error; createErr != nil {
+		if createErr := tx.Create(ctx, &TestUser{Name: "Bob"}); createErr != nil {
 			return createErr
 		}
 		return expectedErr
@@ -114,9 +113,10 @@ func TestTransaction_Rollback(t *testing.T) {
 	}
 
 	// Verify the record was rolled back
-	gormDB := db.Engine().(*gorm.DB)
 	var count int64
-	gormDB.Model(&TestUser{}).Count(&count)
+	if err := db.Model(&TestUser{}).Count(ctx, &count); err != nil {
+		t.Fatalf("Count() error = %v", err)
+	}
 	if count != 0 {
 		t.Errorf("expected 0 records after rollback, got %d", count)
 	}
@@ -135,7 +135,7 @@ func TestAutoMigrate(t *testing.T) {
 		t.Errorf("AutoMigrate() error = %v", err)
 	}
 
-	gormDB := db.Engine().(*gorm.DB)
+	gormDB := db.Unwrap().(*gorm.DB)
 	hasTable := gormDB.Migrator().HasTable(&TestUser{})
 	if !hasTable {
 		t.Error("AutoMigrate() did not create table")
@@ -155,7 +155,7 @@ func TestClose(t *testing.T) {
 	}
 
 	// Verify connection is closed by attempting to use it
-	gormDB := db.Engine().(*gorm.DB)
+	gormDB := db.Unwrap().(*gorm.DB)
 	sqlDB, _ := gormDB.DB()
 	if err := sqlDB.Ping(); err == nil {
 		t.Error("expected error pinging closed connection")
@@ -170,7 +170,7 @@ func TestWithMaxOpenConns(t *testing.T) {
 	}
 	defer db.Close()
 
-	gormDB := db.Engine().(*gorm.DB)
+	gormDB := db.Unwrap().(*gorm.DB)
 	sqlDB, err := gormDB.DB()
 	if err != nil {
 		t.Fatalf("failed to get sql.DB: %v", err)
@@ -208,7 +208,7 @@ func TestWithDryRun(t *testing.T) {
 		t.Fatalf("AutoMigrate failed: %v", err)
 	}
 
-	gormDB := db.Engine().(*gorm.DB)
+	gormDB := db.Unwrap().(*gorm.DB)
 	result := gormDB.Create(&TestUser{Name: "Charlie"})
 
 	if result.Error != nil {
@@ -234,7 +234,7 @@ func TestWithSingularTable(t *testing.T) {
 		t.Fatalf("AutoMigrate failed: %v", err)
 	}
 
-	gormDB := db.Engine().(*gorm.DB)
+	gormDB := db.Unwrap().(*gorm.DB)
 	hasTable := gormDB.Migrator().HasTable("test_user")
 	if !hasTable {
 		t.Error("expected singular table name 'test_user'")
@@ -258,7 +258,7 @@ func TestWithTablePrefix(t *testing.T) {
 		t.Fatalf("AutoMigrate failed: %v", err)
 	}
 
-	gormDB := db.Engine().(*gorm.DB)
+	gormDB := db.Unwrap().(*gorm.DB)
 	hasTable := gormDB.Migrator().HasTable("app_test_users")
 	if !hasTable {
 		t.Error("expected table with prefix 'app_test_users'")
