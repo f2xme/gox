@@ -7,6 +7,13 @@ import (
 	"github.com/f2xme/gox/httpx"
 )
 
+func getMsg(msg []string, def string) string {
+	if len(msg) > 0 && msg[0] != "" {
+		return msg[0]
+	}
+	return def
+}
+
 type mockLogger struct {
 	messages []string
 	fields   [][]any
@@ -63,6 +70,13 @@ func (m *mockContext) SetCookie(*http.Cookie)                  {}
 func (m *mockContext) Status(code int)                         { m.respCode = code }
 func (m *mockContext) Success(data any) error                  { return m.JSON(200, data) }
 func (m *mockContext) Fail(msg string) error                   { return m.JSON(200, msg) }
+func (m *mockContext) BadRequest(msg ...string) error          { return m.JSON(400, getMsg(msg, "Bad Request")) }
+func (m *mockContext) Unauthorized(msg ...string) error        { return m.JSON(401, getMsg(msg, "Unauthorized")) }
+func (m *mockContext) Forbidden(msg ...string) error           { return m.JSON(403, getMsg(msg, "Forbidden")) }
+func (m *mockContext) NotFound(msg ...string) error            { return m.JSON(404, getMsg(msg, "Not Found")) }
+func (m *mockContext) TooManyRequests(msg ...string) error     { return m.JSON(429, getMsg(msg, "Too Many Requests")) }
+func (m *mockContext) InternalError(msg ...string) error       { return m.JSON(500, getMsg(msg, "Internal Server Error")) }
+func (m *mockContext) ServiceUnavailable(msg ...string) error  { return m.JSON(503, getMsg(msg, "Service Unavailable")) }
 func (m *mockContext) Set(key string, value any)               { m.store[key] = value }
 func (m *mockContext) Get(key string) (any, bool)              { v, ok := m.store[key]; return v, ok }
 func (m *mockContext) MustGet(key string) any                  { return m.store[key] }

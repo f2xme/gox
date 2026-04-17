@@ -8,6 +8,13 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
+func getMsg(msg []string, def string) string {
+	if len(msg) > 0 && msg[0] != "" {
+		return msg[0]
+	}
+	return def
+}
+
 type ginContext struct {
 	c *ginframework.Context
 }
@@ -78,6 +85,34 @@ func (ctx *ginContext) Success(data any) error {
 
 func (ctx *ginContext) Fail(msg string) error {
 	return ctx.JSON(http.StatusOK, httpx.NewFailResponse(msg))
+}
+
+func (ctx *ginContext) BadRequest(msg ...string) error {
+	return ctx.JSON(http.StatusBadRequest, httpx.NewFailResponse(getMsg(msg, "Bad Request")))
+}
+
+func (ctx *ginContext) Unauthorized(msg ...string) error {
+	return ctx.JSON(http.StatusUnauthorized, httpx.NewFailResponse(getMsg(msg, "Unauthorized")))
+}
+
+func (ctx *ginContext) Forbidden(msg ...string) error {
+	return ctx.JSON(http.StatusForbidden, httpx.NewFailResponse(getMsg(msg, "Forbidden")))
+}
+
+func (ctx *ginContext) NotFound(msg ...string) error {
+	return ctx.JSON(http.StatusNotFound, httpx.NewFailResponse(getMsg(msg, "Not Found")))
+}
+
+func (ctx *ginContext) TooManyRequests(msg ...string) error {
+	return ctx.JSON(http.StatusTooManyRequests, httpx.NewFailResponse(getMsg(msg, "Too Many Requests")))
+}
+
+func (ctx *ginContext) InternalError(msg ...string) error {
+	return ctx.JSON(http.StatusInternalServerError, httpx.NewFailResponse(getMsg(msg, "Internal Server Error")))
+}
+
+func (ctx *ginContext) ServiceUnavailable(msg ...string) error {
+	return ctx.JSON(http.StatusServiceUnavailable, httpx.NewFailResponse(getMsg(msg, "Service Unavailable")))
 }
 
 func (ctx *ginContext) Set(key string, value any)    { ctx.c.Set(key, value) }

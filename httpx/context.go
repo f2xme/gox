@@ -36,6 +36,15 @@ type Context interface {
 	Success(data any) error
 	Fail(msg string) error
 
+	// Common HTTP status responses
+	BadRequest(msg ...string) error        // 400 参数错误
+	Unauthorized(msg ...string) error      // 401 未登录
+	Forbidden(msg ...string) error         // 403 无权限
+	NotFound(msg ...string) error          // 404 资源不存在
+	TooManyRequests(msg ...string) error   // 429 请求过于频繁
+	InternalError(msg ...string) error     // 500 服务器错误
+	ServiceUnavailable(msg ...string) error // 503 服务器繁忙
+
 	// Context value store
 	Set(key string, value any)
 	Get(key string) (any, bool)
