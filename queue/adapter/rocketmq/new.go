@@ -1,6 +1,7 @@
 package rocketmq
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -33,6 +34,11 @@ func buildConfig(cfg Options, consumerGroup string) *rmq.Config {
 
 // New 使用给定选项创建新的 RocketMQ 队列
 func New(opts ...Option) (queue.Queue, error) {
+	return NewContext(context.Background(), opts...)
+}
+
+// NewContext 使用给定选项和 context 创建新的 RocketMQ 队列，context 可用于控制启动超时
+func NewContext(ctx context.Context, opts ...Option) (queue.Queue, error) {
 	cfg := defaultOptions()
 	for _, opt := range opts {
 		opt(&cfg)
@@ -43,8 +49,21 @@ func New(opts ...Option) (queue.Queue, error) {
 		return nil, fmt.Errorf("rocketmq: failed to create producer: %w", err)
 	}
 
-	if err := p.Start(); err != nil {
-		return nil, fmt.Errorf("rocketmq: failed to start producer: %w", err)
+	type result struct {
+		err error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		ch <- result{err: p.Start()}
+	}()
+
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			return nil, fmt.Errorf("rocketmq: failed to start producer: %w", r.err)
+		}
+	case <-ctx.Done():
+		return nil, fmt.Errorf("rocketmq: producer start timeout: %w", ctx.Err())
 	}
 
 	return &rocketmqQueue{
