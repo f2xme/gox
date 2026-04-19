@@ -55,12 +55,30 @@ type SubscribeOptions struct {
 	AutoCommit bool
 }
 
-// Publisher 定义发布操作接口
+// SendResult 发送消息的结果
+type SendResult struct {
+	// MessageID Broker 分配的消息唯一标识，可用于追踪和幂等去重
+	MessageID string
+}
+
+// Publisher 定义基础发布操作接口
 type Publisher interface {
 	// Publish 发送消息到指定主题
 	Publish(ctx context.Context, topic string, body []byte) error
 	// PublishWithOptions 使用额外选项发送消息
 	PublishWithOptions(ctx context.Context, topic string, body []byte, opts PublishOptions) error
+}
+
+// AdvancedPublisher 扩展发布接口，支持获取发送结果（如消息 ID）
+// 并非所有实现都支持，可通过类型断言按需使用：
+//
+//	if ap, ok := q.(queue.AdvancedPublisher); ok {
+//	    result, err := ap.PublishAndGetResult(ctx, topic, body, opts)
+//	}
+type AdvancedPublisher interface {
+	Publisher
+	// PublishAndGetResult 发送消息并返回包含消息 ID 的结果
+	PublishAndGetResult(ctx context.Context, topic string, body []byte, opts PublishOptions) (*SendResult, error)
 }
 
 // Subscriber 定义订阅操作接口
