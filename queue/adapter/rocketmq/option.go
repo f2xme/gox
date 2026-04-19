@@ -4,23 +4,21 @@ import "time"
 
 // 消费模式常量
 const (
-	ConsumerModelClustering  = "clustering"  // 集群消费模式
-	ConsumerModelBroadcasting = "broadcasting" // 广播消费模式
+	ConsumerModelClustering   = "clustering"   // 集群消费模式
+	ConsumerModelBroadcasting = "broadcasting" // 广播消费模式（RocketMQ 5.x 不支持，仅作保留）
 )
 
 // Options 定义 RocketMQ 队列的配置选项
 type Options struct {
-	// NameServers RocketMQ name server 地址列表
-	NameServers []string
+	// Endpoint RocketMQ 5.x Proxy 地址（格式：host:port）
+	Endpoint string
 	// AccessKey 认证访问密钥（可选）
 	AccessKey string
 	// SecretKey 认证密钥（可选）
 	SecretKey string
 	// Namespace 消息隔离命名空间（可选）
 	Namespace string
-	// GroupName 默认生产者组名称
-	GroupName string
-	// Retries 发送失败重试次数
+	// Retries 发送失败重试次数（保留字段，新 SDK 内部处理重试）
 	Retries int
 	// SendTimeout 发送消息超时时间
 	SendTimeout time.Duration
@@ -31,8 +29,7 @@ type Options struct {
 // defaultOptions 返回默认配置
 func defaultOptions() Options {
 	return Options{
-		NameServers:   []string{"127.0.0.1:9876"},
-		GroupName:     "DEFAULT_PRODUCER_GROUP",
+		Endpoint:      "127.0.0.1:8081",
 		Retries:       2,
 		SendTimeout:   3 * time.Second,
 		ConsumerModel: ConsumerModelClustering,
@@ -42,14 +39,14 @@ func defaultOptions() Options {
 // Option 配置选项函数
 type Option func(*Options)
 
-// WithNameServers 设置 RocketMQ name server 地址
+// WithEndpoint 设置 RocketMQ 5.x Proxy 地址
 //
 // 示例：
 //
-//	rocketmq.New(rocketmq.WithNameServers([]string{"localhost:9876"}))
-func WithNameServers(addrs []string) Option {
+//	rocketmq.New(rocketmq.WithEndpoint("localhost:8081"))
+func WithEndpoint(endpoint string) Option {
 	return func(o *Options) {
-		o.NameServers = addrs
+		o.Endpoint = endpoint
 	}
 }
 
@@ -73,17 +70,6 @@ func WithCredentials(accessKey, secretKey string) Option {
 func WithNamespace(namespace string) Option {
 	return func(o *Options) {
 		o.Namespace = namespace
-	}
-}
-
-// WithGroupName 设置生产者组名称
-//
-// 示例：
-//
-//	rocketmq.New(rocketmq.WithGroupName("my-producer-group"))
-func WithGroupName(groupName string) Option {
-	return func(o *Options) {
-		o.GroupName = groupName
 	}
 }
 
@@ -119,7 +105,7 @@ func WithSendTimeout(timeout time.Duration) Option {
 //
 // 示例：
 //
-//	rocketmq.New(rocketmq.WithConsumerModel("broadcasting"))
+//	rocketmq.New(rocketmq.WithConsumerModel("clustering"))
 func WithConsumerModel(model string) Option {
 	return func(o *Options) {
 		o.ConsumerModel = model

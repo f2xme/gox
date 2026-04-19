@@ -1,72 +1,134 @@
 /*
-Package rocketmq 提供 RocketMQ 消息队列适配器。
+Package rocketmq 基于 Apache RocketMQ 5.x Go SDK 实现 `queue.Queue`，
+提供面向 Proxy 的消息发布与订阅适配器。
 
-# 概述
+# 功能特性
 
-rocketmq 是基于 Apache RocketMQ Go 客户端的队列实现，支持分布式消息队列的发布和订阅。
-
-# 特性
-
-  - 分布式消息队列
+  - 使用 `WithEndpoint` 指定 RocketMQ 5.x Proxy 地址
   - 支持消息标签（Tags）过滤
-  - 支持消息键（Keys）索引
-  - 支持延迟消息
-  - 支持集群和广播消费模式
-  - 高可用和高吞吐量
+  - 支持消息键（Keys）和自定义属性
+  - 支持 RocketMQ 固定延迟等级消息（1-18 级）
+  - 支持通过 `queue.AdvancedPublisher` 获取发送后的消息 ID
+  - 支持 `NewWithConfig` / `MustNewWithConfig` 从配置中心创建实例
 
-# 基本使用
+# 快速开始
 
-## 创建队列
+	import (
+		"context"
 
-	import "github.com/f2xme/gox/queue/adapter/rocketmq"
+		"github.com/f2xme/gox/queue"
+		"github.com/f2xme/gox/queue/adapter/rocketmq"
+	)
+
+	func example(ctx context.Context) error {
+		q, err := rocketmq.New(
+			rocketmq.WithEndpoint("localhost:8081"),
+			rocketmq.WithNamespace("dev"),
+		)
+		if err != nil {
+			return err
+		}
+		defer q.(queue.Closer).Close()
+
+		if err := q.Publish(ctx, "orders", []byte(`{"order_id":"123"}`)); err != nil {
+			return err
+		}
+
+		sub, err := q.SubscribeWithOptions(ctx, "orders", func(ctx context.Context, msg *queue.Message) error {
+			return nil
+		}, queue.SubscribeOptions{
+			ConsumerGroup: "order-consumer",
+			Tags:          "*",
+		})
+		if err != nil {
+			return err
+		}
+		defer sub.Unsubscribe()
+
+		return nil
+	}
+
+# 创建实例
+
+使用 `New` 通过 Option 创建队列：
 
 	q, err := rocketmq.New(
-		rocketmq.WithNameServers([]string{"localhost:9876"}),
-		rocketmq.WithGroupName("my-producer-group"),
+		rocketmq.WithEndpoint("localhost:8081"),
+		rocketmq.WithCredentials("accessKey", "secretKey"),
+		rocketmq.WithNamespace("production"),
+		rocketmq.WithSendTimeout(5*time.Second),
 	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer q.(queue.Closer).Close()
 
-## 发布消息
+使用 `MustNew` 在初始化失败时直接终止程序：
 
-	// 简单发布
+	q := rocketmq.MustNew(
+		rocketmq.WithEndpoint("localhost:8081"),
+	)
+
+使用 `NewWithConfig` 从 `config.Config` 读取配置：
+
+	q, err := rocketmq.NewWithConfig(cfg)
+
+支持的配置键：
+
+  - `queue.rocketmq.endpoint`
+  - `queue.rocketmq.accessKey`
+  - `queue.rocketmq.secretKey`
+  - `queue.rocketmq.namespace`
+  - `queue.rocketmq.retries`
+  - `queue.rocketmq.sendTimeout`
+  - `queue.rocketmq.consumerModel`
+
+# 发布消息
+
+简单发布：
+
 	err := q.Publish(ctx, "orders", []byte(`{"order_id":"123"}`))
 
-	// 带选项发布
+带选项发布：
+
 	err := q.PublishWithOptions(ctx, "orders", []byte(`{"order_id":"123"}`), queue.PublishOptions{
 		Tags: "urgent",
 		Keys: []string{"order-123"},
 		Properties: map[string]string{
 			"source": "web",
 		},
+		DelayLevel: 3,
 	})
 
-## 订阅消息
+获取发送结果（消息 ID）：
 
-	// 简单订阅
-	sub, err := q.Subscribe(ctx, "orders", func(ctx context.Context, msg *queue.Message) error {
-		log.Printf("Received: %s", msg.Body)
-		return nil
-	})
+	if ap, ok := q.(queue.AdvancedPublisher); ok {
+		result, err := ap.PublishAndGetResult(ctx, "orders", body, queue.PublishOptions{})
+		if err != nil {
+			return err
+		}
+		_ = result.MessageID
+	}
 
-	// 带选项订阅
+# 订阅消息
+
+`Subscribe` 会使用默认消费者组 `DEFAULT_CONSUMER_GROUP`，更推荐在生产环境显式调用
+`SubscribeWithOptions` 指定消费者组和过滤条件：
+
 	sub, err := q.SubscribeWithOptions(ctx, "orders", handler, queue.SubscribeOptions{
 		ConsumerGroup: "order-processor",
 		Tags:          "urgent||normal",
-		MaxConcurrency: 10,
 	})
 
-	defer sub.Unsubscribe()
+标签规则：
 
-# 配置选项
+  - `"*"` 表示订阅全部消息
+  - `"tagA||tagB"` 表示订阅多个标签
+  - 空字符串会被自动视为 `"*"`
 
-## WithNameServers
+# 可用选项
 
-设置 RocketMQ Name Server 地址：
+## WithEndpoint
 
-	rocketmq.New(rocketmq.WithNameServers([]string{"localhost:9876"}))
+设置 RocketMQ 5.x Proxy 地址：
+
+	rocketmq.New(rocketmq.WithEndpoint("localhost:8081"))
 
 ## WithCredentials
 
@@ -80,15 +142,10 @@ rocketmq 是基于 Apache RocketMQ Go 客户端的队列实现，支持分布式
 
 	rocketmq.New(rocketmq.WithNamespace("dev"))
 
-## WithGroupName
-
-设置生产者组名：
-
-	rocketmq.New(rocketmq.WithGroupName("my-producer-group"))
-
 ## WithRetries
 
-设置重试次数：
+设置发送失败重试次数。该字段会被记录到适配器配置中，但 RocketMQ 5.x SDK
+当前由底层自行处理重试策略：
 
 	rocketmq.New(rocketmq.WithRetries(3))
 
@@ -100,40 +157,18 @@ rocketmq 是基于 Apache RocketMQ Go 客户端的队列实现，支持分布式
 
 ## WithConsumerModel
 
-设置消费模式（clustering 或 broadcasting）：
+设置消费模式标识：
 
-	rocketmq.New(rocketmq.WithConsumerModel("broadcasting"))
+	rocketmq.New(rocketmq.WithConsumerModel(rocketmq.ConsumerModelClustering))
 
-# 消息标签过滤
-
-RocketMQ 支持使用标签过滤消息：
-
-	// 发布带标签的消息
-	q.PublishWithOptions(ctx, "orders", data, queue.PublishOptions{
-		Tags: "urgent",
-	})
-
-	// 订阅特定标签
-	q.SubscribeWithOptions(ctx, "orders", handler, queue.SubscribeOptions{
-		ConsumerGroup: "processor",
-		Tags:          "urgent||normal", // 订阅 urgent 或 normal 标签
-	})
-
-	// 订阅所有标签
-	q.SubscribeWithOptions(ctx, "orders", handler, queue.SubscribeOptions{
-		ConsumerGroup: "processor",
-		Tags:          "*", // 订阅所有消息
-	})
+其中 `ConsumerModelBroadcasting` 目前仅作为兼容字段保留；RocketMQ 5.x Go SDK
+及当前适配器实现并未真正切换到广播消费行为。
 
 # 延迟消息
 
-RocketMQ 支持延迟消息（18 个延迟级别）：
+RocketMQ 支持固定延迟等级，适配器会将 `queue.PublishOptions.DelayLevel`
+转换为绝对投递时间。支持的等级如下：
 
-	q.PublishWithOptions(ctx, "tasks", data, queue.PublishOptions{
-		DelayLevel: 3, // 延迟级别 3 = 10 秒
-	})
-
-延迟级别对应的时间：
   - 1: 1s
   - 2: 5s
   - 3: 10s
@@ -153,56 +188,21 @@ RocketMQ 支持延迟消息（18 个延迟级别）：
   - 17: 1h
   - 18: 2h
 
-# 消费模式
+# 关闭资源
 
-## 集群消费（Clustering）
+该适配器实现了 `queue.Closer`。调用 `Close` 会停止所有已注册订阅，
+并优雅关闭底层 Producer：
 
-默认模式，同一消费组内的消费者负载均衡消费消息：
-
-	rocketmq.New(rocketmq.WithConsumerModel("clustering"))
-
-## 广播消费（Broadcasting）
-
-每个消费者都会收到所有消息：
-
-	rocketmq.New(rocketmq.WithConsumerModel("broadcasting"))
-
-# 最佳实践
-
-## 1. 使用消费者组
-
-	q.SubscribeWithOptions(ctx, "orders", handler, queue.SubscribeOptions{
-		ConsumerGroup: "order-processor", // 必须指定消费者组
-	})
-
-## 2. 设置合理的并发度
-
-	q.SubscribeWithOptions(ctx, "orders", handler, queue.SubscribeOptions{
-		ConsumerGroup:  "processor",
-		MaxConcurrency: 10, // 限制并发处理数
-	})
-
-## 3. 使用消息键进行索引
-
-	q.PublishWithOptions(ctx, "orders", data, queue.PublishOptions{
-		Keys: []string{"order-123"}, // 便于查询和追踪
-	})
-
-## 4. 优雅关闭
-
-	q, err := rocketmq.New(...)
-	defer func() {
-		if closer, ok := q.(queue.Closer); ok {
-			closer.Close()
-		}
-	}()
+	if closer, ok := q.(queue.Closer); ok {
+		_ = closer.Close()
+	}
 
 # 注意事项
 
-  - 消费者组名（ConsumerGroup）是必需的
-  - Name Server 地址必须正确配置
-  - 生产环境建议配置多个 Name Server 地址
-  - 延迟消息只支持固定的 18 个延迟级别
-  - 广播模式下消息不会重试
+  - 当前接入点是 RocketMQ 5.x Proxy，不再使用旧版 NameServer 配置
+  - `SubscribeWithOptions` 必须提供 `ConsumerGroup`
+  - `Subscribe` 仅适合快速示例，生产环境应显式指定消费者组
+  - `MaxConcurrency` 和 `AutoCommit` 目前未映射到底层 SDK 行为
+  - 延迟消息仅支持固定的 1-18 级
 */
 package rocketmq

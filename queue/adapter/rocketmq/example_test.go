@@ -22,8 +22,7 @@ func Example() {
 
 	// 创建 RocketMQ 队列
 	q, err := rocketmq.New(
-		rocketmq.WithNameServers([]string{"localhost:9876"}),
-		rocketmq.WithGroupName("example-group"),
+		rocketmq.WithEndpoint("localhost:8081"),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create queue: %v", err)
@@ -42,10 +41,9 @@ func Example() {
 func ExampleNew_withOptions() {
 	// 创建带完整配置的 RocketMQ 队列
 	q, err := rocketmq.New(
-		rocketmq.WithNameServers([]string{"localhost:9876"}),
+		rocketmq.WithEndpoint("localhost:8081"),
 		rocketmq.WithCredentials("access-key", "secret-key"),
 		rocketmq.WithNamespace("production"),
-		rocketmq.WithGroupName("order-service"),
 		rocketmq.WithRetries(3),
 	)
 	if err != nil {
@@ -60,8 +58,7 @@ func ExampleNew_withOptions() {
 func ExampleQueue_PublishWithOptions() {
 	ctx := context.Background()
 	q, _ := rocketmq.New(
-		rocketmq.WithNameServers([]string{"localhost:9876"}),
-		rocketmq.WithGroupName("example-group"),
+		rocketmq.WithEndpoint("localhost:8081"),
 	)
 
 	// 发布带标签和延迟的消息
@@ -87,8 +84,7 @@ func ExampleQueue_PublishWithOptions() {
 func ExampleQueue_Subscribe() {
 	ctx := context.Background()
 	q, _ := rocketmq.New(
-		rocketmq.WithNameServers([]string{"localhost:9876"}),
-		rocketmq.WithGroupName("example-group"),
+		rocketmq.WithEndpoint("localhost:8081"),
 	)
 
 	// 订阅消息

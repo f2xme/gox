@@ -19,9 +19,9 @@ func TestNew(t *testing.T) {
 			opts: []Option{},
 		},
 		{
-			name: "with custom name servers",
+			name: "with custom endpoint",
 			opts: []Option{
-				WithNameServers([]string{"localhost:9876"}),
+				WithEndpoint("localhost:8081"),
 			},
 		},
 		{
@@ -34,12 +34,6 @@ func TestNew(t *testing.T) {
 			name: "with namespace",
 			opts: []Option{
 				WithNamespace("test"),
-			},
-		},
-		{
-			name: "with group name",
-			opts: []Option{
-				WithGroupName("test-group"),
 			},
 		},
 		{
@@ -57,7 +51,7 @@ func TestNew(t *testing.T) {
 		{
 			name: "with consumer model",
 			opts: []Option{
-				WithConsumerModel("broadcasting"),
+				WithConsumerModel("clustering"),
 			},
 		},
 	}
@@ -82,11 +76,11 @@ func TestNew(t *testing.T) {
 
 // TestOptions tests option functions.
 func TestOptions(t *testing.T) {
-	t.Run("WithNameServers", func(t *testing.T) {
+	t.Run("WithEndpoint", func(t *testing.T) {
 		opts := defaultOptions()
-		WithNameServers([]string{"server1:9876", "server2:9876"})(&opts)
-		if len(opts.NameServers) != 2 {
-			t.Errorf("expected 2 name servers, got %d", len(opts.NameServers))
+		WithEndpoint("server1:8081")(&opts)
+		if opts.Endpoint != "server1:8081" {
+			t.Errorf("expected endpoint 'server1:8081', got %s", opts.Endpoint)
 		}
 	})
 
@@ -103,14 +97,6 @@ func TestOptions(t *testing.T) {
 		WithNamespace("test-ns")(&opts)
 		if opts.Namespace != "test-ns" {
 			t.Errorf("namespace not set correctly")
-		}
-	})
-
-	t.Run("WithGroupName", func(t *testing.T) {
-		opts := defaultOptions()
-		WithGroupName("test-group")(&opts)
-		if opts.GroupName != "test-group" {
-			t.Errorf("group name not set correctly")
 		}
 	})
 
@@ -148,8 +134,8 @@ func TestOptions(t *testing.T) {
 
 	t.Run("WithConsumerModel", func(t *testing.T) {
 		opts := defaultOptions()
-		WithConsumerModel("broadcasting")(&opts)
-		if opts.ConsumerModel != "broadcasting" {
+		WithConsumerModel("clustering")(&opts)
+		if opts.ConsumerModel != "clustering" {
 			t.Errorf("consumer model not set correctly")
 		}
 	})
@@ -159,12 +145,8 @@ func TestOptions(t *testing.T) {
 func TestDefaultOptions(t *testing.T) {
 	opts := defaultOptions()
 
-	if len(opts.NameServers) != 1 || opts.NameServers[0] != "127.0.0.1:9876" {
-		t.Errorf("unexpected default name servers: %v", opts.NameServers)
-	}
-
-	if opts.GroupName != "DEFAULT_PRODUCER_GROUP" {
-		t.Errorf("unexpected default group name: %s", opts.GroupName)
+	if opts.Endpoint != "127.0.0.1:8081" {
+		t.Errorf("unexpected default endpoint: %v", opts.Endpoint)
 	}
 
 	if opts.Retries != 2 {
@@ -180,8 +162,7 @@ func TestDefaultOptions(t *testing.T) {
 	}
 }
 
-// Note: Integration tests require a running RocketMQ server.
-// The following tests are examples and will be skipped in CI.
+// 注意：集成测试需要运行中的 RocketMQ 服务，以下测试在 CI 中会被跳过。
 
 func TestIntegration_PublishSubscribe(t *testing.T) {
 	if testing.Short() {
@@ -191,8 +172,7 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 	ctx := context.Background()
 
 	q, err := New(
-		WithNameServers([]string{"localhost:9876"}),
-		WithGroupName("test-producer"),
+		WithEndpoint("localhost:8081"),
 	)
 	if err != nil {
 		t.Skipf("skipping test, RocketMQ not available: %v", err)
@@ -248,8 +228,7 @@ func TestIntegration_DelayMessage(t *testing.T) {
 	ctx := context.Background()
 
 	q, err := New(
-		WithNameServers([]string{"localhost:9876"}),
-		WithGroupName("test-producer"),
+		WithEndpoint("localhost:8081"),
 	)
 	if err != nil {
 		t.Skipf("skipping test, RocketMQ not available: %v", err)
