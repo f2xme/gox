@@ -44,7 +44,11 @@ func NewContext(ctx context.Context, opts ...Option) (queue.Queue, error) {
 		opt(&cfg)
 	}
 
-	p, err := rmq.NewProducer(buildConfig(cfg, ""))
+	if len(cfg.Topics) == 0 {
+		return nil, fmt.Errorf("rocketmq: at least one topic is required, use WithTopics to specify")
+	}
+
+	p, err := rmq.NewProducer(buildConfig(cfg, ""), rmq.WithTopics(cfg.Topics...))
 	if err != nil {
 		return nil, fmt.Errorf("rocketmq: failed to create producer: %w", err)
 	}
