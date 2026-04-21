@@ -36,10 +36,10 @@ func main() {
 	fmt.Println("\n2. 使用自定义参数（更高安全性）:")
 	params := &crypto.Argon2Params{
 		Memory:      128 * 1024, // 128 MB
-		Iterations:  4,           // 4 次迭代
-		Parallelism: 4,           // 4 个并行线程
-		SaltLength:  16,          // 16 字节盐
-		KeyLength:   32,          // 32 字节密钥
+		Iterations:  4,          // 4 次迭代
+		Parallelism: 4,          // 4 个并行线程
+		SaltLength:  16,         // 16 字节盐
+		KeyLength:   32,         // 32 字节密钥
 	}
 	hash2, err := crypto.HashPasswordArgon2(password, params)
 	if err != nil {

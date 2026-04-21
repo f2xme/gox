@@ -1,6 +1,8 @@
 package jwt
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -124,4 +126,70 @@ func (c *Claims) IsNotYetValid() bool {
 		return false
 	}
 	return time.Now().Before(c.NotBefore)
+}
+
+// GetUID 将 Subject（标准 sub 声明）解析为 int64，供 httpx 认证中间件使用；无法解析时返回 0。
+func (c *Claims) GetUID() int64 {
+	if c == nil {
+		return 0
+	}
+	s := strings.TrimSpace(c.Subject)
+	if s == "" {
+		return 0
+	}
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+// Get 按 key 返回声明值，涵盖标准字段与 Custom，满足 httpx/middleware/auth.Claims。
+func (c *Claims) Get(key string) (any, bool) {
+	if c == nil {
+		return nil, false
+	}
+	switch key {
+	case "sub":
+		if c.Subject == "" {
+			return nil, false
+		}
+		return c.Subject, true
+	case "iss":
+		if c.Issuer == "" {
+			return nil, false
+		}
+		return c.Issuer, true
+	case "aud":
+		if len(c.Audience) == 0 {
+			return nil, false
+		}
+		return c.Audience, true
+	case "exp":
+		if c.ExpiresAt.IsZero() {
+			return nil, false
+		}
+		return c.ExpiresAt, true
+	case "nbf":
+		if c.NotBefore.IsZero() {
+			return nil, false
+		}
+		return c.NotBefore, true
+	case "iat":
+		if c.IssuedAt.IsZero() {
+			return nil, false
+		}
+		return c.IssuedAt, true
+	case "jti":
+		if c.ID == "" {
+			return nil, false
+		}
+		return c.ID, true
+	default:
+		if c.Custom == nil {
+			return nil, false
+		}
+		v, ok := c.Custom[key]
+		return v, ok
+	}
 }

@@ -4,36 +4,38 @@
 
 ## 示例列表
 
+每个示例为独立子目录（可单独 `go run`），避免同一目录多个 `main` 无法构建。
+
 ### 密码哈希
 
-- **hash_bcrypt.go** - bcrypt 密码哈希示例
-- **hash_argon2.go** - Argon2id 密码哈希示例（推荐）
+- **hash_bcrypt/** - bcrypt 密码哈希示例
+- **hash_argon2/** - Argon2id 密码哈希示例（推荐）
 
 ### 数字签名
 
-- **sign_ed25519.go** - Ed25519 数字签名示例（推荐）
-- **sign_ecdsa.go** - ECDSA 数字签名示例
-- **sign_rsa.go** - RSA 数字签名示例
+- **sign_ed25519/** - Ed25519 数字签名示例（推荐）
+- **sign_ecdsa/** - ECDSA 数字签名示例
+- **sign_rsa/** - RSA 数字签名示例
 
 ## 运行示例
 
-在 `crypto/examples` 目录下运行：
+在仓库根目录执行：
 
 ```bash
 # bcrypt 密码哈希
-go run hash_bcrypt.go
+go run ./examples/crypto/hash_bcrypt
 
 # Argon2id 密码哈希
-go run hash_argon2.go
+go run ./examples/crypto/hash_argon2
 
 # Ed25519 数字签名
-go run sign_ed25519.go
+go run ./examples/crypto/sign_ed25519
 
 # ECDSA 数字签名
-go run sign_ecdsa.go
+go run ./examples/crypto/sign_ecdsa
 
 # RSA 数字签名
-go run sign_rsa.go
+go run ./examples/crypto/sign_rsa
 ```
 
 ## 算法选择建议

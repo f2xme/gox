@@ -41,29 +41,22 @@ func main() {
 	}
 	fmt.Println("用户表创建成功")
 
-	// 3. 插入数据（Create）
-	fmt.Println("\n3. 插入数据:")
 	ctx := context.Background()
 
+	// 3. 插入数据（Create）
+	fmt.Println("\n3. 插入数据:")
 	err = db.Transaction(ctx, func(tx database.DB) error {
-		engine := tx.Engine()
-		gormDB := engine.(interface {
-			Create(value interface{}) interface{ Error() error }
-		})
-
 		users := []User{
 			{Name: "张三", Email: "zhangsan@example.com", Age: 25},
 			{Name: "李四", Email: "lisi@example.com", Age: 30},
 			{Name: "王五", Email: "wangwu@example.com", Age: 28},
 		}
-
-		for _, user := range users {
-			if result := gormDB.Create(&user); result.Error() != nil {
-				return result.Error()
+		for i := range users {
+			if err := tx.Create(ctx, &users[i]); err != nil {
+				return err
 			}
-			fmt.Printf("  插入用户: %s (ID: %d)\n", user.Name, user.ID)
+			fmt.Printf("  插入用户: %s (ID: %d)\n", users[i].Name, users[i].ID)
 		}
-
 		return nil
 	})
 
@@ -74,19 +67,9 @@ func main() {
 
 	// 4. 查询数据（Read）
 	fmt.Println("\n4. 查询数据:")
-	engine := db.Engine()
-	gormDB := engine.(interface {
-		Find(dest interface{}, conds ...interface{}) interface{ Error() error }
-		First(dest interface{}, conds ...interface{}) interface{ Error() error }
-		Where(query interface{}, args ...interface{}) interface {
-			Find(dest interface{}, conds ...interface{}) interface{ Error() error }
-		}
-	})
-
-	// 查询所有用户
 	var allUsers []User
-	if result := gormDB.Find(&allUsers); result.Error() != nil {
-		fmt.Printf("查询失败: %v\n", result.Error())
+	if err := db.Find(ctx, &allUsers); err != nil {
+		fmt.Printf("查询失败: %v\n", err)
 		return
 	}
 	fmt.Printf("查询到 %d 个用户:\n", len(allUsers))
@@ -97,8 +80,8 @@ func main() {
 	// 5. 条件查询
 	fmt.Println("\n5. 条件查询:")
 	var user User
-	if result := gormDB.Where("name = ?", "张三").Find(&user); result.Error() != nil {
-		fmt.Printf("查询失败: %v\n", result.Error())
+	if err := db.Where("name = ?", "张三").First(ctx, &user); err != nil {
+		fmt.Printf("查询失败: %v\n", err)
 		return
 	}
 	fmt.Printf("查询到用户: %s, 年龄: %d\n", user.Name, user.Age)
@@ -106,18 +89,12 @@ func main() {
 	// 6. 更新数据（Update）
 	fmt.Println("\n6. 更新数据:")
 	err = db.Transaction(ctx, func(tx database.DB) error {
-		engine := tx.Engine()
-		gormDB := engine.(interface {
-			Model(value interface{}) interface {
-				Where(query interface{}, args ...interface{}) interface {
-					Update(column string, value interface{}) interface{ Error() error }
-				}
-			}
-		})
-
-		result := gormDB.Model(&User{}).Where("name = ?", "张三").Update("age", 26)
-		if result.Error() != nil {
-			return result.Error()
+		var u User
+		if err := tx.Where("name = ?", "张三").First(ctx, &u); err != nil {
+			return err
+		}
+		if err := tx.Update(ctx, &u, "age", 26); err != nil {
+			return err
 		}
 		fmt.Println("  更新张三的年龄为 26")
 		return nil
@@ -129,22 +106,18 @@ func main() {
 	}
 
 	// 验证更新
-	gormDB.Where("name = ?", "张三").Find(&user)
+	user = User{}
+	if err := db.Where("name = ?", "张三").First(ctx, &user); err != nil {
+		fmt.Printf("验证查询失败: %v\n", err)
+		return
+	}
 	fmt.Printf("  验证: 张三的年龄现在是 %d\n", user.Age)
 
 	// 7. 删除数据（Delete）
 	fmt.Println("\n7. 删除数据:")
 	err = db.Transaction(ctx, func(tx database.DB) error {
-		engine := tx.Engine()
-		gormDB := engine.(interface {
-			Where(query interface{}, args ...interface{}) interface {
-				Delete(value interface{}, conds ...interface{}) interface{ Error() error }
-			}
-		})
-
-		result := gormDB.Where("name = ?", "王五").Delete(&User{})
-		if result.Error() != nil {
-			return result.Error()
+		if err := tx.Delete(ctx, &User{}, "name = ?", "王五"); err != nil {
+			return err
 		}
 		fmt.Println("  删除用户: 王五")
 		return nil
@@ -158,19 +131,11 @@ func main() {
 	// 8. 事务示例
 	fmt.Println("\n8. 事务示例:")
 	err = db.Transaction(ctx, func(tx database.DB) error {
-		engine := tx.Engine()
-		gormDB := engine.(interface {
-			Create(value interface{}) interface{ Error() error }
-		})
-
-		// 在事务中插入新用户
 		newUser := User{Name: "赵六", Email: "zhaoliu@example.com", Age: 35}
-		if result := gormDB.Create(&newUser); result.Error() != nil {
-			return result.Error()
+		if err := tx.Create(ctx, &newUser); err != nil {
+			return err
 		}
 		fmt.Printf("  事务中插入用户: %s\n", newUser.Name)
-
-		// 事务会自动提交（如果没有返回错误）
 		return nil
 	})
 
@@ -183,7 +148,10 @@ func main() {
 	// 9. 最终统计
 	fmt.Println("\n9. 最终统计:")
 	var finalUsers []User
-	gormDB.Find(&finalUsers)
+	if err := db.Find(ctx, &finalUsers); err != nil {
+		fmt.Printf("统计查询失败: %v\n", err)
+		return
+	}
 	fmt.Printf("数据库中共有 %d 个用户\n", len(finalUsers))
 
 	fmt.Println("\n数据库示例完成")
