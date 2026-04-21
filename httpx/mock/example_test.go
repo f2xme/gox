@@ -70,7 +70,7 @@ func ExampleMockContext_headers() {
 		if token == "" {
 			return ctx.JSON(401, map[string]string{"error": "unauthorized"})
 		}
-		return ctx.Success(map[string]string{"message": "authorized"})
+		return httpx.Success(ctx, map[string]string{"message": "authorized"})
 	}
 
 	handler(ctx)
@@ -127,7 +127,7 @@ func ExampleMockContext_unifiedResponse() {
 
 	handler := func(ctx httpx.Context) error {
 		// 模拟创建成功
-		return ctx.Success(map[string]any{
+		return httpx.Success(ctx, map[string]any{
 			"id":   123,
 			"name": "张三",
 		})

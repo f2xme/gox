@@ -122,15 +122,12 @@ func testErrorResponse() {
 
 	// 定义 handler（模拟错误）
 	handler := func(ctx httpx.Context) error {
-		// 使用 mock context 的错误方法
-		mockCtx := ctx.(*mock.MockContext)
-		return mockCtx.NotFound("用户不存在")
+		return httpx.ErrNotFound("用户不存在")
 	}
 
-	// 执行 handler
+	// 执行 handler，错误通过 DefaultErrorHandler 转为响应
 	if err := handler(ctx); err != nil {
-		fmt.Printf("   错误: %v\n", err)
-		return
+		httpx.DefaultErrorHandler(ctx, err)
 	}
 
 	// 验证结果
@@ -145,8 +142,7 @@ func testUnifiedResponse() {
 	// 测试成功响应
 	ctx1 := mock.NewMockContext("GET", "/api/success")
 	handler1 := func(ctx httpx.Context) error {
-		mockCtx := ctx.(*mock.MockContext)
-		return mockCtx.Success(map[string]string{
+		return httpx.Success(ctx, map[string]string{
 			"message": "操作成功",
 		})
 	}
@@ -163,8 +159,7 @@ func testUnifiedResponse() {
 	// 测试失败响应
 	ctx2 := mock.NewMockContext("POST", "/api/fail")
 	handler2 := func(ctx httpx.Context) error {
-		mockCtx := ctx.(*mock.MockContext)
-		return mockCtx.Fail("操作失败")
+		return httpx.Fail(ctx, "操作失败")
 	}
 	handler2(ctx2)
 

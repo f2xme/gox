@@ -73,42 +73,6 @@ func (ctx *ginContext) SetCookie(cookie *http.Cookie) {
 
 func (ctx *ginContext) Status(code int) { ctx.c.Status(code) }
 
-func (ctx *ginContext) Success(data any) error {
-	return ctx.JSON(http.StatusOK, httpx.NewSuccessResponse(data))
-}
-
-func (ctx *ginContext) Fail(msg string) error {
-	return ctx.JSON(http.StatusOK, httpx.NewFailResponse(msg))
-}
-
-func (ctx *ginContext) BadRequest(msg ...string) error {
-	return ctx.JSON(http.StatusBadRequest, httpx.NewFailResponse(httpx.FirstMsg(msg, "Bad Request")))
-}
-
-func (ctx *ginContext) Unauthorized(msg ...string) error {
-	return ctx.JSON(http.StatusUnauthorized, httpx.NewFailResponse(httpx.FirstMsg(msg, "Unauthorized")))
-}
-
-func (ctx *ginContext) Forbidden(msg ...string) error {
-	return ctx.JSON(http.StatusForbidden, httpx.NewFailResponse(httpx.FirstMsg(msg, "Forbidden")))
-}
-
-func (ctx *ginContext) NotFound(msg ...string) error {
-	return ctx.JSON(http.StatusNotFound, httpx.NewFailResponse(httpx.FirstMsg(msg, "Not Found")))
-}
-
-func (ctx *ginContext) TooManyRequests(msg ...string) error {
-	return ctx.JSON(http.StatusTooManyRequests, httpx.NewFailResponse(httpx.FirstMsg(msg, "Too Many Requests")))
-}
-
-func (ctx *ginContext) InternalError(msg ...string) error {
-	return ctx.JSON(http.StatusInternalServerError, httpx.NewFailResponse(httpx.FirstMsg(msg, "Internal Server Error")))
-}
-
-func (ctx *ginContext) ServiceUnavailable(msg ...string) error {
-	return ctx.JSON(http.StatusServiceUnavailable, httpx.NewFailResponse(httpx.FirstMsg(msg, "Service Unavailable")))
-}
-
 func (ctx *ginContext) Set(key string, value any)    { ctx.c.Set(key, value) }
 func (ctx *ginContext) Get(key string) (any, bool)   { return ctx.c.Get(key) }
 func (ctx *ginContext) MustGet(key string) any       { return ctx.c.MustGet(key) }

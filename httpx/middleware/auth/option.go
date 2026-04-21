@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/f2xme/gox/httpx"
@@ -36,11 +37,11 @@ func defaultTokenExtractor(ctx httpx.Context) string {
 }
 
 func defaultErrorHandler(ctx httpx.Context) {
-	ctx.Unauthorized("Authentication required")
+	_ = ctx.JSON(http.StatusUnauthorized, httpx.NewFailResponse("Authentication required"))
 }
 
 func defaultCheckerHandler(ctx httpx.Context, _ error) {
-	ctx.Forbidden()
+	_ = ctx.JSON(http.StatusForbidden, httpx.NewFailResponse("Forbidden"))
 }
 
 // Option 配置认证中间件

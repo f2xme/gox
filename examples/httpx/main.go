@@ -112,13 +112,13 @@ func handleCreateUser(ctx httpx.Context) error {
 	}
 
 	// 使用统一响应格式
-	return ctx.Success(user)
+	return httpx.Success(ctx, user)
 }
 
 // handleError 演示错误处理
 func handleError(ctx httpx.Context) error {
 	// 使用统一失败响应
-	return ctx.Fail("这是一个示例错误")
+	return httpx.Fail(ctx, "这是一个示例错误")
 }
 
 // handleHealth 健康检查

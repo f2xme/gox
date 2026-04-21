@@ -234,7 +234,7 @@ func TestAuth_BannedUserReturnsForbidden(t *testing.T) {
 	middleware := New(
 		WithValidator(validator),
 		WithUserChecker(statusChecker),
-		WithCheckHandler(func(c httpx.Context, _ error) { c.Forbidden("user is banned") }),
+		WithCheckHandler(func(c httpx.Context, _ error) { _ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("user is banned")) }),
 	)
 
 	handler := middleware(func(ctx httpx.Context) error {
@@ -310,7 +310,7 @@ func TestAuth_CheckerErrorReturnsForbidden(t *testing.T) {
 	middleware := New(
 		WithValidator(validator),
 		WithUserChecker(statusChecker),
-		WithCheckHandler(func(c httpx.Context, _ error) { c.Forbidden("check failed") }),
+		WithCheckHandler(func(c httpx.Context, _ error) { _ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("check failed")) }),
 	)
 
 	handler := middleware(func(ctx httpx.Context) error {

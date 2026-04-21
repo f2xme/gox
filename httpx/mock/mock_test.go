@@ -99,27 +99,25 @@ func TestMockContext_String(t *testing.T) {
 	}
 }
 
-func TestMockContext_StatusMethods(t *testing.T) {
+func TestHTTPErrors_DefaultMessage(t *testing.T) {
 	tests := []struct {
 		name     string
-		fn       func(*MockContext) error
+		err      *httpx.HTTPError
 		wantCode int
 	}{
-		{"BadRequest", func(c *MockContext) error { return c.BadRequest() }, 400},
-		{"Unauthorized", func(c *MockContext) error { return c.Unauthorized() }, 401},
-		{"Forbidden", func(c *MockContext) error { return c.Forbidden() }, 403},
-		{"NotFound", func(c *MockContext) error { return c.NotFound() }, 404},
-		{"TooManyRequests", func(c *MockContext) error { return c.TooManyRequests() }, 429},
-		{"InternalError", func(c *MockContext) error { return c.InternalError() }, 500},
-		{"ServiceUnavailable", func(c *MockContext) error { return c.ServiceUnavailable() }, 503},
+		{"BadRequest", httpx.ErrBadRequest(), 400},
+		{"Unauthorized", httpx.ErrUnauthorized(), 401},
+		{"Forbidden", httpx.ErrForbidden(), 403},
+		{"NotFound", httpx.ErrNotFound(), 404},
+		{"TooManyRequests", httpx.ErrTooManyRequests(), 429},
+		{"InternalError", httpx.ErrInternalError(), 500},
+		{"ServiceUnavailable", httpx.ErrServiceUnavailable(), 503},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewMockContext("GET", "/")
-			if err := tt.fn(ctx); err != nil {
-				t.Fatal(err)
-			}
+			httpx.DefaultErrorHandler(ctx, tt.err)
 			if ctx.RespCode != tt.wantCode {
 				t.Errorf("expected %d, got %d", tt.wantCode, ctx.RespCode)
 			}
@@ -127,11 +125,9 @@ func TestMockContext_StatusMethods(t *testing.T) {
 	}
 }
 
-func TestMockContext_CustomMessage(t *testing.T) {
+func TestHTTPError_CustomMessage(t *testing.T) {
 	ctx := NewMockContext("GET", "/")
-	if err := ctx.NotFound("用户不存在"); err != nil {
-		t.Fatal(err)
-	}
+	httpx.DefaultErrorHandler(ctx, httpx.ErrNotFound("用户不存在"))
 
 	if ctx.RespCode != 404 {
 		t.Errorf("expected 404, got %d", ctx.RespCode)
@@ -219,12 +215,12 @@ func TestMockContext_Blob(t *testing.T) {
 	}
 }
 
-func TestMockContext_SuccessAndFail(t *testing.T) {
+func TestSuccessAndFail(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		ctx := NewMockContext("GET", "/")
 		data := map[string]int{"count": 42}
 
-		if err := ctx.Success(data); err != nil {
+		if err := httpx.Success(ctx, data); err != nil {
 			t.Fatal(err)
 		}
 
@@ -244,7 +240,7 @@ func TestMockContext_SuccessAndFail(t *testing.T) {
 	t.Run("Fail", func(t *testing.T) {
 		ctx := NewMockContext("GET", "/")
 
-		if err := ctx.Fail("操作失败"); err != nil {
+		if err := httpx.Fail(ctx, "操作失败"); err != nil {
 			t.Fatal(err)
 		}
 

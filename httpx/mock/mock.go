@@ -171,42 +171,6 @@ func (m *MockContext) Status(code int) {
 	m.RespCode = code
 }
 
-func (m *MockContext) Success(data any) error {
-	return m.JSON(http.StatusOK, httpx.NewSuccessResponse(data))
-}
-
-func (m *MockContext) Fail(msg string) error {
-	return m.JSON(http.StatusOK, httpx.NewFailResponse(msg))
-}
-
-func (m *MockContext) BadRequest(msg ...string) error {
-	return m.error(http.StatusBadRequest, msgBadRequest, msg)
-}
-
-func (m *MockContext) Unauthorized(msg ...string) error {
-	return m.error(http.StatusUnauthorized, msgUnauthorized, msg)
-}
-
-func (m *MockContext) Forbidden(msg ...string) error {
-	return m.error(http.StatusForbidden, msgForbidden, msg)
-}
-
-func (m *MockContext) NotFound(msg ...string) error {
-	return m.error(http.StatusNotFound, msgNotFound, msg)
-}
-
-func (m *MockContext) TooManyRequests(msg ...string) error {
-	return m.error(http.StatusTooManyRequests, msgTooManyRequests, msg)
-}
-
-func (m *MockContext) InternalError(msg ...string) error {
-	return m.error(http.StatusInternalServerError, msgInternalError, msg)
-}
-
-func (m *MockContext) ServiceUnavailable(msg ...string) error {
-	return m.error(http.StatusServiceUnavailable, msgServiceUnavailable, msg)
-}
-
 func (m *MockContext) Set(key string, value any) {
 	m.Store[key] = value
 }
@@ -246,16 +210,3 @@ func (w *mockResponseWriter) Header() http.Header        { return w.ctx.RespHead
 func (w *mockResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
 func (w *mockResponseWriter) WriteHeader(code int)        { w.ctx.RespCode = code }
 
-const (
-	msgBadRequest         = "Bad Request"
-	msgUnauthorized       = "Unauthorized"
-	msgForbidden          = "Forbidden"
-	msgNotFound           = "Not Found"
-	msgTooManyRequests    = "Too Many Requests"
-	msgInternalError      = "Internal Server Error"
-	msgServiceUnavailable = "Service Unavailable"
-)
-
-func (m *MockContext) error(code int, defaultMsg string, msg []string) error {
-	return m.JSON(code, httpx.NewFailResponse(httpx.FirstMsg(msg, defaultMsg)))
-}

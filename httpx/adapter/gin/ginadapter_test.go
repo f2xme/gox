@@ -74,7 +74,7 @@ func TestGET_JSON(t *testing.T) {
 func TestSuccess(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/ok", func(ctx httpx.Context) error {
-		return ctx.Success([]string{"a", "b"})
+		return httpx.Success(ctx, []string{"a", "b"})
 	})
 
 	w := doRequest(e, "GET", "/ok")
@@ -93,7 +93,7 @@ func TestSuccess(t *testing.T) {
 func TestFail(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/fail", func(ctx httpx.Context) error {
-		return ctx.Fail("something wrong")
+		return httpx.Fail(ctx, "something wrong")
 	})
 
 	w := doRequest(e, "GET", "/fail")
@@ -232,7 +232,7 @@ func TestParamInt64(t *testing.T) {
 	e.GET("/items/:id", func(ctx httpx.Context) error {
 		id, err := ctx.Param("id").Int64()
 		if err != nil {
-			return ctx.BadRequest("invalid id")
+			return httpx.ErrBadRequest("invalid id")
 		}
 		return ctx.JSON(200, map[string]int64{"id": id})
 	})
@@ -313,7 +313,7 @@ func TestBindJSON(t *testing.T) {
 		if err := ctx.BindJSON(&req); err != nil {
 			return err
 		}
-		return ctx.Success(req.Name)
+		return httpx.Success(ctx, req.Name)
 	})
 
 	w := doRequest(e, "POST", "/bind", `{"name":"bob"}`)

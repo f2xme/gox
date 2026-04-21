@@ -73,26 +73,6 @@ type Context interface {
 	// Status 设置响应状态码（不写入响应体）。
 	Status(code int)
 
-	// Success 返回统一格式的成功响应。
-	Success(data any) error
-	// Fail 返回统一格式的失败响应。
-	Fail(msg string) error
-
-	// BadRequest 返回 400 参数错误响应。
-	BadRequest(msg ...string) error
-	// Unauthorized 返回 401 未登录响应。
-	Unauthorized(msg ...string) error
-	// Forbidden 返回 403 无权限响应。
-	Forbidden(msg ...string) error
-	// NotFound 返回 404 资源不存在响应。
-	NotFound(msg ...string) error
-	// TooManyRequests 返回 429 请求过于频繁响应。
-	TooManyRequests(msg ...string) error
-	// InternalError 返回 500 服务器错误响应。
-	InternalError(msg ...string) error
-	// ServiceUnavailable 返回 503 服务器繁忙响应。
-	ServiceUnavailable(msg ...string) error
-
 	// Set 在上下文中保存键值。
 	Set(key string, value any)
 	// Get 从上下文中读取键值，不存在时 ok 为 false。
