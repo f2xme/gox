@@ -10,6 +10,7 @@ type Engine interface {
 	Shutdown(ctx context.Context) error
 
 	SetErrorHandler(h ErrorHandler)
+	SetNotFoundHandler(h Handler)
 	SetRenderer(r Renderer)
 
 	Raw() any

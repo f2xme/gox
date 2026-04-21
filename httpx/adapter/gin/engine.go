@@ -81,8 +81,11 @@ func (e *ginEngine) Group(prefix string, mw ...httpx.Middleware) httpx.Router {
 
 func (e *ginEngine) Static(prefix, root string)              { e.engine.Static(prefix, root) }
 func (e *ginEngine) StaticFile(path, file string)            { e.engine.StaticFile(path, file) }
-func (e *ginEngine) SetErrorHandler(h httpx.ErrorHandler)    { e.errorHandler = h }
-func (e *ginEngine) SetRenderer(r httpx.Renderer)            { /* TODO: not yet implemented */ }
+func (e *ginEngine) SetErrorHandler(h httpx.ErrorHandler) { e.errorHandler = h }
+func (e *ginEngine) SetNotFoundHandler(h httpx.Handler) {
+	e.engine.NoRoute(e.wrapHandler(h, e.mw))
+}
+func (e *ginEngine) SetRenderer(r httpx.Renderer) { /* TODO: not yet implemented */ }
 func (e *ginEngine) Raw() any                                { return e.engine }
 
 func (e *ginEngine) Start(addr string) error {
