@@ -114,7 +114,7 @@ tracing 中间件集成分布式追踪系统（如 OpenTelemetry、Jaeger、Zipk
 	func handleGetUser(ctx httpx.Context) error {
 		span := tracing.GetSpan(ctx)
 		if span != nil {
-			span.SetTag("user.id", ctx.Param("id"))
+			span.SetTag("user.id", ctx.Param("id").String())
 		}
 
 		// 处理请求

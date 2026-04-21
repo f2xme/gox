@@ -1,13 +1,13 @@
 package httpx
 
-// Response is the unified API response format.
+// Response 是统一的 API 响应格式。
 type Response struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Data    any    `json:"data,omitempty"`
 }
 
-// NewSuccessResponse creates a success response.
+// NewSuccessResponse 创建成功响应。
 func NewSuccessResponse(data any) *Response {
 	return &Response{
 		Success: true,
@@ -16,7 +16,7 @@ func NewSuccessResponse(data any) *Response {
 	}
 }
 
-// NewFailResponse creates a failure response.
+// NewFailResponse 创建失败响应。
 func NewFailResponse(msg string) *Response {
 	return &Response{
 		Success: false,

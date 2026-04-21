@@ -1,169 +1,71 @@
 /*
 Package httpx 提供统一的 HTTP 框架抽象层。
 
-# 概述
+httpx 定义了 HTTP 服务器的标准接口，支持多种 HTTP 框架（Gin、Echo 等）。
+通过这些接口，可以在不同框架之间切换而无需修改业务代码。
 
-httpx 包定义了 HTTP 服务器的标准接口，支持多种 HTTP 框架（Gin、Echo、Fiber 等）。
-通过这些接口，你可以轻松地在不同的 HTTP 框架之间切换，而无需修改业务代码。
+# 功能特性
 
-# 核心接口
+  - 统一接口：Engine、Router、Context 三层抽象，屏蔽框架差异
+  - Value 类型：Param/Query/Header 返回 Value，支持链式类型转换与默认值回退
+  - 多值 Query：QueryAll 支持同名参数多值（如 ?tag=a&tag=b）
+  - 统一响应：Success/Fail/BadRequest 等方法输出标准 JSON 格式
+  - 中间件：洋葱模型，支持全局和路由组级别注册
+  - 错误处理：可自定义 ErrorHandler，默认映射 HTTPError 到状态码
 
-## Engine - HTTP 服务器引擎
+# 快速开始
 
-所有 HTTP 框架实现都必须实现此接口：
+基本使用：
 
-	type Engine interface {
-		Router
-		Start(addr string) error
-		Shutdown(ctx context.Context) error
-		SetErrorHandler(h ErrorHandler)
-		SetRenderer(r Renderer)
-		Raw() any
-	}
-
-## Router - 路由接口
-
-定义路由注册方法：
-
-	type Router interface {
-		GET(path string, handler HandlerFunc)
-		POST(path string, handler HandlerFunc)
-		PUT(path string, handler HandlerFunc)
-		DELETE(path string, handler HandlerFunc)
-		PATCH(path string, handler HandlerFunc)
-		Group(prefix string) Router
-		Use(middleware ...MiddlewareFunc)
-	}
-
-## Context - 请求上下文
-
-提供请求和响应的操作方法：
-
-	type Context interface {
-		Request() *http.Request
-		Response() http.ResponseWriter
-		Param(key string) string
-		Query(key string) string
-		Bind(v any) error
-		JSON(code int, v any) error
-		String(code int, s string) error
-		Set(key string, value any)
-		Get(key string) any
-	}
-
-# 使用示例
-
-## 创建服务器
-
-	import "github.com/f2xme/gox/httpx/adapter/gin"
+	import (
+		"github.com/f2xme/gox/httpx"
+		"github.com/f2xme/gox/httpx/adapter/gin"
+	)
 
 	engine := gin.New()
 
 	engine.GET("/users/:id", func(c httpx.Context) error {
-		id := c.Param("id")
-		return c.JSON(200, map[string]string{"id": id})
+		id, err := c.Param("id").Int64()
+		if err != nil {
+			return c.BadRequest("invalid id")
+		}
+		return c.JSON(200, map[string]int64{"id": id})
 	})
 
 	engine.Start(":8080")
 
-## 路由分组
+# Value 类型化取值
+
+	id, err := c.Param("id").Int64()           // 必须是合法整数
+	page     := c.Query("page").IntOr(1)        // 非法/缺失则回退默认值
+	enabled  := c.Query("enabled").BoolOr(false)
+	until, _ := c.Query("until").Time(time.RFC3339)
+	tags     := c.Query("tags").Split(",")      // "a,b,c" -> ["a","b","c"]
+	name     := c.Query("name").Or("guest")     // 缺失回退字符串默认值
+	if c.Header("X-Admin").Exists() { ... }     // 存在性判断
+
+# 路由分组与中间件
 
 	api := engine.Group("/api/v1")
+	api.Use(authMiddleware)
 	api.GET("/users", listUsers)
 	api.POST("/users", createUser)
 
-	admin := api.Group("/admin")
-	admin.Use(authMiddleware)
-	admin.DELETE("/users/:id", deleteUser)
-
-## 中间件
-
-	// 全局中间件
-	engine.Use(loggerMiddleware, recoveryMiddleware)
-
-	// 路由组中间件
-	api := engine.Group("/api")
-	api.Use(authMiddleware)
-
-## 错误处理
+# 错误处理
 
 	engine.SetErrorHandler(func(c httpx.Context, err error) {
-		if errorx.IsKind(err, errorx.KindValidation) {
-			c.JSON(400, map[string]string{"error": err.Error()})
+		var he *httpx.HTTPError
+		if errors.As(err, &he) {
+			c.JSON(he.Code, httpx.NewFailResponse(he.Message))
 			return
 		}
-		c.JSON(500, map[string]string{"error": "internal error"})
+		c.JSON(500, httpx.NewFailResponse("internal error"))
 	})
 
-## 自定义渲染器
-
-	engine.SetRenderer(&customRenderer{})
-
-# 可用适配器
-
-## Gin 适配器
-
-	import "github.com/f2xme/gox/httpx/adapter/gin"
-
-	engine := gin.New()
-
-## Echo 适配器
-
-	import "github.com/f2xme/gox/httpx/adapter/echoadapter"
-
-	engine := echoadapter.New()
-
-# 最佳实践
-
-## 1. 使用统一的错误处理
-
-	engine.SetErrorHandler(func(c httpx.Context, err error) {
-		statusCode := errorx.HTTPStatus(err)
-		c.JSON(statusCode, map[string]string{
-			"error": err.Error(),
-			"code":  errorx.Code(err),
-		})
-	})
-
-## 2. 使用中间件进行横切关注点
-
-	// 日志中间件
-	engine.Use(func(c httpx.Context) error {
-		start := time.Now()
-		err := c.Next()
-		log.Printf("%s %s %v", c.Request().Method, c.Request().URL.Path, time.Since(start))
-		return err
-	})
-
-## 3. 使用路由分组组织 API
-
-	v1 := engine.Group("/api/v1")
-	{
-		users := v1.Group("/users")
-		users.GET("", listUsers)
-		users.POST("", createUser)
-		users.GET("/:id", getUser)
-	}
-
-## 4. 优雅关闭
-
-	go func() {
-		if err := engine.Start(":8080"); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	// 等待中断信号
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+# 优雅关闭
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	engine.Shutdown(ctx)
-
-# 线程安全
-
-所有 HTTP 框架实现都应该是线程安全的，可以在多个 goroutine 中并发处理请求。
 */
 package httpx

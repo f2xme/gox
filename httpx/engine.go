@@ -2,7 +2,7 @@ package httpx
 
 import "context"
 
-// Engine is the top-level HTTP server entry point.
+// Engine 是 HTTP 服务器的顶层入口。
 type Engine interface {
 	Router
 

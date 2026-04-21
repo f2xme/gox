@@ -1,6 +1,6 @@
 package httpx
 
-// Router defines route registration capabilities.
+// Router 定义路由注册能力。
 type Router interface {
 	GET(path string, h Handler, mw ...Middleware)
 	POST(path string, h Handler, mw ...Middleware)
