@@ -28,7 +28,7 @@ func defaultOptions() Options {
 }
 
 func defaultTokenExtractor(ctx httpx.Context) string {
-	authHeader := ctx.Header("Authorization")
+	authHeader := ctx.Header("Authorization").String()
 	if len(authHeader) <= len(BearerPrefix) || authHeader[:len(BearerPrefix)] != BearerPrefix {
 		return ""
 	}

@@ -75,9 +75,9 @@ func lookupCSRFToken(ctx httpx.Context, tokenLookup string) string {
 	}
 	switch parts[0] {
 	case "header":
-		return ctx.Header(parts[1])
+		return ctx.Header(parts[1]).String()
 	case "query":
-		return ctx.Query(parts[1])
+		return ctx.Query(parts[1]).String()
 	default:
 		return ""
 	}

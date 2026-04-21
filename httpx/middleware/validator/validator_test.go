@@ -7,83 +7,8 @@ import (
 	"testing"
 
 	"github.com/f2xme/gox/httpx"
+	"github.com/f2xme/gox/httpx/mock"
 )
-
-func getMsg(msg []string, def string) string {
-	if len(msg) > 0 && msg[0] != "" {
-		return msg[0]
-	}
-	return def
-}
-
-type mockContext struct {
-	method      string
-	path        string
-	body        io.ReadCloser
-	respCode    int
-	respBody    any
-	store       map[string]any
-	headers     map[string]string
-	queries     map[string]string
-	cookies     map[string]*http.Cookie
-	respHeaders map[string]string
-}
-
-func newMockContext() *mockContext {
-	return &mockContext{
-		method:      http.MethodGet,
-		path:        "/test",
-		body:        io.NopCloser(strings.NewReader("")),
-		store:       make(map[string]any),
-		headers:     make(map[string]string),
-		queries:     make(map[string]string),
-		cookies:     make(map[string]*http.Cookie),
-		respHeaders: make(map[string]string),
-	}
-}
-
-func (m *mockContext) Request() *http.Request {
-	req, _ := http.NewRequest(m.method, "https://example.com"+m.path, m.body)
-	for k, v := range m.headers {
-		req.Header.Set(k, v)
-	}
-	return req
-}
-func (m *mockContext) Param(string) string                      { return "" }
-func (m *mockContext) Query(key string) string                  { return m.queries[key] }
-func (m *mockContext) QueryDefault(key, def string) string      { if v, ok := m.queries[key]; ok { return v }; return def }
-func (m *mockContext) Header(key string) string                 { return m.headers[key] }
-func (m *mockContext) Cookie(name string) (*http.Cookie, error) { if c, ok := m.cookies[name]; ok { return c, nil }; return nil, http.ErrNoCookie }
-func (m *mockContext) ClientIP() string                         { return "127.0.0.1" }
-func (m *mockContext) Method() string                           { return m.method }
-func (m *mockContext) Path() string                             { return m.path }
-func (m *mockContext) Bind(any) error                           { return nil }
-func (m *mockContext) BindJSON(any) error                       { return nil }
-func (m *mockContext) BindQuery(any) error                      { return nil }
-func (m *mockContext) BindForm(any) error                       { return nil }
-func (m *mockContext) JSON(code int, v any) error               { m.respCode = code; m.respBody = v; return nil }
-func (m *mockContext) String(code int, s string) error          { m.respCode = code; m.respBody = s; return nil }
-func (m *mockContext) HTML(code int, html string) error         { m.respCode = code; m.respBody = html; return nil }
-func (m *mockContext) Blob(code int, _ string, _ []byte) error  { m.respCode = code; return nil }
-func (m *mockContext) NoContent(code int) error                 { m.respCode = code; return nil }
-func (m *mockContext) Redirect(code int, _ string) error        { m.respCode = code; return nil }
-func (m *mockContext) SetHeader(key, value string)              { m.respHeaders[key] = value }
-func (m *mockContext) SetCookie(c *http.Cookie)                 { m.cookies[c.Name] = c }
-func (m *mockContext) Status(code int)                          { m.respCode = code }
-func (m *mockContext) Success(data any) error                   { return m.JSON(http.StatusOK, data) }
-func (m *mockContext) Fail(msg string) error                    { return m.JSON(http.StatusOK, msg) }
-func (m *mockContext) BadRequest(msg ...string) error           { return m.JSON(400, getMsg(msg, "Bad Request")) }
-func (m *mockContext) Unauthorized(msg ...string) error         { return m.JSON(401, getMsg(msg, "Unauthorized")) }
-func (m *mockContext) Forbidden(msg ...string) error            { return m.JSON(403, getMsg(msg, "Forbidden")) }
-func (m *mockContext) NotFound(msg ...string) error             { return m.JSON(404, getMsg(msg, "Not Found")) }
-func (m *mockContext) TooManyRequests(msg ...string) error      { return m.JSON(429, getMsg(msg, "Too Many Requests")) }
-func (m *mockContext) InternalError(msg ...string) error        { return m.JSON(500, getMsg(msg, "Internal Server Error")) }
-func (m *mockContext) ServiceUnavailable(msg ...string) error   { return m.JSON(503, getMsg(msg, "Service Unavailable")) }
-func (m *mockContext) Set(key string, value any)                { m.store[key] = value }
-func (m *mockContext) Get(key string) (any, bool)               { v, ok := m.store[key]; return v, ok }
-func (m *mockContext) MustGet(key string) any                   { return m.store[key] }
-func (m *mockContext) ResponseWriter() http.ResponseWriter      { return nil }
-func (m *mockContext) Raw() any                                 { return nil }
 
 func TestValidator_ExceedsMaxBodySize(t *testing.T) {
 	middleware := New(WithMaxBodySize(10))
@@ -93,16 +18,15 @@ func TestValidator_ExceedsMaxBodySize(t *testing.T) {
 		return nil
 	})
 
-	ctx := newMockContext()
-	ctx.method = http.MethodPost
-	ctx.body = io.NopCloser(strings.NewReader("this is more than 10 bytes"))
-	ctx.headers["Content-Length"] = "27"
+	ctx := mock.NewMockContext(http.MethodPost, "/test")
+	ctx.BodyValue = io.NopCloser(strings.NewReader("this is more than 10 bytes"))
+	ctx.Headers["Content-Length"] = "27"
 
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if ctx.respCode != http.StatusRequestEntityTooLarge {
-		t.Fatalf("expected status %d, got %d", http.StatusRequestEntityTooLarge, ctx.respCode)
+	if ctx.RespCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status %d, got %d", http.StatusRequestEntityTooLarge, ctx.RespCode)
 	}
 }
 
@@ -114,15 +38,14 @@ func TestValidator_DisallowedContentType(t *testing.T) {
 		return nil
 	})
 
-	ctx := newMockContext()
-	ctx.method = http.MethodPost
-	ctx.headers["Content-Type"] = "text/plain"
+	ctx := mock.NewMockContext(http.MethodPost, "/test")
+	ctx.Headers["Content-Type"] = "text/plain"
 
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if ctx.respCode != http.StatusUnsupportedMediaType {
-		t.Fatalf("expected status %d, got %d", http.StatusUnsupportedMediaType, ctx.respCode)
+	if ctx.RespCode != http.StatusUnsupportedMediaType {
+		t.Fatalf("expected status %d, got %d", http.StatusUnsupportedMediaType, ctx.RespCode)
 	}
 }
 
@@ -135,9 +58,8 @@ func TestValidator_AllowedContentType(t *testing.T) {
 		return nil
 	})
 
-	ctx := newMockContext()
-	ctx.method = http.MethodPost
-	ctx.headers["Content-Type"] = "application/json"
+	ctx := mock.NewMockContext(http.MethodPost, "/test")
+	ctx.Headers["Content-Type"] = "application/json"
 
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -155,15 +77,15 @@ func TestValidator_MissingRequiredHeader(t *testing.T) {
 		return nil
 	})
 
-	ctx := newMockContext()
-	ctx.headers["X-API-Key"] = "secret"
-	// X-Request-ID is missing
+	ctx := mock.NewMockContext(http.MethodGet, "/test")
+	ctx.Headers["X-API-Key"] = "secret"
+	// X-Request-ID 缺失
 
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if ctx.respCode != http.StatusBadRequest {
-		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, ctx.respCode)
+	if ctx.RespCode != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, ctx.RespCode)
 	}
 }
 
@@ -176,9 +98,9 @@ func TestValidator_AllRequiredHeadersPresent(t *testing.T) {
 		return nil
 	})
 
-	ctx := newMockContext()
-	ctx.headers["X-API-Key"] = "secret"
-	ctx.headers["X-Request-ID"] = "12345"
+	ctx := mock.NewMockContext(http.MethodGet, "/test")
+	ctx.Headers["X-API-Key"] = "secret"
+	ctx.Headers["X-Request-ID"] = "12345"
 
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -201,14 +123,14 @@ func TestValidator_CustomValidatorFails(t *testing.T) {
 		return nil
 	})
 
-	ctx := newMockContext()
-	// token query param is missing
+	ctx := mock.NewMockContext(http.MethodGet, "/test")
+	// token query param 缺失
 
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if ctx.respCode != http.StatusBadRequest {
-		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, ctx.respCode)
+	if ctx.RespCode != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, ctx.RespCode)
 	}
 }
 
@@ -226,13 +148,13 @@ func TestValidator_CustomValidatorPasses(t *testing.T) {
 		return nil
 	})
 
-	ctx := newMockContext()
-	ctx.queries["token"] = "valid-token"
+	ctx := mock.NewMockContext(http.MethodGet, "/test")
+	ctx.QueryParams["token"] = []string{"valid-token"}
 
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if !handlerCalled {
-		t.Fatal("handler should be called when custom validator passes")
+		t.Fatal("handler should be called when all required headers are present")
 	}
 }

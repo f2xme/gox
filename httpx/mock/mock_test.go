@@ -1,7 +1,9 @@
 package mock
 
 import (
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/f2xme/gox/httpx"
@@ -23,17 +25,20 @@ func TestNewMockContext(t *testing.T) {
 
 func TestMockContext_QueryParams(t *testing.T) {
 	ctx := NewMockContext("GET", "/search")
-	ctx.QueryParams["q"] = "golang"
-	ctx.QueryParams["page"] = "2"
+	ctx.QueryParams["q"] = []string{"golang"}
+	ctx.QueryParams["page"] = []string{"2"}
 
 	if ctx.Query("q") != "golang" {
 		t.Error("expected q=golang")
 	}
-	if ctx.QueryDefault("page", "1") != "2" {
+	if ctx.Query("page").Or("1") != "2" {
 		t.Error("expected page=2")
 	}
-	if ctx.QueryDefault("limit", "10") != "10" {
+	if ctx.Query("limit").Or("10") != "10" {
 		t.Error("expected default limit=10")
+	}
+	if got := ctx.Query("page").IntOr(0); got != 2 {
+		t.Errorf("expected typed page=2, got %d", got)
 	}
 }
 
@@ -43,6 +48,10 @@ func TestMockContext_PathParams(t *testing.T) {
 
 	if ctx.Param("id") != "123" {
 		t.Error("expected id=123")
+	}
+	id, err := ctx.Param("id").Int64()
+	if err != nil || id != 123 {
+		t.Errorf("expected typed id=123, got id=%d err=%v", id, err)
 	}
 }
 
@@ -158,10 +167,10 @@ func TestMockContext_SetHeader(t *testing.T) {
 	ctx.SetHeader("X-Request-ID", "abc123")
 	ctx.SetHeader("X-Custom", "value")
 
-	if ctx.RespHeaders["X-Request-ID"] != "abc123" {
+	if ctx.RespHeaders.Get("X-Request-ID") != "abc123" {
 		t.Error("expected X-Request-ID header")
 	}
-	if ctx.RespHeaders["X-Custom"] != "value" {
+	if ctx.RespHeaders.Get("X-Custom") != "value" {
 		t.Error("expected X-Custom header")
 	}
 }
@@ -175,7 +184,7 @@ func TestMockContext_Redirect(t *testing.T) {
 	if ctx.RespCode != http.StatusMovedPermanently {
 		t.Errorf("expected 301, got %d", ctx.RespCode)
 	}
-	if ctx.RespHeaders["Location"] != "/new" {
+	if ctx.RespHeaders.Get("Location") != "/new" {
 		t.Error("expected Location header")
 	}
 }
@@ -205,7 +214,7 @@ func TestMockContext_Blob(t *testing.T) {
 	if ctx.RespCode != 200 {
 		t.Errorf("expected 200, got %d", ctx.RespCode)
 	}
-	if ctx.RespHeaders["Content-Type"] != "application/octet-stream" {
+	if ctx.RespHeaders.Get("Content-Type") != "application/octet-stream" {
 		t.Error("expected Content-Type header")
 	}
 }
@@ -254,4 +263,74 @@ func TestMockContext_SuccessAndFail(t *testing.T) {
 			t.Errorf("expected message, got %s", resp.Message)
 		}
 	})
+}
+
+func TestMockContext_Request(t *testing.T) {
+	ctx := NewMockContext("POST", "/api/items")
+	ctx.HostValue = "api.example.com"
+	ctx.Headers["X-Trace-ID"] = "trace-1"
+	ctx.QueryParams["q"] = []string{"golang"}
+	ctx.Cookies["session"] = &http.Cookie{Name: "session", Value: "s-123"}
+	ctx.BodyValue = io.NopCloser(strings.NewReader(`{"name":"x"}`))
+
+	req := ctx.Request()
+	if req == nil {
+		t.Fatal("expected non-nil request")
+	}
+	if req.Method != "POST" {
+		t.Errorf("expected POST, got %s", req.Method)
+	}
+	if req.Host != "api.example.com" {
+		t.Errorf("expected host, got %s", req.Host)
+	}
+	if req.URL.Query().Get("q") != "golang" {
+		t.Errorf("expected query q=golang, got %s", req.URL.Query().Get("q"))
+	}
+	if req.Header.Get("X-Trace-ID") != "trace-1" {
+		t.Errorf("expected header, got %s", req.Header.Get("X-Trace-ID"))
+	}
+	c, err := req.Cookie("session")
+	if err != nil || c.Value != "s-123" {
+		t.Errorf("expected cookie session=s-123, got %v err=%v", c, err)
+	}
+
+	body, _ := io.ReadAll(req.Body)
+	if string(body) != `{"name":"x"}` {
+		t.Errorf("expected body, got %q", string(body))
+	}
+}
+
+func TestMockContext_CookieReadWrite(t *testing.T) {
+	ctx := NewMockContext("GET", "/")
+	ctx.SetCookie(&http.Cookie{Name: "token", Value: "abc"})
+
+	got, err := ctx.Cookie("token")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Value != "abc" {
+		t.Errorf("expected abc, got %s", got.Value)
+	}
+
+	if _, err := ctx.Cookie("missing"); err != http.ErrNoCookie {
+		t.Errorf("expected ErrNoCookie, got %v", err)
+	}
+}
+
+func TestMockContext_ResponseWriter(t *testing.T) {
+	ctx := NewMockContext("GET", "/")
+	ctx.SetHeader("Content-Length", "1024")
+
+	rw := ctx.ResponseWriter()
+	if rw == nil {
+		t.Fatal("expected non-nil ResponseWriter")
+	}
+	if got := rw.Header().Get("Content-Length"); got != "1024" {
+		t.Errorf("expected Content-Length=1024, got %q", got)
+	}
+
+	rw.WriteHeader(http.StatusTeapot)
+	if ctx.RespCode != http.StatusTeapot {
+		t.Errorf("expected RespCode synced from WriteHeader, got %d", ctx.RespCode)
+	}
 }

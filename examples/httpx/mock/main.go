@@ -44,7 +44,7 @@ func testGetUser() {
 	// 创建 mock context
 	ctx := mock.NewMockContext("GET", "/api/users/123")
 	ctx.PathParams["id"] = "123"
-	ctx.QueryParams["detail"] = "true"
+	ctx.QueryParams["detail"] = []string{"true"}
 	ctx.Headers["Authorization"] = "Bearer token123"
 
 	// 定义 handler

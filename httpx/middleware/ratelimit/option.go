@@ -115,7 +115,7 @@ func ByIP(ctx httpx.Context) string {
 // ByHeader 返回按指定请求头值限流的 KeyFunc
 func ByHeader(header string) KeyFunc {
 	return func(ctx httpx.Context) string {
-		return ctx.Header(header)
+		return ctx.Header(header).String()
 	}
 }
 

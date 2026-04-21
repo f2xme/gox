@@ -11,7 +11,7 @@ func New(opts ...Option) httpx.Middleware {
 
 	return func(next httpx.Handler) httpx.Handler {
 		return func(ctx httpx.Context) error {
-			id := ctx.Header(o.headerKey)
+			id := ctx.Header(o.headerKey).String()
 			if id == "" {
 				id = o.generator()
 			}
@@ -29,5 +29,5 @@ func New(opts ...Option) httpx.Middleware {
 
 // Get 从上下文头中获取请求 ID
 func Get(ctx httpx.Context) string {
-	return ctx.Header(defaultHeaderKey)
+	return ctx.Header(defaultHeaderKey).String()
 }

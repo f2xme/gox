@@ -15,8 +15,8 @@ const (
 	HeaderDeviceID  = "X-Device-ID"
 )
 
-// HTTPMiddleware 返回一个标准库 http.Handler 中间件
-// 自动从 HTTP Header 提取或生成追踪信息，并注入到 context
+// HTTPMiddleware 返回标准库 http.Handler 中间件：从请求头提取或补全
+// 追踪信息，注入 context，并回写到响应头。
 func HTTPMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := processTraceMiddleware(w, r)
@@ -24,8 +24,7 @@ func HTTPMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// HTTPMiddlewareFunc 返回一个 http.HandlerFunc 中间件
-// 用于包装 http.HandlerFunc 类型的处理器
+// HTTPMiddlewareFunc 是 HTTPMiddleware 针对 http.HandlerFunc 的便捷形式。
 func HTTPMiddlewareFunc(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := processTraceMiddleware(w, r)
@@ -47,9 +46,10 @@ func processTraceMiddleware(w http.ResponseWriter, r *http.Request) context.Cont
 		info.RequestID = generateID()
 	}
 
-	w.Header().Set(HeaderTraceID, info.TraceID)
-	w.Header().Set(HeaderSpanID, info.SpanID)
-	w.Header().Set(HeaderRequestID, info.RequestID)
+	h := w.Header()
+	h.Set(HeaderTraceID, info.TraceID)
+	h.Set(HeaderSpanID, info.SpanID)
+	h.Set(HeaderRequestID, info.RequestID)
 
 	return ToContext(r.Context(), info)
 }
@@ -64,8 +64,8 @@ func extractFromHeaders(r *http.Request) *Info {
 	}
 }
 
-// InjectToHeaders 将追踪信息注入到 HTTP Header
-// 用于客户端发起请求时传递追踪信息
+// InjectToHeaders 将 context 中的追踪信息注入到请求头，
+// 用于客户端向下游发起请求时透传链路。
 func InjectToHeaders(ctx context.Context, header http.Header) {
 	info := FromContext(ctx)
 	setHeaderIfNotEmpty(header, HeaderTraceID, info.TraceID)
@@ -81,19 +81,14 @@ func setHeaderIfNotEmpty(header http.Header, key, value string) {
 	}
 }
 
-// HTTPClient 返回一个带追踪信息的 http.Client
-// 自动在请求中注入追踪信息
+// HTTPClient 返回一个自动将 ctx 中追踪信息注入到出站请求头的 http.Client。
 func HTTPClient(ctx context.Context) *http.Client {
 	return &http.Client{
-		Transport: &tracingTransport{
-			ctx:  ctx,
-			base: http.DefaultTransport,
-		},
+		Transport: &tracingTransport{ctx: ctx, base: http.DefaultTransport},
 	}
 }
 
-// tracingTransport 实现 http.RoundTripper 接口
-// 自动注入追踪信息到请求头
+// tracingTransport 从构造时绑定的 ctx 读取追踪信息并注入出站请求头。
 type tracingTransport struct {
 	ctx  context.Context
 	base http.RoundTripper
@@ -105,9 +100,10 @@ func (t *tracingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	return t.base.RoundTrip(req)
 }
 
-// generateID 生成唯一 ID
+// generateID 生成 128 位随机十六进制 ID（32 字符）。
+// crypto/rand.Read 自 Go 1.24 起保证不返回错误，此处显式丢弃以通过静态检查。
 func generateID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }

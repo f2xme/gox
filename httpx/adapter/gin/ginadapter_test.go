@@ -218,7 +218,7 @@ func TestMiddleware_ExecutionOrder(t *testing.T) {
 func TestParam(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/users/:id", func(ctx httpx.Context) error {
-		return ctx.String(200, ctx.Param("id"))
+		return ctx.String(200, ctx.Param("id").String())
 	})
 
 	w := doRequest(e, "GET", "/users/42")
@@ -227,17 +227,62 @@ func TestParam(t *testing.T) {
 	}
 }
 
+func TestParamInt64(t *testing.T) {
+	e := ginadapter.New()
+	e.GET("/items/:id", func(ctx httpx.Context) error {
+		id, err := ctx.Param("id").Int64()
+		if err != nil {
+			return ctx.BadRequest("invalid id")
+		}
+		return ctx.JSON(200, map[string]int64{"id": id})
+	})
+
+	w := doRequest(e, "GET", "/items/123")
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"id":123`) {
+		t.Errorf("expected id=123 in body, got %q", w.Body.String())
+	}
+}
+
 func TestQuery(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/search", func(ctx httpx.Context) error {
-		q := ctx.Query("q")
-		page := ctx.QueryDefault("page", "1")
+		q := ctx.Query("q").String()
+		page := ctx.Query("page").Or("1")
 		return ctx.String(200, q+":"+page)
 	})
 
 	w := doRequest(e, "GET", "/search?q=hello")
 	if w.Body.String() != "hello:1" {
 		t.Errorf("expected 'hello:1', got %q", w.Body.String())
+	}
+}
+
+func TestQueryTyped(t *testing.T) {
+	e := ginadapter.New()
+	e.GET("/list", func(ctx httpx.Context) error {
+		page := ctx.Query("page").IntOr(1)
+		enabled := ctx.Query("enabled").BoolOr(false)
+		return ctx.JSON(200, map[string]any{"page": page, "enabled": enabled})
+	})
+
+	w := doRequest(e, "GET", "/list?page=3&enabled=true")
+	if !strings.Contains(w.Body.String(), `"page":3`) || !strings.Contains(w.Body.String(), `"enabled":true`) {
+		t.Errorf("unexpected body: %q", w.Body.String())
+	}
+}
+
+func TestQueryAll(t *testing.T) {
+	e := ginadapter.New()
+	e.GET("/tags", func(ctx httpx.Context) error {
+		return ctx.JSON(200, map[string][]string{"tags": ctx.QueryAll("tag")})
+	})
+
+	w := doRequest(e, "GET", "/tags?tag=a&tag=b&tag=c")
+	if !strings.Contains(w.Body.String(), `"a","b","c"`) {
+		t.Errorf("expected multi-value tags, got %q", w.Body.String())
 	}
 }
 

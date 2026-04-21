@@ -8,12 +8,6 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-func getMsg(msg []string, def string) string {
-	if len(msg) > 0 && msg[0] != "" {
-		return msg[0]
-	}
-	return def
-}
 
 type ginContext struct {
 	c *ginframework.Context
@@ -21,11 +15,11 @@ type ginContext struct {
 
 var _ httpx.Context = (*ginContext)(nil)
 
-func (ctx *ginContext) Request() *http.Request               { return ctx.c.Request }
-func (ctx *ginContext) Param(key string) string              { return ctx.c.Param(key) }
-func (ctx *ginContext) Query(key string) string              { return ctx.c.Query(key) }
-func (ctx *ginContext) QueryDefault(key, def string) string  { return ctx.c.DefaultQuery(key, def) }
-func (ctx *ginContext) Header(key string) string             { return ctx.c.GetHeader(key) }
+func (ctx *ginContext) Request() *http.Request       { return ctx.c.Request }
+func (ctx *ginContext) Param(key string) httpx.Value  { return httpx.Value(ctx.c.Param(key)) }
+func (ctx *ginContext) Query(key string) httpx.Value  { return httpx.Value(ctx.c.Query(key)) }
+func (ctx *ginContext) QueryAll(key string) []string  { return ctx.c.QueryArray(key) }
+func (ctx *ginContext) Header(key string) httpx.Value { return httpx.Value(ctx.c.GetHeader(key)) }
 func (ctx *ginContext) Cookie(name string) (*http.Cookie, error) {
 	return ctx.c.Request.Cookie(name)
 }
@@ -88,31 +82,31 @@ func (ctx *ginContext) Fail(msg string) error {
 }
 
 func (ctx *ginContext) BadRequest(msg ...string) error {
-	return ctx.JSON(http.StatusBadRequest, httpx.NewFailResponse(getMsg(msg, "Bad Request")))
+	return ctx.JSON(http.StatusBadRequest, httpx.NewFailResponse(httpx.FirstMsg(msg, "Bad Request")))
 }
 
 func (ctx *ginContext) Unauthorized(msg ...string) error {
-	return ctx.JSON(http.StatusUnauthorized, httpx.NewFailResponse(getMsg(msg, "Unauthorized")))
+	return ctx.JSON(http.StatusUnauthorized, httpx.NewFailResponse(httpx.FirstMsg(msg, "Unauthorized")))
 }
 
 func (ctx *ginContext) Forbidden(msg ...string) error {
-	return ctx.JSON(http.StatusForbidden, httpx.NewFailResponse(getMsg(msg, "Forbidden")))
+	return ctx.JSON(http.StatusForbidden, httpx.NewFailResponse(httpx.FirstMsg(msg, "Forbidden")))
 }
 
 func (ctx *ginContext) NotFound(msg ...string) error {
-	return ctx.JSON(http.StatusNotFound, httpx.NewFailResponse(getMsg(msg, "Not Found")))
+	return ctx.JSON(http.StatusNotFound, httpx.NewFailResponse(httpx.FirstMsg(msg, "Not Found")))
 }
 
 func (ctx *ginContext) TooManyRequests(msg ...string) error {
-	return ctx.JSON(http.StatusTooManyRequests, httpx.NewFailResponse(getMsg(msg, "Too Many Requests")))
+	return ctx.JSON(http.StatusTooManyRequests, httpx.NewFailResponse(httpx.FirstMsg(msg, "Too Many Requests")))
 }
 
 func (ctx *ginContext) InternalError(msg ...string) error {
-	return ctx.JSON(http.StatusInternalServerError, httpx.NewFailResponse(getMsg(msg, "Internal Server Error")))
+	return ctx.JSON(http.StatusInternalServerError, httpx.NewFailResponse(httpx.FirstMsg(msg, "Internal Server Error")))
 }
 
 func (ctx *ginContext) ServiceUnavailable(msg ...string) error {
-	return ctx.JSON(http.StatusServiceUnavailable, httpx.NewFailResponse(getMsg(msg, "Service Unavailable")))
+	return ctx.JSON(http.StatusServiceUnavailable, httpx.NewFailResponse(httpx.FirstMsg(msg, "Service Unavailable")))
 }
 
 func (ctx *ginContext) Set(key string, value any)    { ctx.c.Set(key, value) }

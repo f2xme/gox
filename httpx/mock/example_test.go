@@ -28,12 +28,12 @@ func ExampleMockContext_basic() {
 // 示例：测试带查询参数的请求
 func ExampleMockContext_queryParams() {
 	ctx := mock.NewMockContext("GET", "/api/search")
-	ctx.QueryParams["q"] = "golang"
-	ctx.QueryParams["page"] = "2"
+	ctx.QueryParams["q"] = []string{"golang"}
+	ctx.QueryParams["page"] = []string{"2"}
 
 	handler := func(ctx httpx.Context) error {
-		query := ctx.Query("q")
-		page := ctx.QueryDefault("page", "1")
+		query := ctx.Query("q").String()
+		page := ctx.Query("page").Or("1")
 		return ctx.JSON(200, map[string]string{
 			"query": query,
 			"page":  page,
@@ -51,7 +51,7 @@ func ExampleMockContext_pathParams() {
 	ctx.PathParams["id"] = "123"
 
 	handler := func(ctx httpx.Context) error {
-		id := ctx.Param("id")
+		id := ctx.Param("id").String()
 		return ctx.JSON(200, map[string]string{"user_id": id})
 	}
 

@@ -17,7 +17,7 @@ func New(opts ...Option) httpx.Middleware {
 
 	return func(next httpx.Handler) httpx.Handler {
 		return func(ctx httpx.Context) error {
-			origin := ctx.Header("Origin")
+			origin := ctx.Header("Origin").String()
 			if origin == "" {
 				return next(ctx)
 			}

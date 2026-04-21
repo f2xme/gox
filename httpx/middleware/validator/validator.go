@@ -2,7 +2,6 @@ package validator
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/f2xme/gox/httpx"
 )
@@ -19,7 +18,7 @@ func New(opts ...Option) httpx.Middleware {
 			// Check max body size
 			if cfg.MaxBodySize > 0 {
 				if contentLength := ctx.Header("Content-Length"); contentLength != "" {
-					size, err := strconv.ParseInt(contentLength, 10, 64)
+					size, err := contentLength.Int64()
 					if err == nil && size > cfg.MaxBodySize {
 						cfg.ErrorHandler(ctx, http.StatusRequestEntityTooLarge, "Request body too large")
 						return nil
@@ -29,7 +28,7 @@ func New(opts ...Option) httpx.Middleware {
 
 			// Check allowed content types
 			if len(cfg.AllowedTypes) > 0 {
-				contentType := ctx.Header("Content-Type")
+				contentType := ctx.Header("Content-Type").String()
 				if contentType == "" {
 					cfg.ErrorHandler(ctx, http.StatusUnsupportedMediaType, "Content-Type header is required")
 					return nil

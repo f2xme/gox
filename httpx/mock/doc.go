@@ -54,8 +54,8 @@
 //	ctx.PathParams["id"] = "123"
 //
 //	// 设置查询参数
-//	ctx.QueryParams["page"] = "1"
-//	ctx.QueryParams["limit"] = "10"
+//	ctx.QueryParams["page"] = []string{"1"}
+//	ctx.QueryParams["limit"] = []string{"10"}
 //
 //	// 设置请求头
 //	ctx.Headers["Authorization"] = "Bearer token"
@@ -125,7 +125,7 @@
 //	}
 //
 //	// 验证响应头
-//	if ctx.RespHeaders["X-Request-ID"] == "" {
+//	if ctx.RespHeaders.Get("X-Request-ID") == "" {
 //	    t.Error("expected X-Request-ID header")
 //	}
 //

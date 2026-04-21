@@ -63,11 +63,11 @@ func TestWithParams(t *testing.T) {
     ctx.ClientIPValue = "192.168.1.100"
     
     handler := func(ctx httpx.Context) error {
-        id := ctx.Param("id")
-        page := ctx.Query("page")
-        token := ctx.Header("Authorization")
-        
-        return ctx.JSON(200, map[string]string{
+        id := ctx.Param("id").String()       // 或 ctx.Param("id").Int64()
+        page := ctx.Query("page").IntOr(1)
+        token := ctx.Header("Authorization").String()
+
+        return ctx.JSON(200, map[string]any{
             "id":    id,
             "page":  page,
             "token": token,
