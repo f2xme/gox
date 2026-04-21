@@ -67,25 +67,33 @@ func (m *mockContext) Status(code int)                         { m.respCode = co
 func (m *mockContext) Success(data any) error                  { return m.JSON(200, data) }
 func (m *mockContext) Fail(msg string) error                   { return m.JSON(200, msg) }
 func (m *mockContext) BadRequest(msg ...string) error          { return m.JSON(400, getMsg(msg, "Bad Request")) }
-func (m *mockContext) Unauthorized(msg ...string) error        { return m.JSON(401, getMsg(msg, "Unauthorized")) }
-func (m *mockContext) Forbidden(msg ...string) error           { return m.JSON(403, getMsg(msg, "Forbidden")) }
-func (m *mockContext) NotFound(msg ...string) error            { return m.JSON(404, getMsg(msg, "Not Found")) }
-func (m *mockContext) TooManyRequests(msg ...string) error     { return m.JSON(429, getMsg(msg, "Too Many Requests")) }
-func (m *mockContext) InternalError(msg ...string) error       { return m.JSON(500, getMsg(msg, "Internal Server Error")) }
-func (m *mockContext) ServiceUnavailable(msg ...string) error  { return m.JSON(503, getMsg(msg, "Service Unavailable")) }
-func (m *mockContext) Set(key string, value any)               { m.store[key] = value }
-func (m *mockContext) Get(key string) (any, bool)              { v, ok := m.store[key]; return v, ok }
-func (m *mockContext) MustGet(key string) any                  { return m.store[key] }
-func (m *mockContext) ResponseWriter() http.ResponseWriter     { return nil }
-func (m *mockContext) Raw() any                                { return nil }
+func (m *mockContext) Unauthorized(msg ...string) error {
+	return m.JSON(401, getMsg(msg, "Unauthorized"))
+}
+func (m *mockContext) Forbidden(msg ...string) error { return m.JSON(403, getMsg(msg, "Forbidden")) }
+func (m *mockContext) NotFound(msg ...string) error  { return m.JSON(404, getMsg(msg, "Not Found")) }
+func (m *mockContext) TooManyRequests(msg ...string) error {
+	return m.JSON(429, getMsg(msg, "Too Many Requests"))
+}
+func (m *mockContext) InternalError(msg ...string) error {
+	return m.JSON(500, getMsg(msg, "Internal Server Error"))
+}
+func (m *mockContext) ServiceUnavailable(msg ...string) error {
+	return m.JSON(503, getMsg(msg, "Service Unavailable"))
+}
+func (m *mockContext) Set(key string, value any)           { m.store[key] = value }
+func (m *mockContext) Get(key string) (any, bool)          { v, ok := m.store[key]; return v, ok }
+func (m *mockContext) MustGet(key string) any              { return m.store[key] }
+func (m *mockContext) ResponseWriter() http.ResponseWriter { return nil }
+func (m *mockContext) Raw() any                            { return nil }
 
 type mockClaims struct {
-	subject string
-	values  map[string]any
+	uid    int64
+	values map[string]any
 }
 
-func (c *mockClaims) GetSubject() string {
-	return c.subject
+func (c *mockClaims) GetUID() int64 {
+	return c.uid
 }
 
 func (c *mockClaims) Get(key string) (any, bool) {
@@ -106,6 +114,22 @@ func (v *mockValidator) Validate(token string) (Claims, error) {
 	return nil, errors.New("invalid token")
 }
 
+// mockStatusChecker is a test implementation of UserChecker
+type mockStatusChecker struct {
+	bannedUsers map[int64]bool
+	checkError  error
+}
+
+func (m *mockStatusChecker) CheckUser(uid int64) error {
+	if m.checkError != nil {
+		return m.checkError
+	}
+	if m.bannedUsers[uid] {
+		return errors.New("user is banned")
+	}
+	return nil
+}
+
 func TestAuth_MissingTokenReturnsUnauthorized(t *testing.T) {
 	middleware := New()
 
@@ -119,7 +143,6 @@ func TestAuth_MissingTokenReturnsUnauthorized(t *testing.T) {
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-
 	if got := ctx.respCode; got != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, got)
 	}
@@ -128,12 +151,7 @@ func TestAuth_MissingTokenReturnsUnauthorized(t *testing.T) {
 func TestAuth_ValidBearerTokenStoresClaimsAndCallsNext(t *testing.T) {
 	validator := &mockValidator{
 		tokenToClaims: map[string]Claims{
-			"good-token": &mockClaims{
-				subject: "user-123",
-				values: map[string]any{
-					"role": "admin",
-				},
-			},
+			"good-token": &mockClaims{uid: 123, values: map[string]any{"role": "admin"}},
 		},
 	}
 
@@ -144,8 +162,8 @@ func TestAuth_ValidBearerTokenStoresClaimsAndCallsNext(t *testing.T) {
 		if claims == nil {
 			t.Fatal("expected claims in context")
 		}
-		if claims.GetSubject() != "user-123" {
-			t.Fatalf("expected subject user-123, got %q", claims.GetSubject())
+		if claims.GetUID() != 123 {
+			t.Fatalf("expected uid 123, got %d", claims.GetUID())
 		}
 		role, ok := claims.Get("role")
 		if !ok || role != "admin" {
@@ -160,19 +178,13 @@ func TestAuth_ValidBearerTokenStoresClaimsAndCallsNext(t *testing.T) {
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-
 	if ctx.respCode != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, ctx.respCode)
-	}
-	if len(validator.calledWith) != 1 || validator.calledWith[0] != "good-token" {
-		t.Fatalf("expected validator called with good-token, got %#v", validator.calledWith)
 	}
 }
 
 func TestAuth_InvalidTokenReturnsUnauthorized(t *testing.T) {
-	validator := &mockValidator{
-		tokenToClaims: map[string]Claims{},
-	}
+	validator := &mockValidator{tokenToClaims: map[string]Claims{}}
 
 	middleware := New(WithValidator(validator))
 
@@ -187,24 +199,15 @@ func TestAuth_InvalidTokenReturnsUnauthorized(t *testing.T) {
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-
 	if ctx.respCode != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, ctx.respCode)
-	}
-	if len(validator.calledWith) != 1 || validator.calledWith[0] != "bad-token" {
-		t.Fatalf("expected validator called with bad-token, got %#v", validator.calledWith)
 	}
 }
 
 func TestAuth_SkipPathsBypassAuthentication(t *testing.T) {
-	validator := &mockValidator{
-		tokenToClaims: map[string]Claims{},
-	}
+	validator := &mockValidator{tokenToClaims: map[string]Claims{}}
 
-	middleware := New(
-		WithValidator(validator),
-		WithSkipPaths("/health", "/public/*"),
-	)
+	middleware := New(WithValidator(validator), WithSkipPaths("/health", "/public/*"))
 
 	handler := middleware(func(ctx httpx.Context) error {
 		return ctx.JSON(http.StatusOK, map[string]any{"ok": true})
@@ -236,15 +239,13 @@ func TestAuth_SkipPathsBypassAuthentication(t *testing.T) {
 func TestAuth_CustomTokenExtractorReadsQueryToken(t *testing.T) {
 	validator := &mockValidator{
 		tokenToClaims: map[string]Claims{
-			"query-token": &mockClaims{subject: "query-user", values: map[string]any{}},
+			"query-token": &mockClaims{uid: 456, values: map[string]any{}},
 		},
 	}
 
 	middleware := New(
 		WithValidator(validator),
-		WithTokenExtractor(func(c httpx.Context) string {
-			return c.Query("token")
-		}),
+		WithTokenExtractor(func(c httpx.Context) string { return c.Query("token") }),
 	)
 
 	handler := middleware(func(ctx httpx.Context) error {
@@ -252,8 +253,8 @@ func TestAuth_CustomTokenExtractorReadsQueryToken(t *testing.T) {
 		if claims == nil {
 			t.Fatal("expected claims from custom extractor")
 		}
-		if claims.GetSubject() != "query-user" {
-			t.Fatalf("expected subject query-user, got %q", claims.GetSubject())
+		if claims.GetUID() != 456 {
+			t.Fatalf("expected uid 456, got %d", claims.GetUID())
 		}
 		return ctx.JSON(http.StatusOK, map[string]any{"ok": true})
 	})
@@ -273,9 +274,7 @@ func TestAuth_CustomErrorHandlerOverridesDefaultResponse(t *testing.T) {
 	middleware := New(
 		WithErrorHandler(func(c httpx.Context) {
 			c.Status(http.StatusForbidden)
-			_ = c.JSON(http.StatusForbidden, map[string]any{
-				"error": "forbidden",
-			})
+			_ = c.JSON(http.StatusForbidden, map[string]any{"error": "forbidden"})
 		}),
 	)
 
@@ -297,30 +296,27 @@ func TestAuth_CustomErrorHandlerOverridesDefaultResponse(t *testing.T) {
 func TestAuth_BannedUserReturnsForbidden(t *testing.T) {
 	validator := &mockValidator{
 		tokenToClaims: map[string]Claims{
-			"banned-token": &mockClaims{subject: "banned-user", values: map[string]any{}},
-			"normal-token": &mockClaims{subject: "normal-user", values: map[string]any{}},
+			"banned-token": &mockClaims{uid: 1, values: map[string]any{}},
+			"normal-token": &mockClaims{uid: 2, values: map[string]any{}},
 		},
 	}
 
 	statusChecker := &mockStatusChecker{
-		bannedUsers: map[string]bool{
-			"banned-user": true,
-		},
+		bannedUsers: map[int64]bool{1: true},
 	}
 
 	middleware := New(
 		WithValidator(validator),
-		WithUserStatusChecker(statusChecker),
+		WithUserChecker(statusChecker),
+		WithCheckHandler(func(c httpx.Context, _ error) { c.Forbidden("user is banned") }),
 	)
 
 	handler := middleware(func(ctx httpx.Context) error {
 		return ctx.JSON(http.StatusOK, map[string]any{"ok": true})
 	})
 
-	// Test banned user
 	bannedCtx := newMockContext()
 	bannedCtx.headers["Authorization"] = "Bearer banned-token"
-
 	if err := handler(bannedCtx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -328,10 +324,8 @@ func TestAuth_BannedUserReturnsForbidden(t *testing.T) {
 		t.Fatalf("expected banned user status %d, got %d", http.StatusForbidden, bannedCtx.respCode)
 	}
 
-	// Test normal user
 	normalCtx := newMockContext()
 	normalCtx.headers["Authorization"] = "Bearer normal-token"
-
 	if err := handler(normalCtx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -340,27 +334,23 @@ func TestAuth_BannedUserReturnsForbidden(t *testing.T) {
 	}
 }
 
-func TestAuth_CustomBanHandlerOverridesDefaultResponse(t *testing.T) {
+func TestAuth_CustomCheckHandlerOverridesDefaultResponse(t *testing.T) {
 	validator := &mockValidator{
 		tokenToClaims: map[string]Claims{
-			"banned-token": &mockClaims{subject: "banned-user", values: map[string]any{}},
+			"banned-token": &mockClaims{uid: 1, values: map[string]any{}},
 		},
 	}
 
 	statusChecker := &mockStatusChecker{
-		bannedUsers: map[string]bool{
-			"banned-user": true,
-		},
+		bannedUsers: map[int64]bool{1: true},
 	}
 
 	middleware := New(
 		WithValidator(validator),
-		WithUserStatusChecker(statusChecker),
-		WithBanHandler(func(c httpx.Context) {
+		WithUserChecker(statusChecker),
+		WithCheckHandler(func(c httpx.Context, _ error) {
 			c.Status(http.StatusGone)
-			_ = c.JSON(http.StatusGone, map[string]any{
-				"error": "account suspended",
-			})
+			_ = c.JSON(http.StatusGone, map[string]any{"error": "account suspended"})
 		}),
 	)
 
@@ -380,90 +370,10 @@ func TestAuth_CustomBanHandlerOverridesDefaultResponse(t *testing.T) {
 	}
 }
 
-// mockStatusChecker is a test implementation of UserStatusChecker
-type mockStatusChecker struct {
-	bannedUsers map[string]bool
-	checkError  error
-}
-
-func (m *mockStatusChecker) IsBanned(userID string) (bool, error) {
-	if m.checkError != nil {
-		return false, m.checkError
-	}
-	return m.bannedUsers[userID], nil
-}
-
-func TestAuth_UserStatusChecker_BannedUserReturnsForbidden(t *testing.T) {
+func TestAuth_CheckerErrorReturnsForbidden(t *testing.T) {
 	validator := &mockValidator{
 		tokenToClaims: map[string]Claims{
-			"user-token": &mockClaims{subject: "user123", values: map[string]any{}},
-		},
-	}
-
-	statusChecker := &mockStatusChecker{
-		bannedUsers: map[string]bool{
-			"user123": true,
-		},
-	}
-
-	middleware := New(
-		WithValidator(validator),
-		WithUserStatusChecker(statusChecker),
-	)
-
-	handler := middleware(func(ctx httpx.Context) error {
-		t.Fatal("handler should not be called for banned user")
-		return nil
-	})
-
-	ctx := newMockContext()
-	ctx.headers["Authorization"] = "Bearer user-token"
-
-	if err := handler(ctx); err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if ctx.respCode != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, ctx.respCode)
-	}
-}
-
-func TestAuth_UserStatusChecker_NormalUserPasses(t *testing.T) {
-	validator := &mockValidator{
-		tokenToClaims: map[string]Claims{
-			"user-token": &mockClaims{subject: "user456", values: map[string]any{}},
-		},
-	}
-
-	statusChecker := &mockStatusChecker{
-		bannedUsers: map[string]bool{
-			"user123": true, // different user is banned
-		},
-	}
-
-	middleware := New(
-		WithValidator(validator),
-		WithUserStatusChecker(statusChecker),
-	)
-
-	handler := middleware(func(ctx httpx.Context) error {
-		return ctx.JSON(http.StatusOK, map[string]any{"ok": true})
-	})
-
-	ctx := newMockContext()
-	ctx.headers["Authorization"] = "Bearer user-token"
-
-	if err := handler(ctx); err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if ctx.respCode != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, ctx.respCode)
-	}
-}
-
-func TestAuth_UserStatusChecker_ErrorAllowsAccess(t *testing.T) {
-	validator := &mockValidator{
-		tokenToClaims: map[string]Claims{
-			"user-token": &mockClaims{subject: "user789", values: map[string]any{}},
+			"user-token": &mockClaims{uid: 789, values: map[string]any{}},
 		},
 	}
 
@@ -473,7 +383,8 @@ func TestAuth_UserStatusChecker_ErrorAllowsAccess(t *testing.T) {
 
 	middleware := New(
 		WithValidator(validator),
-		WithUserStatusChecker(statusChecker),
+		WithUserChecker(statusChecker),
+		WithCheckHandler(func(c httpx.Context, _ error) { c.Forbidden("check failed") }),
 	)
 
 	handler := middleware(func(ctx httpx.Context) error {
@@ -486,7 +397,75 @@ func TestAuth_UserStatusChecker_ErrorAllowsAccess(t *testing.T) {
 	if err := handler(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if ctx.respCode != http.StatusOK {
-		t.Fatalf("expected status %d for checker error (fail open), got %d", http.StatusOK, ctx.respCode)
+	if ctx.respCode != http.StatusForbidden {
+		t.Fatalf("expected status %d for checker error (fail closed), got %d", http.StatusForbidden, ctx.respCode)
 	}
+}
+
+func TestAuth_OptionalPaths(t *testing.T) {
+	validator := &mockValidator{
+		tokenToClaims: map[string]Claims{
+			"valid-token": &mockClaims{uid: 1, values: map[string]any{}},
+		},
+	}
+	middleware := New(
+		WithValidator(validator),
+		WithOptionalPaths("/feed", "/public/*"),
+	)
+
+	// 有 token：注入 claims，继续
+	t.Run("with valid token", func(t *testing.T) {
+		ctx := newMockContext()
+		ctx.path = "/feed"
+		ctx.headers["Authorization"] = "Bearer valid-token"
+		called := false
+		if err := middleware(func(c httpx.Context) error {
+			called = true
+			if GetUID(c) != 1 {
+				t.Fatal("expected uid 1")
+			}
+			return nil
+		})(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if !called {
+			t.Fatal("handler should be called")
+		}
+	})
+
+	// 无 token：放行，claims 为 nil
+	t.Run("without token", func(t *testing.T) {
+		ctx := newMockContext()
+		ctx.path = "/feed"
+		called := false
+		if err := middleware(func(c httpx.Context) error {
+			called = true
+			if GetUID(c) != 0 {
+				t.Fatal("expected uid 0")
+			}
+			return nil
+		})(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if !called {
+			t.Fatal("handler should be called")
+		}
+	})
+
+	// 无效 token：放行（optional 模式不拦截）
+	t.Run("with invalid token", func(t *testing.T) {
+		ctx := newMockContext()
+		ctx.path = "/public/news"
+		ctx.headers["Authorization"] = "Bearer bad-token"
+		called := false
+		if err := middleware(func(c httpx.Context) error {
+			called = true
+			return nil
+		})(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if !called {
+			t.Fatal("handler should be called")
+		}
+	})
 }

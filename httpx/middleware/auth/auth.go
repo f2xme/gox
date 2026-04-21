@@ -20,14 +20,14 @@ type TokenValidator interface {
 
 // Claims 表示已认证的 token 声明
 type Claims interface {
-	GetSubject() string
+	GetUID() int64
 	Get(key string) (any, bool)
 }
 
-// UserStatusChecker 实时检查用户状态（如封禁、禁用）
+// UserChecker 实时检查用户状态（如封禁、禁用）
 // 在每次请求的 token 验证后调用，以确保立即生效
-type UserStatusChecker interface {
-	IsBanned(userID string) (bool, error)
+type UserChecker interface {
+	CheckUser(uid int64) error
 }
 
 // New 创建认证中间件
@@ -43,28 +43,32 @@ func New(opts ...Option) httpx.Middleware {
 				return next(ctx)
 			}
 
+			optional := (len(o.optionalPaths) > 0 || len(o.optionalPatterns) > 0) &&
+				shouldSkip(ctx.Path(), o.optionalPaths, o.optionalPatterns)
+
 			token := o.tokenExtractor(ctx)
 			if token == "" || o.validator == nil {
+				if optional {
+					return next(ctx)
+				}
 				o.errorHandler(ctx)
 				return nil
 			}
 
 			claims, err := o.validator.Validate(token)
 			if err != nil {
+				if optional {
+					return next(ctx)
+				}
 				o.errorHandler(ctx)
 				return nil
 			}
 
 			ctx.Set(ClaimsContextKey, claims)
 
-			// Real-time user status check (e.g., banned, disabled)
 			if o.statusChecker != nil {
-				userID := claims.GetSubject()
-				banned, err := o.statusChecker.IsBanned(userID)
-				if err != nil {
-					// Fail-open: allow request if checker unavailable to prevent cascading failures
-				} else if banned {
-					o.banHandler(ctx)
+				if err = o.statusChecker.CheckUser(claims.GetUID()); err != nil {
+					o.checkHandler(ctx, err)
 					return nil
 				}
 			}
@@ -75,11 +79,9 @@ func New(opts ...Option) httpx.Middleware {
 }
 
 func shouldSkip(path string, skipPaths map[string]bool, skipPatterns []string) bool {
-	// Fast O(1) exact match check
 	if skipPaths[path] {
 		return true
 	}
-	// Fallback to pattern matching for wildcards
 	for _, pattern := range skipPatterns {
 		if matchPath(pattern, path) {
 			return true
@@ -107,4 +109,12 @@ func GetClaims(ctx httpx.Context) Claims {
 		}
 	}
 	return nil
+}
+
+// GetUID 从上下文中获取当前用户 ID，未认证时返回 0
+func GetUID(ctx httpx.Context) int64 {
+	if c := GetClaims(ctx); c != nil {
+		return c.GetUID()
+	}
+	return 0
 }

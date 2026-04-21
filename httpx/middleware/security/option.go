@@ -2,7 +2,6 @@ package security
 
 import (
 	"github.com/f2xme/gox/httpx"
-	"github.com/f2xme/gox/httpx/middleware/internal"
 )
 
 // Options 定义安全中间件配置
@@ -43,7 +42,7 @@ func defaultOptions() *Options {
 }
 
 func defaultErrorHandler(ctx httpx.Context, code int, message string) {
-	internal.JSONError(ctx, code, message)
+	ctx.JSON(code, httpx.NewFailResponse(message))
 }
 
 func normalizeCSRFConfig(cfg *CSRFConfig) {

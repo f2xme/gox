@@ -2,7 +2,6 @@ package validator
 
 import (
 	"github.com/f2xme/gox/httpx"
-	"github.com/f2xme/gox/httpx/middleware/internal"
 )
 
 // Options 定义验证中间件配置
@@ -25,7 +24,7 @@ func defaultOptions() *Options {
 }
 
 func defaultErrorHandler(ctx httpx.Context, code int, message string) {
-	internal.JSONErrorSimple(ctx, code, message)
+	ctx.JSON(code, httpx.NewFailResponse(message))
 }
 
 // WithMaxBodySize 设置允许的最大请求体大小（字节）
