@@ -18,6 +18,14 @@ type TokenValidator interface {
 	Validate(token string) (Claims, error)
 }
 
+// TokenValidatorFunc 是实现 TokenValidator 的函数类型，便于以内联函数直接作为验证器使用
+type TokenValidatorFunc func(token string) (Claims, error)
+
+// Validate 调用底层函数完成 token 验证
+func (f TokenValidatorFunc) Validate(token string) (Claims, error) {
+	return f(token)
+}
+
 // Claims 表示已认证的 token 声明
 type Claims interface {
 	GetUID() int64
