@@ -142,7 +142,7 @@ func testUnifiedResponse() {
 	// 测试成功响应
 	ctx1 := mock.NewMockContext("GET", "/api/success")
 	handler1 := func(ctx httpx.Context) error {
-		return httpx.Success(ctx, map[string]string{
+		return httpx.Data(ctx, map[string]string{
 			"message": "操作成功",
 		})
 	}

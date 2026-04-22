@@ -220,7 +220,7 @@ func TestSuccessAndFail(t *testing.T) {
 		ctx := NewMockContext("GET", "/")
 		data := map[string]int{"count": 42}
 
-		if err := httpx.Success(ctx, data); err != nil {
+		if err := httpx.Data(ctx, data); err != nil {
 			t.Fatal(err)
 		}
 

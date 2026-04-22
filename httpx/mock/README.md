@@ -122,7 +122,7 @@ func TestResponse(t *testing.T) {
     ctx := mock.NewMockContext("POST", "/api/users")
     
     handler := func(ctx httpx.Context) error {
-        return ctx.Success(map[string]any{
+        return httpx.Data(ctx, map[string]any{
             "id":   123,
             "name": "张三",
         })

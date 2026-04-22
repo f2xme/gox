@@ -112,7 +112,7 @@ func handleCreateUser(ctx httpx.Context) error {
 	}
 
 	// 使用统一响应格式
-	return httpx.Success(ctx, user)
+	return httpx.Data(ctx, user)
 }
 
 // handleError 演示错误处理

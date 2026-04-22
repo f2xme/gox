@@ -71,10 +71,10 @@ func TestGET_JSON(t *testing.T) {
 	}
 }
 
-func TestSuccess(t *testing.T) {
+func TestData(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/ok", func(ctx httpx.Context) error {
-		return httpx.Success(ctx, []string{"a", "b"})
+		return httpx.Data(ctx, []string{"a", "b"})
 	})
 
 	w := doRequest(e, "GET", "/ok")
@@ -87,6 +87,44 @@ func TestSuccess(t *testing.T) {
 	}
 	if resp.Message != "ok" {
 		t.Errorf("expected message='ok', got %q", resp.Message)
+	}
+}
+
+func TestData_CustomMsg(t *testing.T) {
+	e := ginadapter.New()
+	e.GET("/created", func(ctx httpx.Context) error {
+		return httpx.Data(ctx, map[string]int{"id": 1}, "创建成功")
+	})
+
+	w := doRequest(e, "GET", "/created")
+	resp := decodeResponse(t, w)
+	if !resp.Success {
+		t.Error("expected success=true")
+	}
+	if resp.Message != "创建成功" {
+		t.Errorf("expected message='创建成功', got %q", resp.Message)
+	}
+}
+
+func TestDone(t *testing.T) {
+	e := ginadapter.New()
+	e.GET("/done", func(ctx httpx.Context) error {
+		return httpx.Done(ctx, "删除成功")
+	})
+
+	w := doRequest(e, "GET", "/done")
+	if w.Code != 200 {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	resp := decodeResponse(t, w)
+	if !resp.Success {
+		t.Error("expected success=true")
+	}
+	if resp.Message != "删除成功" {
+		t.Errorf("expected message='删除成功', got %q", resp.Message)
+	}
+	if strings.Contains(w.Body.String(), `"data"`) {
+		t.Errorf("expected response body to omit data field, got %s", w.Body.String())
 	}
 }
 
@@ -313,7 +351,7 @@ func TestBindJSON(t *testing.T) {
 		if err := ctx.BindJSON(&req); err != nil {
 			return err
 		}
-		return httpx.Success(ctx, req.Name)
+		return httpx.Data(ctx, req.Name)
 	})
 
 	w := doRequest(e, "POST", "/bind", `{"name":"bob"}`)
