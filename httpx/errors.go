@@ -37,12 +37,37 @@ func (e *HTTPError) WithError(err error) *HTTPError {
 	return e
 }
 
-// FirstMsg 返回 msg 中第一个非空字符串，若均为空则返回 def。
-func FirstMsg(msg []string, def string) string {
-	if len(msg) > 0 && msg[0] != "" {
-		return msg[0]
+func (e *HTTPError) withErr(err error) *HTTPError {
+	if err != nil {
+		e.Err = err
 	}
-	return def
+	return e
+}
+
+// resolveArgs 从 any 变参中提取消息字符串和底层错误。
+// 规则：string 覆盖默认消息；error 存入 Err 字段，若消息尚未被 string 覆盖则同时以 err.Error() 作为消息；
+// fmt.Stringer 等效于 string；nil 忽略；其余类型忽略。
+func resolveArgs(def string, args []any) (msg string, err error) {
+	msg = def
+	for _, a := range args {
+		switch v := a.(type) {
+		case nil:
+		case string:
+			if v != "" {
+				msg = v
+			}
+		case error:
+			err = v
+			if msg == def {
+				msg = v.Error()
+			}
+		case fmt.Stringer:
+			if s := v.String(); s != "" {
+				msg = s
+			}
+		}
+	}
+	return
 }
 
 // BizError 表示业务层错误，HTTP 状态码固定为 200，通过 success:false 标识失败。
@@ -51,9 +76,10 @@ type BizError struct {
 	Err     error
 }
 
-// NewBizError 创建一个新的 BizError。
-func NewBizError(message string) *BizError {
-	return &BizError{Message: message}
+// NewBizError 创建一个新的 BizError。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func NewBizError(args ...any) *BizError {
+	msg, err := resolveArgs("", args)
+	return &BizError{Message: msg, Err: err}
 }
 
 // Error 实现 error 接口。
@@ -75,39 +101,46 @@ func (e *BizError) WithError(err error) *BizError {
 	return e
 }
 
-// ErrBadRequest 创建 400 参数错误。
-func ErrBadRequest(msg ...string) *HTTPError {
-	return NewHTTPError(http.StatusBadRequest, FirstMsg(msg, "Bad Request"))
+// ErrBadRequest 创建 400 参数错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func ErrBadRequest(args ...any) *HTTPError {
+	msg, err := resolveArgs("Bad Request", args)
+	return NewHTTPError(http.StatusBadRequest, msg).withErr(err)
 }
 
-// ErrUnauthorized 创建 401 未登录错误。
-func ErrUnauthorized(msg ...string) *HTTPError {
-	return NewHTTPError(http.StatusUnauthorized, FirstMsg(msg, "Unauthorized"))
+// ErrUnauthorized 创建 401 未登录错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func ErrUnauthorized(args ...any) *HTTPError {
+	msg, err := resolveArgs("Unauthorized", args)
+	return NewHTTPError(http.StatusUnauthorized, msg).withErr(err)
 }
 
-// ErrForbidden 创建 403 无权限错误。
-func ErrForbidden(msg ...string) *HTTPError {
-	return NewHTTPError(http.StatusForbidden, FirstMsg(msg, "Forbidden"))
+// ErrForbidden 创建 403 无权限错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func ErrForbidden(args ...any) *HTTPError {
+	msg, err := resolveArgs("Forbidden", args)
+	return NewHTTPError(http.StatusForbidden, msg).withErr(err)
 }
 
-// ErrNotFound 创建 404 资源不存在错误。
-func ErrNotFound(msg ...string) *HTTPError {
-	return NewHTTPError(http.StatusNotFound, FirstMsg(msg, "Not Found"))
+// ErrNotFound 创建 404 资源不存在错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func ErrNotFound(args ...any) *HTTPError {
+	msg, err := resolveArgs("Not Found", args)
+	return NewHTTPError(http.StatusNotFound, msg).withErr(err)
 }
 
-// ErrTooManyRequests 创建 429 请求过频错误。
-func ErrTooManyRequests(msg ...string) *HTTPError {
-	return NewHTTPError(http.StatusTooManyRequests, FirstMsg(msg, "Too Many Requests"))
+// ErrTooManyRequests 创建 429 请求过频错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func ErrTooManyRequests(args ...any) *HTTPError {
+	msg, err := resolveArgs("Too Many Requests", args)
+	return NewHTTPError(http.StatusTooManyRequests, msg).withErr(err)
 }
 
-// ErrInternalError 创建 500 服务器内部错误。
-func ErrInternalError(msg ...string) *HTTPError {
-	return NewHTTPError(http.StatusInternalServerError, FirstMsg(msg, "Internal Server Error"))
+// ErrInternalError 创建 500 服务器内部错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func ErrInternalError(args ...any) *HTTPError {
+	msg, err := resolveArgs("Internal Server Error", args)
+	return NewHTTPError(http.StatusInternalServerError, msg).withErr(err)
 }
 
-// ErrServiceUnavailable 创建 503 服务不可用错误。
-func ErrServiceUnavailable(msg ...string) *HTTPError {
-	return NewHTTPError(http.StatusServiceUnavailable, FirstMsg(msg, "Service Unavailable"))
+// ErrServiceUnavailable 创建 503 服务不可用错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
+func ErrServiceUnavailable(args ...any) *HTTPError {
+	msg, err := resolveArgs("Service Unavailable", args)
+	return NewHTTPError(http.StatusServiceUnavailable, msg).withErr(err)
 }
 
 // DefaultErrorHandler 是默认的错误处理器。
