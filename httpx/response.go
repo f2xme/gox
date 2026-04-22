@@ -73,3 +73,8 @@ func Done(c Context, msg string) error {
 func Fail(c Context, msg string, data ...any) error {
 	return c.JSON(http.StatusOK, NewFailResponse(msg, data...))
 }
+
+// FailErr 业务失败，msg 从 error.Error() 提取。
+func FailErr(c Context, err error, data ...any) error {
+    return Fail(c, err.Error(), data...)
+}
