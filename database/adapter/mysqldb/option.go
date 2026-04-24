@@ -76,6 +76,13 @@ func WithConnMaxIdleTime(d time.Duration) Option {
 	}
 }
 
+// WithIgnoreRecordNotFound 设置是否忽略 ErrRecordNotFound 错误
+func WithIgnoreRecordNotFound(ignore bool) Option {
+	return func(o *Options) {
+		o.IgnoreRecordNotFound = ignore
+	}
+}
+
 // WithOptions 设置多个选项
 func WithOptions(opts ...Option) Option {
 	return func(o *Options) {

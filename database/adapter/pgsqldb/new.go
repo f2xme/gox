@@ -54,6 +54,7 @@ func MustNew(opts ...Option) database.DB {
 //   - {prefix}.maxIdleConns (int): 最大空闲连接数
 //   - {prefix}.connMaxLifetime (duration): 连接最大生命周期
 //   - {prefix}.connMaxIdleTime (duration): 连接最大空闲时间
+//   - {prefix}.ignoreRecordNotFound (bool): 是否忽略 ErrRecordNotFound 错误
 //
 // 示例配置（YAML）：
 //
@@ -63,6 +64,7 @@ func MustNew(opts ...Option) database.DB {
 //	  maxIdleConns: 10
 //	  connMaxLifetime: 1h
 //	  connMaxIdleTime: 10m
+//	  ignoreRecordNotFound: true
 //
 // 多数据库实例示例：
 //
@@ -99,6 +101,10 @@ func NewWithConfig(cfg config.Config, prefixes ...string) (database.DB, error) {
 
 	if idleTime := cfg.GetDuration(prefix + ".connMaxIdleTime"); idleTime > 0 {
 		opts = append(opts, WithConnMaxIdleTime(idleTime))
+	}
+
+	if cfg.GetBool(prefix + ".ignoreRecordNotFound") {
+		opts = append(opts, WithIgnoreRecordNotFound(true))
 	}
 
 	return New(opts...)
