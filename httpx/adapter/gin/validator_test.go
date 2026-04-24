@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/f2xme/gox/httpx"
+	goxvalidator "github.com/f2xme/gox/validator"
 	ginframework "github.com/gin-gonic/gin"
 )
 
@@ -32,6 +33,95 @@ func (r *TestRequest) Validate() error {
 type TestRequestNoValidator struct {
 	Name string `json:"name"`
 	Age  int    `json:"age"`
+}
+
+type adapterValidateRequest struct {
+	Name string `json:"name" validate:"required"`
+}
+
+func TestGoxValidatorAdapterValidateStruct(t *testing.T) {
+	adapter := &goxValidatorAdapter{validator: newGoxValidator()}
+	valid := adapterValidateRequest{Name: "Alice"}
+	invalid := adapterValidateRequest{}
+	validPtr := &valid
+
+	tests := []struct {
+		name    string
+		input   any
+		wantErr bool
+	}{
+		{
+			name:    "nil",
+			input:   nil,
+			wantErr: false,
+		},
+		{
+			name:    "non struct",
+			input:   "Alice",
+			wantErr: false,
+		},
+		{
+			name:    "valid struct",
+			input:   valid,
+			wantErr: false,
+		},
+		{
+			name:    "invalid struct",
+			input:   invalid,
+			wantErr: true,
+		},
+		{
+			name:    "valid pointer",
+			input:   &valid,
+			wantErr: false,
+		},
+		{
+			name:    "nil pointer",
+			input:   (*adapterValidateRequest)(nil),
+			wantErr: false,
+		},
+		{
+			name:    "valid nested pointer",
+			input:   &validPtr,
+			wantErr: false,
+		},
+		{
+			name:    "valid slice",
+			input:   []adapterValidateRequest{valid},
+			wantErr: false,
+		},
+		{
+			name:    "invalid slice element",
+			input:   []adapterValidateRequest{valid, invalid},
+			wantErr: true,
+		},
+		{
+			name:    "invalid array element",
+			input:   [2]adapterValidateRequest{valid, invalid},
+			wantErr: true,
+		},
+		{
+			name:    "valid interface",
+			input:   any(valid),
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := adapter.ValidateStruct(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateStruct() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGoxValidatorAdapterEngine(t *testing.T) {
+	adapter := &goxValidatorAdapter{validator: newGoxValidator()}
+	if _, ok := adapter.Engine().(*goxvalidator.Validator); !ok {
+		t.Fatalf("Engine() = %T, want *validator.Validator", adapter.Engine())
+	}
 }
 
 func TestBindJSONWithValidator(t *testing.T) {

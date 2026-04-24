@@ -77,6 +77,18 @@ func getDefaultValidator() *Validator {
 	return defaultValidator
 }
 
+// Default 返回全局默认验证器实例。
+//
+// 默认验证器使用懒加载初始化，并且可以安全地在多个 goroutine 中共享。
+//
+// 示例：
+//
+//	v := validator.Default()
+//	err := v.Validate(user)
+func Default() *Validator {
+	return getDefaultValidator()
+}
+
 // Validate 验证结构体字段是否符合标签定义的规则。
 //
 // 如果验证失败，返回包含所有错误信息的 error（中文描述）。

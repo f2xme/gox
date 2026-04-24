@@ -30,40 +30,32 @@ func (ctx *ginContext) Bind(v any) error {
 	if err := ctx.c.ShouldBind(v); err != nil {
 		return err
 	}
-	// 调用自定义 Validate 方法（如果实现了）
-	if validator, ok := v.(httpx.Validator); ok {
-		return validator.Validate()
-	}
-	return nil
+	return callCustomValidate(v)
 }
 
 func (ctx *ginContext) BindJSON(v any) error {
 	if err := ctx.c.ShouldBindJSON(v); err != nil {
 		return err
 	}
-	// 调用自定义 Validate 方法（如果实现了）
-	if validator, ok := v.(httpx.Validator); ok {
-		return validator.Validate()
-	}
-	return nil
+	return callCustomValidate(v)
 }
 
 func (ctx *ginContext) BindQuery(v any) error {
 	if err := ctx.c.ShouldBindQuery(v); err != nil {
 		return err
 	}
-	// 调用自定义 Validate 方法（如果实现了）
-	if validator, ok := v.(httpx.Validator); ok {
-		return validator.Validate()
-	}
-	return nil
+	return callCustomValidate(v)
 }
 
 func (ctx *ginContext) BindForm(v any) error {
 	if err := ctx.c.ShouldBindWith(v, binding.Form); err != nil {
 		return err
 	}
-	// 调用自定义 Validate 方法（如果实现了）
+	return callCustomValidate(v)
+}
+
+// callCustomValidate 调用自定义 Validate 方法（如果实现了 httpx.Validator 接口）
+func callCustomValidate(v any) error {
 	if validator, ok := v.(httpx.Validator); ok {
 		return validator.Validate()
 	}

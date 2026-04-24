@@ -251,6 +251,16 @@ func TestValidate_GlobalFunction(t *testing.T) {
 	}
 }
 
+// 测试默认验证器实例
+func TestDefault(t *testing.T) {
+	if Default() == nil {
+		t.Fatal("Default() returned nil")
+	}
+	if Default() != Default() {
+		t.Fatal("Default() should return the same validator instance")
+	}
+}
+
 // 测试全局注册自定义验证
 func TestRegisterValidation_Global(t *testing.T) {
 	type Product struct {

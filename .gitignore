@@ -10,6 +10,8 @@ go.work.sum
 *.dylib
 bin/
 dist/
+examples/*/[!.]*/
+examples/*/[!.]*
 
 # Test binary, built with `go test -c`
 *.test

@@ -2,11 +2,14 @@ module github.com/f2xme/gox/httpx/adapter/gin
 
 go 1.25.7
 
-replace github.com/f2xme/gox => ../../../
+replace (
+	github.com/f2xme/gox => ../../../
+	github.com/f2xme/gox/validator => ../../../validator
+)
 
 require (
 	github.com/f2xme/gox v0.14.2
-	github.com/f2xme/gox/validator v0.1.0
+	github.com/f2xme/gox/validator v0.2.0
 	github.com/gin-gonic/gin v1.12.0
 )
 

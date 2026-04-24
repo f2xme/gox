@@ -2,7 +2,6 @@ package gin
 
 import (
 	"reflect"
-	"sync"
 
 	"github.com/f2xme/gox/validator"
 	"github.com/gin-gonic/gin/binding"
@@ -11,7 +10,6 @@ import (
 // goxValidatorAdapter 将 gox/validator 适配为 gin 的 binding.StructValidator 接口
 type goxValidatorAdapter struct {
 	validator *validator.Validator
-	once      sync.Once
 }
 
 var _ binding.StructValidator = (*goxValidatorAdapter)(nil)
@@ -22,15 +20,31 @@ func (v *goxValidatorAdapter) ValidateStruct(obj any) error {
 		return nil
 	}
 
-	value := reflect.ValueOf(obj)
-	switch value.Kind() {
-	case reflect.Ptr:
-		return v.ValidateStruct(value.Elem().Interface())
-	case reflect.Struct:
-		return v.validator.Validate(obj)
-	default:
+	return v.validateValue(reflect.ValueOf(obj))
+}
+
+func (v *goxValidatorAdapter) validateValue(value reflect.Value) error {
+	if !value.IsValid() {
 		return nil
 	}
+
+	switch value.Kind() {
+	case reflect.Ptr, reflect.Interface:
+		if value.IsNil() {
+			return nil
+		}
+		return v.validateValue(value.Elem())
+	case reflect.Struct:
+		return v.validator.Validate(value.Interface())
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < value.Len(); i++ {
+			if err := v.validateValue(value.Index(i)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // Engine 实现 binding.StructValidator 接口，返回底层验证引擎
@@ -38,7 +52,7 @@ func (v *goxValidatorAdapter) Engine() any {
 	return v.validator
 }
 
-// newGoxValidator 创建一个新的 gox validator 实例
+// newGoxValidator 返回默认 gox validator 实例
 func newGoxValidator() *validator.Validator {
-	return validator.New()
+	return validator.Default()
 }
