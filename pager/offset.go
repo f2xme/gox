@@ -8,8 +8,8 @@ const (
 
 // OffsetPage 表示基于偏移量的分页参数
 type OffsetPage struct {
-	Limit  int
-	Offset int
+	Limit  int `json:"limit" form:"limit"`
+	Offset int `json:"offset" form:"offset"`
 }
 
 // NewOffset 创建给定 limit 和 offset 的新偏移量分页
@@ -69,4 +69,14 @@ func (r OffsetResult[T]) HasNext() bool {
 
 func (r OffsetResult[T]) HasPrev() bool {
 	return r.Offset > 0
+}
+
+// GetOffset 返回 GORM 使用的 offset 值
+func (p OffsetPage) GetOffset() int {
+	return p.Offset
+}
+
+// GetLimit 返回 GORM 使用的 limit 值
+func (p OffsetPage) GetLimit() int {
+	return p.Limit
 }

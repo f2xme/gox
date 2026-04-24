@@ -8,8 +8,8 @@ const (
 
 // PageNumber 表示基于页码的分页参数
 type PageNumber struct {
-	Page int
-	Size int
+	Page int `json:"pn" form:"pn"`
+	Size int `json:"ps" form:"ps"`
 }
 
 // NewPage 创建给定页码和大小的新页码分页
@@ -80,6 +80,16 @@ func (r PageResult[T]) HasNext() bool {
 
 func (r PageResult[T]) HasPrev() bool {
 	return r.Page > 1
+}
+
+// GetOffset 返回 GORM 使用的 offset 值
+func (p PageNumber) GetOffset() int {
+	return (p.Page - 1) * p.Size
+}
+
+// GetLimit 返回 GORM 使用的 limit 值
+func (p PageNumber) GetLimit() int {
+	return p.Size
 }
 
 // CalculateTotalPages 根据总项数和页面大小计算总页数

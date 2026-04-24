@@ -65,7 +65,7 @@
 //
 // # 从 HTTP 请求解析分页参数
 //
-// 偏移分页：
+// 方式一：使用 NewXxxFromRequest 函数：
 //
 //	import "net/http"
 //
@@ -75,21 +75,40 @@
 //		// 使用 page.Limit 和 page.Offset 查询数据
 //	}
 //
-// 页码分页：
-//
 //	func handler(w http.ResponseWriter, r *http.Request) {
 //		// 从查询参数解析：?page=2&size=20
 //		page := pager.NewPageFromRequest(r)
 //		// 使用 page.ToOffset() 转换为数据库查询参数
 //	}
 //
-// 游标分页：
-//
 //	func handler(w http.ResponseWriter, r *http.Request) {
 //		// 从查询参数解析：?cursor=abc123&limit=20
 //		page := pager.NewCursorFromRequest(r)
 //		// 解码游标并查询数据
 //		cursor, _ := pager.DecodeCursor(page.Cursor)
+//	}
+//
+// 方式二：嵌入到请求结构体（推荐用于 GORM）：
+//
+//	import "github.com/f2xme/gox/pager"
+//
+//	// 使用 OffsetPage（offset/limit 模式）
+//	type UserListRequest struct {
+//		pager.OffsetPage        // 嵌入分页参数
+//		Keyword          string `json:"keyword" form:"keyword"`
+//	}
+//
+//	// 使用 PageNumber（page/size 模式）
+//	type ProductListRequest struct {
+//		pager.PageNumber        // 嵌入分页参数
+//		Category         string `json:"category" form:"category"`
+//	}
+//
+//	// 在 GORM 中使用
+//	func listUsers(req UserListRequest) ([]User, error) {
+//		var users []User
+//		err := db.Offset(req.GetOffset()).Limit(req.GetLimit()).Find(&users).Error
+//		return users, err
 //	}
 //
 // # 分页策略选择指南

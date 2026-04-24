@@ -133,3 +133,45 @@ func TestOffsetResult_HasPrev(t *testing.T) {
 		})
 	}
 }
+
+func TestOffsetPage_GetOffset(t *testing.T) {
+	tests := []struct {
+		name   string
+		offset int
+		want   int
+	}{
+		{"zero offset", 0, 0},
+		{"positive offset", 20, 20},
+		{"large offset", 100, 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page := NewOffset(10, tt.offset)
+			if got := page.GetOffset(); got != tt.want {
+				t.Errorf("GetOffset() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOffsetPage_GetLimit(t *testing.T) {
+	tests := []struct {
+		name  string
+		limit int
+		want  int
+	}{
+		{"default limit", 0, DefaultLimit},
+		{"custom limit", 20, 20},
+		{"large limit", 100, 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page := NewOffset(tt.limit, 0)
+			if got := page.GetLimit(); got != tt.want {
+				t.Errorf("GetLimit() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

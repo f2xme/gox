@@ -156,7 +156,10 @@ func TestValidateFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validate(tt.input)
+			var err error
+			if validator, ok := tt.input.(httpx.Validator); ok {
+				err = validator.Validate()
+			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
 			}

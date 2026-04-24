@@ -4,6 +4,7 @@ import (
 	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/httpx"
 	ginframework "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // New 创建一个基于 Gin 的 httpx.Engine 实例
@@ -12,12 +13,19 @@ import (
 //
 //	engine := New()
 //	engine := New(WithMode("debug"))
+//	engine := New(WithValidator(myValidator))
 func New(opts ...Option) httpx.Engine {
 	o := defaultOptions()
 	for _, opt := range opts {
 		opt(o)
 	}
 	ginframework.SetMode(o.Mode)
+
+	// 设置全局 validator
+	if o.Validator != nil {
+		binding.Validator = o.Validator
+	}
+
 	return &ginEngine{
 		engine:       ginframework.New(),
 		errorHandler: httpx.DefaultErrorHandler,

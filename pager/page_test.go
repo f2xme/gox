@@ -186,3 +186,47 @@ func TestCalculateTotalPages(t *testing.T) {
 		}
 	}
 }
+
+func TestPageNumber_GetOffset(t *testing.T) {
+	tests := []struct {
+		name string
+		page int
+		size int
+		want int
+	}{
+		{"first page", 1, 10, 0},
+		{"second page", 2, 10, 10},
+		{"third page", 3, 20, 40},
+		{"page 5", 5, 15, 60},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page := NewPage(tt.page, tt.size)
+			if got := page.GetOffset(); got != tt.want {
+				t.Errorf("GetOffset() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPageNumber_GetLimit(t *testing.T) {
+	tests := []struct {
+		name string
+		size int
+		want int
+	}{
+		{"default size", 0, DefaultSize},
+		{"custom size", 20, 20},
+		{"large size", 100, 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page := NewPage(1, tt.size)
+			if got := page.GetLimit(); got != tt.want {
+				t.Errorf("GetLimit() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

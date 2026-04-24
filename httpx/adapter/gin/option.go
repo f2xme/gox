@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	ginframework "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 // Options 定义 Gin 适配器的配置选项
@@ -12,6 +13,10 @@ type Options struct {
 	// 可选值：debug, release, test
 	// 默认值：release
 	Mode string
+
+	// Validator 设置 Gin 的验证器
+	// 默认值：使用 gox/validator
+	Validator binding.StructValidator
 }
 
 // Option 定义配置选项函数
@@ -28,7 +33,8 @@ func (o *Options) Validate() error {
 // defaultOptions 返回默认配置
 func defaultOptions() *Options {
 	return &Options{
-		Mode: ginframework.ReleaseMode,
+		Mode:      ginframework.ReleaseMode,
+		Validator: &goxValidatorAdapter{validator: newGoxValidator()},
 	}
 }
 
@@ -40,5 +46,16 @@ func defaultOptions() *Options {
 func WithMode(mode string) Option {
 	return func(o *Options) {
 		o.Mode = mode
+	}
+}
+
+// WithValidator 设置自定义验证器
+//
+// 示例：
+//
+//	New(WithValidator(myValidator))
+func WithValidator(validator binding.StructValidator) Option {
+	return func(o *Options) {
+		o.Validator = validator
 	}
 }

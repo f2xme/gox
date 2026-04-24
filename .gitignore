@@ -32,6 +32,7 @@ vendor/
 .trace/
 .qoder/
 .agents/
+.codex/
 *.swp
 *.swo
 *~

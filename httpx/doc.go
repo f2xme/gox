@@ -47,27 +47,25 @@ httpx 定义了 HTTP 服务器的标准接口,支持多种 HTTP 框架(Gin、Ech
 
 # 请求绑定与自动验证
 
-## 方式一: 使用 binding tag + label tag (推荐)
-
-使用 gin 的 binding tag 进行验证,label tag 自定义中文字段名:
+使用 validate tag 进行验证（默认使用 gox/validator，支持中文错误消息）:
 
 	type CreateUserRequest struct {
-		Name  string `json:"name" binding:"required" label:"名字"`
-		Age   int    `json:"age" binding:"required,min=1,max=150" label:"年龄"`
-		Email string `json:"email" binding:"required,email" label:"邮箱"`
+		Name  string `json:"name" validate:"required" label:"名字"`
+		Age   int    `json:"age" validate:"required,min=1,max=150" label:"年龄"`
+		Email string `json:"email" validate:"email" label:"邮箱"`
 	}
 
 	func createUser(c httpx.Context) error {
 		var req CreateUserRequest
-		// BindJSON 会自动验证并翻译错误为中文
 		if err := c.BindJSON(&req); err != nil {
 			return httpx.ErrBadRequest(err.Error())
-			// 错误示例: "名字不能为空", "年龄不能小于1", "邮箱必须是有效的邮箱地址"
 		}
 		return c.JSON(200, req)
 	}
 
-支持的 binding 验证规则:
+label tag 用于自定义验证错误消息中的字段名(支持中文)。
+
+支持的 validate 验证规则:
   - required: 必填
   - min/max: 最小/最大值(数字)或长度(字符串/数组)
   - len: 固定长度
@@ -78,34 +76,43 @@ httpx 定义了 HTTP 服务器的标准接口,支持多种 HTTP 框架(Gin、Ech
   - uuid/uuid3/uuid4/uuid5: UUID 格式
   - ip/ipv4/ipv6: IP 地址格式
   - contains/startswith/endswith: 包含/前缀/后缀
+  - phone: 中国大陆手机号
+  - id_card: 中国大陆身份证号
+  - bank_card: 银行卡号
   - 更多规则见 github.com/go-playground/validator
 
-## 方式二: 实现 Validator 接口
+自定义 validator（可选）:
 
-实现 Validator 接口,Bind 系列方法会自动调用验证:
+	import ginadapter "github.com/f2xme/gox/httpx/adapter/gin"
+	import "github.com/gin-gonic/gin/binding"
+
+	// 使用自定义 validator
+	engine := ginadapter.New(
+		ginadapter.WithValidator(myCustomValidator),
+	)
+
+实现 Validator 接口进行额外的自定义验证:
 
 	type CreateUserRequest struct {
-		Name string `json:"name"`
-		Age  int    `json:"age"`
+		Name string `json:"name" validate:"required"`
+		Age  int    `json:"age" validate:"required,min=1,max=150"`
 	}
 
 	func (r *CreateUserRequest) Validate() error {
-		if r.Name == "" {
-			return fmt.Errorf("name is required")
-		}
-		if r.Age < 1 || r.Age > 150 {
-			return fmt.Errorf("age must be between 1 and 150")
+		// 这里可以添加 validate tag 无法表达的复杂验证逻辑
+		if r.Name == "admin" {
+			return fmt.Errorf("name cannot be admin")
 		}
 		return nil
 	}
 
 	func createUser(c httpx.Context) error {
 		var req CreateUserRequest
-		// BindJSON 会自动调用 req.Validate()
+		// BindJSON 会先执行 validate tag 验证，再调用 req.Validate()
 		if err := c.BindJSON(&req); err != nil {
 			return httpx.ErrBadRequest(err.Error())
 		}
-		// 此时 req 已通过验证
+		// 此时 req 已通过所有验证
 		return c.JSON(200, req)
 	}
 

@@ -5,7 +5,8 @@ go 1.25.7
 replace github.com/f2xme/gox => ../../../
 
 require (
-	github.com/f2xme/gox v0.10.3
+	github.com/f2xme/gox v0.14.2
+	github.com/f2xme/gox/validator v0.1.0
 	github.com/gin-gonic/gin v1.12.0
 )
 
