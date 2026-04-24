@@ -2,6 +2,29 @@ package httpx
 
 import "net/http"
 
+// Validator 定义请求参数校验接口。
+// 如果绑定的结构体实现了此接口,Bind 系列方法会在绑定成功后自动调用 Validate()。
+//
+// 示例:
+//
+//	type CreateUserRequest struct {
+//		Name string `json:"name"`
+//		Age  int    `json:"age"`
+//	}
+//
+//	func (r *CreateUserRequest) Validate() error {
+//		if r.Name == "" {
+//			return fmt.Errorf("name is required")
+//		}
+//		if r.Age < 0 || r.Age > 150 {
+//			return fmt.Errorf("age must be between 0 and 150")
+//		}
+//		return nil
+//	}
+type Validator interface {
+	Validate() error
+}
+
 // Context 定义统一的 HTTP 请求/响应上下文。
 //
 // 设计原则：
@@ -46,12 +69,16 @@ type Context interface {
 	Path() string
 
 	// Bind 根据 Content-Type 自动绑定并校验请求体。
+	// 绑定成功后,如果 v 实现了 Validator 接口,会自动调用 Validate() 进行校验。
 	Bind(v any) error
 	// BindJSON 绑定 JSON 请求体。
+	// 绑定成功后,如果 v 实现了 Validator 接口,会自动调用 Validate() 进行校验。
 	BindJSON(v any) error
 	// BindQuery 绑定 Query 参数到结构体。
+	// 绑定成功后,如果 v 实现了 Validator 接口,会自动调用 Validate() 进行校验。
 	BindQuery(v any) error
 	// BindForm 绑定表单数据。
+	// 绑定成功后,如果 v 实现了 Validator 接口,会自动调用 Validate() 进行校验。
 	BindForm(v any) error
 
 	// JSON 输出 JSON 响应。

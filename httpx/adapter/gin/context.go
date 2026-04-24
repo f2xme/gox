@@ -27,10 +27,41 @@ func (ctx *ginContext) ClientIP() string { return ctx.c.ClientIP() }
 func (ctx *ginContext) Method() string   { return ctx.c.Request.Method }
 func (ctx *ginContext) Path() string     { return ctx.c.Request.URL.Path }
 
-func (ctx *ginContext) Bind(v any) error      { return ctx.c.ShouldBind(v) }
-func (ctx *ginContext) BindJSON(v any) error   { return ctx.c.ShouldBindJSON(v) }
-func (ctx *ginContext) BindQuery(v any) error  { return ctx.c.ShouldBindQuery(v) }
-func (ctx *ginContext) BindForm(v any) error   { return ctx.c.ShouldBindWith(v, binding.Form) }
+func (ctx *ginContext) Bind(v any) error {
+	if err := ctx.c.ShouldBind(v); err != nil {
+		return err
+	}
+	return validate(v)
+}
+
+func (ctx *ginContext) BindJSON(v any) error {
+	if err := ctx.c.ShouldBindJSON(v); err != nil {
+		return err
+	}
+	return validate(v)
+}
+
+func (ctx *ginContext) BindQuery(v any) error {
+	if err := ctx.c.ShouldBindQuery(v); err != nil {
+		return err
+	}
+	return validate(v)
+}
+
+func (ctx *ginContext) BindForm(v any) error {
+	if err := ctx.c.ShouldBindWith(v, binding.Form); err != nil {
+		return err
+	}
+	return validate(v)
+}
+
+// validate 检查 v 是否实现了 Validator 接口,如果实现则调用 Validate()。
+func validate(v any) error {
+	if validator, ok := v.(httpx.Validator); ok {
+		return validator.Validate()
+	}
+	return nil
+}
 
 func (ctx *ginContext) JSON(code int, v any) error {
 	ctx.c.JSON(code, v)

@@ -23,8 +23,19 @@ type User struct {
 
 // CreateUserRequest 创建用户请求
 type CreateUserRequest struct {
-	Name string `json:"name" binding:"required"`
-	Age  int    `json:"age" binding:"required,min=1,max=150"`
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+
+// Validate 实现 httpx.Validator 接口,自动在 Bind 系列方法后调用
+func (r *CreateUserRequest) Validate() error {
+	if r.Name == "" {
+		return fmt.Errorf("name 不能为空")
+	}
+	if r.Age < 1 || r.Age > 150 {
+		return fmt.Errorf("age 必须在 1-150 之间")
+	}
+	return nil
 }
 
 func main() {
@@ -87,20 +98,20 @@ func handleGetUser(ctx httpx.Context) error {
 		Age:  25,
 	}
 
-	return ctx.JSON(http.StatusOK, map[string]interface{}{
+	return ctx.JSON(http.StatusOK, map[string]any{
 		"id":   id,
 		"user": user,
 	})
 }
 
-// handleCreateUser 创建用户（演示请求体绑定和验证）
+// handleCreateUser 创建用户（演示请求体绑定和自动验证）
 func handleCreateUser(ctx httpx.Context) error {
 	var req CreateUserRequest
 
-	// 绑定并验证 JSON 请求体
+	// BindJSON 会自动调用 req.Validate() 进行校验
 	if err := ctx.BindJSON(&req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{
-			"error": "请求参数无效: " + err.Error(),
+			"error": err.Error(),
 		})
 	}
 
