@@ -23,8 +23,9 @@ type User struct {
 
 // CreateUserRequest 创建用户请求
 type CreateUserRequest struct {
-	Name string `json:"name"`
-	Age  int    `json:"age"`
+	Name  string `json:"name" binding:"required" label:"名字"`
+	Age   int    `json:"age" binding:"required,min=1,max=150" label:"年龄"`
+	Email string `json:"email" binding:"email" label:"邮箱"`
 }
 
 // Validate 实现 httpx.Validator 接口,自动在 Bind 系列方法后调用

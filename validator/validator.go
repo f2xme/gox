@@ -94,7 +94,7 @@ func getDefaultValidator() *Validator {
 //	}
 //	user := User{Name: ""}
 //	err := v.Validate(user) // 返回错误：Name为必填字段
-func (v *Validator) Validate(i interface{}) error {
+func (v *Validator) Validate(i any) error {
 	err := v.validate.Struct(i)
 	if err == nil {
 		return nil
@@ -172,7 +172,7 @@ func (v *Validator) RegisterTranslation(tag, message string) error {
 //	if err := validator.Validate(user); err != nil {
 //	    log.Fatal(err)
 //	}
-func Validate(i interface{}) error {
+func Validate(i any) error {
 	return getDefaultValidator().Validate(i)
 }
 

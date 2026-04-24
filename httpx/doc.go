@@ -47,6 +47,41 @@ httpx 定义了 HTTP 服务器的标准接口,支持多种 HTTP 框架(Gin、Ech
 
 # 请求绑定与自动验证
 
+## 方式一: 使用 binding tag + label tag (推荐)
+
+使用 gin 的 binding tag 进行验证,label tag 自定义中文字段名:
+
+	type CreateUserRequest struct {
+		Name  string `json:"name" binding:"required" label:"名字"`
+		Age   int    `json:"age" binding:"required,min=1,max=150" label:"年龄"`
+		Email string `json:"email" binding:"required,email" label:"邮箱"`
+	}
+
+	func createUser(c httpx.Context) error {
+		var req CreateUserRequest
+		// BindJSON 会自动验证并翻译错误为中文
+		if err := c.BindJSON(&req); err != nil {
+			return httpx.ErrBadRequest(err.Error())
+			// 错误示例: "名字不能为空", "年龄不能小于1", "邮箱必须是有效的邮箱地址"
+		}
+		return c.JSON(200, req)
+	}
+
+支持的 binding 验证规则:
+  - required: 必填
+  - min/max: 最小/最大值(数字)或长度(字符串/数组)
+  - len: 固定长度
+  - email: 邮箱格式
+  - url: URL 格式
+  - oneof: 枚举值
+  - alpha/alphanum/numeric: 字母/字母数字/纯数字
+  - uuid/uuid3/uuid4/uuid5: UUID 格式
+  - ip/ipv4/ipv6: IP 地址格式
+  - contains/startswith/endswith: 包含/前缀/后缀
+  - 更多规则见 github.com/go-playground/validator
+
+## 方式二: 实现 Validator 接口
+
 实现 Validator 接口,Bind 系列方法会自动调用验证:
 
 	type CreateUserRequest struct {
