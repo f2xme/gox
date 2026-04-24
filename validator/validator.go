@@ -1,20 +1,3 @@
-// Package validator 提供数据验证功能，封装 go-playground/validator/v10。
-//
-// 支持结构体标签验证、自定义验证规则、中文错误消息。
-// 所有导出的函数和类型都是并发安全的。
-//
-// 基本用法：
-//
-//	type User struct {
-//	    Name  string `validate:"required"`
-//	    Email string `validate:"email"`
-//	    Age   int    `validate:"min=18,max=100"`
-//	}
-//
-//	user := User{Name: "张三", Email: "zhangsan@example.com", Age: 25}
-//	if err := validator.Validate(user); err != nil {
-//	    log.Fatal(err)
-//	}
 package validator
 
 import (
@@ -34,6 +17,7 @@ import (
 type Validator struct {
 	validate *validator.Validate
 	trans    ut.Translator
+	mu       sync.RWMutex
 }
 
 var (
@@ -42,7 +26,7 @@ var (
 	defaultValidatorOnce sync.Once
 )
 
-// New 创建一个新的验证器实例，默认支持中文错误消息。
+// New 创建一个新的验证器实例，默认支持中文错误消息和中国本地化验证规则。
 //
 // 返回的验证器实例是并发安全的，可以在多个 goroutine 中共享使用。
 //
@@ -50,11 +34,21 @@ var (
 //
 //	v := validator.New()
 //	err := v.Validate(user)
-func New() *Validator {
+func New(opts ...Option) *Validator {
+	options := defaultOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	validate := validator.New()
 
-	// 使用结构体字段名而不是标签名
 	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		if options.FieldNameTag != "" {
+			name := parseTagName(fld.Tag.Get(options.FieldNameTag))
+			if name != "" {
+				return name
+			}
+		}
 		return fld.Name
 	})
 
@@ -66,10 +60,13 @@ func New() *Validator {
 	// 注册中文翻译
 	_ = zh_translations.RegisterDefaultTranslations(validate, trans)
 
-	return &Validator{
+	v := &Validator{
 		validate: validate,
 		trans:    trans,
 	}
+	v.registerBuiltinValidations()
+
+	return v
 }
 
 // getDefaultValidator 获取默认验证器实例（懒加载，并发安全）
@@ -95,6 +92,9 @@ func getDefaultValidator() *Validator {
 //	user := User{Name: ""}
 //	err := v.Validate(user) // 返回错误：Name为必填字段
 func (v *Validator) Validate(i any) error {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+
 	err := v.validate.Struct(i)
 	if err == nil {
 		return nil
@@ -134,6 +134,9 @@ func (v *Validator) formatErrors(errs validator.ValidationErrors) error {
 //	    Username string `validate:"custom_username"`
 //	}
 func (v *Validator) RegisterValidation(tag string, fn validator.Func) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
 	return v.validate.RegisterValidation(tag, fn)
 }
 
@@ -145,6 +148,9 @@ func (v *Validator) RegisterValidation(tag string, fn validator.Func) error {
 //
 //	v.RegisterTranslation("custom_username", "用户名格式不正确")
 func (v *Validator) RegisterTranslation(tag, message string) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
 	return v.validate.RegisterTranslation(
 		tag,
 		v.trans,
@@ -201,19 +207,28 @@ func RegisterTranslation(tag, message string) error {
 	return getDefaultValidator().RegisterTranslation(tag, message)
 }
 
-// init 注册内置的中国本地化验证器
-func init() {
-	// 注册手机号验证器
-	_ = RegisterValidation("phone", validatePhone)
-	_ = RegisterTranslation("phone", "{0}手机号格式不正确")
+func parseTagName(tag string) string {
+	if tag == "" {
+		return ""
+	}
+	if idx := strings.IndexByte(tag, ','); idx != -1 {
+		tag = tag[:idx]
+	}
+	if tag == "-" {
+		return ""
+	}
+	return tag
+}
 
-	// 注册身份证号验证器
-	_ = RegisterValidation("id_card", validateIDCard)
-	_ = RegisterTranslation("id_card", "{0}身份证号格式不正确")
+func (v *Validator) registerBuiltinValidations() {
+	_ = v.validate.RegisterValidation("phone", validatePhone)
+	_ = v.RegisterTranslation("phone", "{0}手机号格式不正确")
 
-	// 注册银行卡号验证器
-	_ = RegisterValidation("bank_card", validateBankCard)
-	_ = RegisterTranslation("bank_card", "{0}银行卡号格式不正确")
+	_ = v.validate.RegisterValidation("id_card", validateIDCard)
+	_ = v.RegisterTranslation("id_card", "{0}身份证号格式不正确")
+
+	_ = v.validate.RegisterValidation("bank_card", validateBankCard)
+	_ = v.RegisterTranslation("bank_card", "{0}银行卡号格式不正确")
 }
 
 // validatePhone 验证中国大陆手机号（11位，1开头）
@@ -235,14 +250,7 @@ func validatePhone(fl validator.FieldLevel) bool {
 		return false
 	}
 
-	// 全部必须是数字
-	for _, r := range phone {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-
-	return true
+	return isDigitsOnly(phone)
 }
 
 // validateIDCard 验证中国大陆身份证号（18位，含校验位）
@@ -300,11 +308,8 @@ func validateBankCard(fl validator.FieldLevel) bool {
 		return false
 	}
 
-	// 全部必须是数字
-	for _, r := range cardNumber {
-		if r < '0' || r > '9' {
-			return false
-		}
+	if !isDigitsOnly(cardNumber) {
+		return false
 	}
 
 	// Luhn 算法校验
@@ -329,3 +334,11 @@ func validateBankCard(fl validator.FieldLevel) bool {
 	return sum%10 == 0
 }
 
+func isDigitsOnly(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}

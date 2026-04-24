@@ -2,6 +2,7 @@ package validator
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
@@ -15,6 +16,75 @@ func TestNew(t *testing.T) {
 	}
 	if v.validate == nil {
 		t.Fatal("validator instance is nil")
+	}
+}
+
+// 测试 New 创建的独立实例包含内置中国本地化验证规则
+func TestNew_RegistersBuiltinValidations(t *testing.T) {
+	type User struct {
+		Phone string `validate:"phone"`
+	}
+
+	v := New()
+	err := v.Validate(User{Phone: "13800138000"})
+	if err != nil {
+		t.Errorf("expected no error for valid phone, got: %v", err)
+	}
+
+	err = v.Validate(User{Phone: "123"})
+	if err == nil {
+		t.Fatal("expected error for invalid phone, got nil")
+	}
+	if !strings.Contains(err.Error(), "手机号") {
+		t.Errorf("expected Chinese error message containing '手机号', got: %v", err)
+	}
+}
+
+// 测试默认使用 label 标签作为错误消息字段名
+func TestNew_UsesDefaultLabelTag(t *testing.T) {
+	type User struct {
+		Name string `validate:"required" label:"姓名"`
+	}
+
+	v := New()
+	err := v.Validate(User{})
+	if err == nil {
+		t.Fatal("expected error for missing required field, got nil")
+	}
+	if !strings.Contains(err.Error(), "姓名") {
+		t.Errorf("error should mention label field name, got: %v", err)
+	}
+}
+
+// 测试可通过 Options 自定义错误消息字段名标签
+func TestNew_WithFieldNameTag(t *testing.T) {
+	type User struct {
+		Name string `json:"name,omitempty" validate:"required"`
+	}
+
+	v := New(WithFieldNameTag("json"))
+	err := v.Validate(User{})
+	if err == nil {
+		t.Fatal("expected error for missing required field, got nil")
+	}
+	if !strings.Contains(err.Error(), "name") {
+		t.Errorf("error should mention json field name, got: %v", err)
+	}
+}
+
+// 测试空字段名标签配置回退到结构体字段名
+func TestNew_WithEmptyFieldNameTag(t *testing.T) {
+	type User struct {
+		Name string `json:"name,omitempty" validate:"required"`
+	}
+
+	v := New(WithFieldNameTag(""))
+	err := v.Validate(User{})
+	if err == nil {
+		t.Fatal("expected error for missing required field, got nil")
+	}
+	if !strings.Contains(err.Error(), "Name") {
+		t.Errorf("error should mention struct field name, got: %v", err)
 	}
 }
 
@@ -207,6 +277,37 @@ func TestRegisterValidation_Global(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error for valid SKU, got: %v", err)
 	}
+}
+
+// 测试验证和注册操作并发使用时不会产生数据竞态
+func TestValidator_ConcurrentValidateAndRegister(t *testing.T) {
+	type User struct {
+		Name string `validate:"required"`
+	}
+
+	v := New()
+	var wg sync.WaitGroup
+
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = v.Validate(User{Name: "张三"})
+		}()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := v.RegisterValidation("concurrent_rule", func(fl validator.FieldLevel) bool {
+			return true
+		})
+		if err != nil {
+			t.Errorf("RegisterValidation() error = %v", err)
+		}
+	}()
+
+	wg.Wait()
 }
 
 // 测试手机号验证器
