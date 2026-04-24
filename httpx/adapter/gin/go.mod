@@ -9,7 +9,7 @@ replace (
 
 require (
 	github.com/f2xme/gox v0.14.2
-	github.com/f2xme/gox/validator v0.2.0
+	github.com/f2xme/gox/validator v0.3.0
 	github.com/gin-gonic/gin v1.12.0
 )
 
