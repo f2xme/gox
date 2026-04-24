@@ -3,11 +3,17 @@ package gormbase
 import (
 	"errors"
 	"time"
-
-	"gorm.io/gorm/logger"
 )
 
-// Options 定义 GORM 数据库配置选项
+type DBType string
+
+const (
+	DBTypeMySQL DBType = "mysql"
+	DBTypePostgres DBType = "postgres"
+	DBTypeSqlite DBType = "sqlite"
+)
+
+// Options 定义数据库连接池配置选项
 type Options struct {
 	// MaxOpenConns 最大打开连接数，默认 100
 	MaxOpenConns int
@@ -17,14 +23,8 @@ type Options struct {
 	ConnMaxLifetime time.Duration
 	// ConnMaxIdleTime 连接最大空闲时间，默认 10 分钟
 	ConnMaxIdleTime time.Duration
-	// Logger GORM 日志记录器
-	Logger logger.Interface
-	// DryRun 启用 DryRun 模式（不执行实际 SQL）
-	DryRun bool
-	// SingularTable 使用单数表名
-	SingularTable bool
-	// TablePrefix 表名前缀
-	TablePrefix string
+	// IgnoreRecordNotFound 是否忽略 ErrRecordNotFound 错误，默认 false
+	IgnoreRecordNotFound bool
 }
 
 // Validate 验证配置选项的有效性
@@ -56,21 +56,10 @@ func defaultOptions() Options {
 	}
 }
 
-// DefaultConfig 返回默认配置
-func DefaultConfig() *Options {
+// DefaultOptions 返回默认连接池配置
+func DefaultOptions() *Options {
 	opts := defaultOptions()
 	return &opts
-}
-
-// DefaultSQLiteConfig 返回 SQLite 的默认配置
-// SQLite 使用单连接以避免并发问题
-func DefaultSQLiteConfig() *Options {
-	return &Options{
-		MaxOpenConns:    1,
-		MaxIdleConns:    1,
-		ConnMaxLifetime: time.Hour,
-		ConnMaxIdleTime: 10 * time.Minute,
-	}
 }
 
 // Option 定义配置选项函数
@@ -92,14 +81,7 @@ func WithConnMaxIdleTime(d time.Duration) Option {
 	return func(o *Options) { o.ConnMaxIdleTime = d }
 }
 
-// WithLogger 设置 GORM 日志记录器
-func WithLogger(l logger.Interface) Option { return func(o *Options) { o.Logger = l } }
-
-// WithDryRun 启用 DryRun 模式
-func WithDryRun() Option { return func(o *Options) { o.DryRun = true } }
-
-// WithSingularTable 启用单数表名
-func WithSingularTable() Option { return func(o *Options) { o.SingularTable = true } }
-
-// WithTablePrefix 设置表名前缀
-func WithTablePrefix(prefix string) Option { return func(o *Options) { o.TablePrefix = prefix } }
+// WithIgnoreRecordNotFound 设置是否忽略 ErrRecordNotFound 错误
+func WithIgnoreRecordNotFound(ignore bool) Option {
+	return func(o *Options) { o.IgnoreRecordNotFound = ignore }
+}

@@ -14,7 +14,7 @@
 //
 //	import "github.com/f2xme/gox/database/adapter/sqlitedb"
 //
-//	db, err := sqlitedb.New("test.db")
+//	db, err := sqlitedb.New(sqlitedb.WithFile("test.db"))
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -23,20 +23,37 @@
 // 配置选项：
 //
 //	// 使用 Option 函数
-//	db, err := sqlitedb.New("test.db",
-//		gormbase.WithLogger(customLogger),
-//		gormbase.WithTablePrefix("app_"),
-//		gormbase.WithSingularTable(),
+//	db, err := sqlitedb.New(
+//		sqlitedb.WithFile("test.db"),
+//		sqlitedb.WithMaxOpenConns(1),
+//		sqlitedb.WithConnMaxIdleTime(5*time.Minute),
 //	)
 //
-//	// 或直接使用 Options 结构体
-//	db, err := sqlitedb.New("test.db",
-//		func(o *gormbase.Options) {
-//			o.Logger = customLogger
-//			o.TablePrefix = "app_"
-//			o.SingularTable = true
+//	// 或函数选项直接改 sqlitedb.Options（内嵌连接池字段）
+//	db, err := sqlitedb.New(
+//		func(o *sqlitedb.Options) {
+//			o.file = "test.db"
+//			o.MaxOpenConns = 1
+//			o.MaxIdleConns = 1
 //		},
 //	)
+//
+// 从配置文件加载：
+//
+//	// config.yaml:
+//	// db:
+//	//   file: "app.db"
+//	//   maxOpenConns: 1
+//	//   maxIdleConns: 1
+//	//   connMaxLifetime: 1h
+//	//   connMaxIdleTime: 10m
+//
+//	cfg := config.Load("config.yaml")
+//	db, err := sqlitedb.NewWithConfig(cfg)
+//
+//	// 多数据库实例
+//	main, _ := sqlitedb.NewWithConfig(cfg, "db_main")
+//	cache, _ := sqlitedb.NewWithConfig(cfg, "db_cache")
 //
 // SQLite 默认使用单连接模式 (MaxOpenConns=1, MaxIdleConns=1)
 // 以避免并发写入问题。谨慎修改连接池设置。

@@ -14,8 +14,8 @@
 //
 //	import "github.com/f2xme/gox/database/adapter/pgsqldb"
 //
-//	dsn := "host=localhost user=postgres password=secret dbname=mydb port=5432 sslmode=disable"
-//	db, err := pgsqldb.New(dsn)
+//	dsn := "host=localhost user=postgres password=pass dbname=mydb port=5432 sslmode=disable"
+//	db, err := pgsqldb.New(pgsqldb.WithDSN(dsn))
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -24,31 +24,39 @@
 // 配置选项：
 //
 //	// 使用 Option 函数
-//	db, err := pgsqldb.New(dsn,
-//		gormbase.WithMaxOpenConns(200),
-//		gormbase.WithMaxIdleConns(20),
-//		gormbase.WithConnMaxLifetime(2*time.Hour),
-//		gormbase.WithTablePrefix("app_"),
+//	db, err := pgsqldb.New(
+//		pgsqldb.WithDSN(dsn),
+//		pgsqldb.WithMaxOpenConns(200),
+//		pgsqldb.WithMaxIdleConns(20),
+//		pgsqldb.WithConnMaxLifetime(2*time.Hour),
+//		pgsqldb.WithConnMaxIdleTime(10*time.Minute),
 //	)
 //
-//	// 或直接使用 Options 结构体
-//	db, err := pgsqldb.New(dsn,
-//		func(o *gormbase.Options) {
+//	// 或函数选项直接改 pgsqldb.Options（内嵌连接池字段）
+//	db, err := pgsqldb.New(
+//		func(o *pgsqldb.Options) {
+//			o.dsn = dsn
 //			o.MaxOpenConns = 200
 //			o.MaxIdleConns = 20
 //			o.ConnMaxLifetime = 2 * time.Hour
-//			o.TablePrefix = "app_"
+//			o.ConnMaxIdleTime = 10 * time.Minute
 //		},
 //	)
 //
-//	// 使用 config.Config 接口从配置文件读取
-//	import "github.com/f2xme/gox/config/adapter/viper"
-//	cfg, err := viper.New("config.yaml")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	db, err := pgsqldb.NewWithConfig(dsn, cfg)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
+// 从配置文件加载：
+//
+//	// config.yaml:
+//	// db:
+//	//   dsn: "host=localhost user=postgres password=pass dbname=mydb port=5432 sslmode=disable"
+//	//   maxOpenConns: 100
+//	//   maxIdleConns: 10
+//	//   connMaxLifetime: 1h
+//	//   connMaxIdleTime: 10m
+//
+//	cfg := config.Load("config.yaml")
+//	db, err := pgsqldb.NewWithConfig(cfg)
+//
+//	// 多数据库实例
+//	primary, _ := pgsqldb.NewWithConfig(cfg, "db_primary")
+//	replica, _ := pgsqldb.NewWithConfig(cfg, "db_replica")
 package pgsqldb

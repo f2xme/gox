@@ -24,20 +24,39 @@
 // 配置选项：
 //
 //	// 使用 Option 函数
-//	db, err := mysqldb.New(dsn,
-//		gormbase.WithMaxOpenConns(200),
-//		gormbase.WithMaxIdleConns(20),
-//		gormbase.WithConnMaxLifetime(2*time.Hour),
-//		gormbase.WithTablePrefix("app_"),
+//	db, err := mysqldb.New(
+//		mysqldb.WithDSN(dsn),
+//		mysqldb.WithMaxOpenConns(200),
+//		mysqldb.WithMaxIdleConns(20),
+//		mysqldb.WithConnMaxLifetime(2*time.Hour),
+//		mysqldb.WithConnMaxIdleTime(10*time.Minute),
 //	)
 //
-//	// 或直接使用 Options 结构体
-//	db, err := mysqldb.New(dsn,
-//		func(o *gormbase.Options) {
+//	// 或函数选项直接改 mysqldb.Options（内嵌连接池字段）
+//	db, err := mysqldb.New(
+//		func(o *mysqldb.Options) {
+//			o.dsn = dsn
 //			o.MaxOpenConns = 200
 //			o.MaxIdleConns = 20
 //			o.ConnMaxLifetime = 2 * time.Hour
-//			o.TablePrefix = "app_"
+//			o.ConnMaxIdleTime = 10 * time.Minute
 //		},
 //	)
+//
+// 从配置文件加载：
+//
+//	// config.yaml:
+//	// db:
+//	//   dsn: "user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True"
+//	//   maxOpenConns: 100
+//	//   maxIdleConns: 10
+//	//   connMaxLifetime: 1h
+//	//   connMaxIdleTime: 10m
+//
+//	cfg := config.Load("config.yaml")
+//	db, err := mysqldb.NewWithConfig(cfg)
+//
+//	// 多数据库实例
+//	primary, _ := mysqldb.NewWithConfig(cfg, "db_primary")
+//	replica, _ := mysqldb.NewWithConfig(cfg, "db_replica")
 package mysqldb

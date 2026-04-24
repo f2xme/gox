@@ -18,6 +18,12 @@ var _ database.DB = (*GormDB)(nil)
 // Unwrap 返回底层的 *gorm.DB 实例
 func (g *GormDB) Unwrap() any { return g.db }
 
+// Gorm 返回底层的 *gorm.DB 实例
+func (g *GormDB) Gorm() *gorm.DB { return g.db }
+
+// SQLDB 返回标准库 *sql.DB 连接池
+func (g *GormDB) SQLDB() *sql.DB { return g.sqlDB }
+
 // Create 插入新记录
 func (g *GormDB) Create(ctx context.Context, value any) error {
 	return g.db.WithContext(ctx).Create(value).Error
