@@ -35,7 +35,7 @@ func New(opts ...Option) httpx.Engine {
 func NewWithConfig(cfg config.Config) httpx.Engine {
 	opts := []Option{}
 
-	if mode := cfg.GetString("httpx.gin.mode"); mode != "" {
+	if mode := cfg.GetString("gin.mode"); mode != "" {
 		opts = append(opts, WithMode(mode))
 	}
 

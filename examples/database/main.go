@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/f2xme/gox/database"
 	"github.com/f2xme/gox/database/adapter/sqlitedb"
@@ -20,11 +19,8 @@ type User struct {
 func main() {
 	fmt.Println("=== Database 使用示例 ===")
 
-	// 1. 创建 SQLite 数据库连接（使用临时文件）
-	dbFile := "/tmp/gox-example.db"
-	defer os.Remove(dbFile)
-
-	db, err := sqlitedb.New(dbFile)
+	// 1. 创建 SQLite 数据库连接（使用内存数据库）
+	db, err := sqlitedb.New(sqlitedb.WithFile(":memory:"))
 	if err != nil {
 		fmt.Printf("连接数据库失败: %v\n", err)
 		return

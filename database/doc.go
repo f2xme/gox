@@ -34,7 +34,7 @@ Package database 提供统一的数据库连接管理抽象层。
 	func main() {
 		// 创建 MySQL 数据库连接
 		dsn := "user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
-		db, err := mysqldb.New(dsn)
+		db, err := mysqldb.New(mysqldb.WithDSN(dsn))
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -17,7 +17,7 @@ type User struct {
 
 // Example_basicCRUD 演示基础 CRUD 操作
 func Example_basicCRUD() {
-	db, err := sqlitedb.New(":memory:")
+	db, err := sqlitedb.New(sqlitedb.WithFile(":memory:"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func Example_basicCRUD() {
 
 // Example_chainQuery 演示链式查询
 func Example_chainQuery() {
-	db, err := sqlitedb.New(":memory:")
+	db, err := sqlitedb.New(sqlitedb.WithFile(":memory:"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func Example_chainQuery() {
 
 // Example_transaction 演示事务处理
 func Example_transaction() {
-	db, err := sqlitedb.New(":memory:")
+	db, err := sqlitedb.New(sqlitedb.WithFile(":memory:"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func Example_transaction() {
 
 // Example_manualTransaction 演示手动事务控制
 func Example_manualTransaction() {
-	db, err := sqlitedb.New(":memory:")
+	db, err := sqlitedb.New(sqlitedb.WithFile(":memory:"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func Example_manualTransaction() {
 
 // Example_rawSQL 演示原生 SQL
 func Example_rawSQL() {
-	db, err := sqlitedb.New(":memory:")
+	db, err := sqlitedb.New(sqlitedb.WithFile(":memory:"))
 	if err != nil {
 		log.Fatal(err)
 	}

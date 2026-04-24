@@ -16,7 +16,7 @@ func ExampleNew() {
 		mysqldb.WithMaxIdleConns(10),
 	)
 	if err != nil {
-		fmt.Printf("连接失败: %v\n", err)
+		fmt.Println("连接失败:", err)
 		return
 	}
 	defer db.Close()
@@ -37,7 +37,7 @@ func ExampleNew_withFunctionalOptions() {
 		mysqldb.WithDSN(dsn),
 	)
 	if err != nil {
-		fmt.Printf("连接失败: %v\n", err)
+		fmt.Println("连接失败:", err)
 		return
 	}
 	defer db.Close()

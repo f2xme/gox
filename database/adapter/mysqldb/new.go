@@ -80,29 +80,30 @@ func NewWithConfig(cfg config.Config, prefixes ...string) (database.DB, error) {
 		prefix = prefixes[0]
 	}
 
-	opts := []Option{}
+	opts := make([]Option, 0, 6)
+	key := func(suffix string) string { return prefix + "." + suffix }
 
-	if dsn := cfg.GetString(prefix + ".dsn"); dsn != "" {
+	if dsn := cfg.GetString(key("dsn")); dsn != "" {
 		opts = append(opts, WithDSN(dsn))
 	}
 
-	if maxOpen := cfg.GetInt(prefix + ".maxOpenConns"); maxOpen > 0 {
+	if maxOpen := cfg.GetInt(key("maxOpenConns")); maxOpen > 0 {
 		opts = append(opts, WithMaxOpenConns(maxOpen))
 	}
 
-	if maxIdle := cfg.GetInt(prefix + ".maxIdleConns"); maxIdle > 0 {
+	if maxIdle := cfg.GetInt(key("maxIdleConns")); maxIdle > 0 {
 		opts = append(opts, WithMaxIdleConns(maxIdle))
 	}
 
-	if lifetime := cfg.GetDuration(prefix + ".connMaxLifetime"); lifetime > 0 {
+	if lifetime := cfg.GetDuration(key("connMaxLifetime")); lifetime > 0 {
 		opts = append(opts, WithConnMaxLifetime(lifetime))
 	}
 
-	if idleTime := cfg.GetDuration(prefix + ".connMaxIdleTime"); idleTime > 0 {
+	if idleTime := cfg.GetDuration(key("connMaxIdleTime")); idleTime > 0 {
 		opts = append(opts, WithConnMaxIdleTime(idleTime))
 	}
 
-	if cfg.GetBool(prefix + ".ignoreRecordNotFound") {
+	if cfg.GetBool(key("ignoreRecordNotFound")) {
 		opts = append(opts, WithIgnoreRecordNotFound(true))
 	}
 

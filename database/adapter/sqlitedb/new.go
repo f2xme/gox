@@ -34,8 +34,7 @@ func New(opts ...Option) (database.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println("sqlitedb: database connected successfully")
-	return base, nil
+	return wrapSQLite(base)
 }
 
 // MustNew 创建由 SQLite 支持的 database.DB，失败时终止程序
@@ -81,29 +80,30 @@ func NewWithConfig(cfg config.Config, prefixes ...string) (database.DB, error) {
 		prefix = prefixes[0]
 	}
 
-	opts := []Option{}
+	opts := make([]Option, 0, 6)
+	key := func(suffix string) string { return prefix + "." + suffix }
 
-	if file := cfg.GetString(prefix + ".file"); file != "" {
+	if file := cfg.GetString(key("file")); file != "" {
 		opts = append(opts, WithFile(file))
 	}
 
-	if maxOpen := cfg.GetInt(prefix + ".maxOpenConns"); maxOpen > 0 {
+	if maxOpen := cfg.GetInt(key("maxOpenConns")); maxOpen > 0 {
 		opts = append(opts, WithMaxOpenConns(maxOpen))
 	}
 
-	if maxIdle := cfg.GetInt(prefix + ".maxIdleConns"); maxIdle > 0 {
+	if maxIdle := cfg.GetInt(key("maxIdleConns")); maxIdle > 0 {
 		opts = append(opts, WithMaxIdleConns(maxIdle))
 	}
 
-	if lifetime := cfg.GetDuration(prefix + ".connMaxLifetime"); lifetime > 0 {
+	if lifetime := cfg.GetDuration(key("connMaxLifetime")); lifetime > 0 {
 		opts = append(opts, WithConnMaxLifetime(lifetime))
 	}
 
-	if idleTime := cfg.GetDuration(prefix + ".connMaxIdleTime"); idleTime > 0 {
+	if idleTime := cfg.GetDuration(key("connMaxIdleTime")); idleTime > 0 {
 		opts = append(opts, WithConnMaxIdleTime(idleTime))
 	}
 
-	if cfg.GetBool(prefix + ".ignoreRecordNotFound") {
+	if cfg.GetBool(key("ignoreRecordNotFound")) {
 		opts = append(opts, WithIgnoreRecordNotFound(true))
 	}
 
@@ -117,4 +117,13 @@ func MustNewWithConfig(cfg config.Config, prefixes ...string) database.DB {
 		log.Fatal(err)
 	}
 	return db
+}
+
+func wrapSQLite(base database.DB) (database.DB, error) {
+	g, ok := base.(*gormbase.GormDB)
+	if !ok {
+		return nil, fmt.Errorf("sqlitedb: unexpected database type %T", base)
+	}
+	log.Println("sqlitedb: database connected successfully")
+	return &SQLiteDB{GormDB: g}, nil
 }
