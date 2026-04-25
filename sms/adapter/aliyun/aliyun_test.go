@@ -3,7 +3,7 @@ package aliyun_test
 import (
 	"testing"
 
-	"github.com/f2xme/gox/sms/aliyun"
+	"github.com/f2xme/gox/sms/adapter/aliyun"
 )
 
 func TestNew(t *testing.T) {

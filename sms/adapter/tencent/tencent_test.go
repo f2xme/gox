@@ -3,7 +3,7 @@ package tencent_test
 import (
 	"testing"
 
-	"github.com/f2xme/gox/sms/tencent"
+	"github.com/f2xme/gox/sms/adapter/tencent"
 )
 
 func TestNew(t *testing.T) {

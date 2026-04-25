@@ -16,7 +16,7 @@
 //	import (
 //		"log"
 //
-//		"github.com/f2xme/gox/sms/tencent"
+//		"github.com/f2xme/gox/sms/adapter/tencent"
 //	)
 //
 //	func main() {
@@ -48,7 +48,7 @@
 //
 //	import (
 //		"github.com/f2xme/gox/config"
-//		"github.com/f2xme/gox/sms/tencent"
+//		"github.com/f2xme/gox/sms/adapter/tencent"
 //	)
 //
 //	func main() {

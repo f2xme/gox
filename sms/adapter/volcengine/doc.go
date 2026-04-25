@@ -16,7 +16,7 @@
 //	import (
 //		"log"
 //
-//		"github.com/f2xme/gox/sms/volcengine"
+//		"github.com/f2xme/gox/sms/adapter/volcengine"
 //	)
 //
 //	func main() {
@@ -47,7 +47,7 @@
 //
 //	import (
 //		"github.com/f2xme/gox/config"
-//		"github.com/f2xme/gox/sms/volcengine"
+//		"github.com/f2xme/gox/sms/adapter/volcengine"
 //	)
 //
 //	func main() {

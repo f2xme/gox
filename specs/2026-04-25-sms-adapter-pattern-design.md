@@ -162,7 +162,7 @@ return fmt.Errorf("volcengine sms: %w", err)
 
 **旧的导入方式（将被废弃）：**
 ```go
-import "github.com/f2xme/gox/sms/aliyun"
+import "github.com/f2xme/gox/sms/adapter/aliyun"
 
 client, err := aliyun.New(...)
 ```
@@ -318,7 +318,7 @@ package sms
 
 **旧代码：**
 ```go
-import "github.com/f2xme/gox/sms/aliyun"
+import "github.com/f2xme/gox/sms/adapter/aliyun"
 
 client, err := aliyun.New(
     aliyun.WithAccessKeyID("..."),
