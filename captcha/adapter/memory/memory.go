@@ -74,7 +74,7 @@ func (s *memoryStore) Get(ctx context.Context, id string) (string, error) {
 		s.mu.Lock()
 		// 获取写锁后重新检查（双重检查模式）
 		if item, exists := s.items[id]; exists && item.isExpired() {
-			delete(s.items, id)
+			s.deleteLocked(id)
 		}
 		s.mu.Unlock()
 		return "", captcha.ErrNotFound
@@ -127,7 +127,7 @@ func (s *memoryStore) Exists(ctx context.Context, id string) (bool, error) {
 		s.mu.Lock()
 		// 获取写锁后重新检查条目以避免竞态条件
 		if item, exists := s.items[id]; exists && item.isExpired() {
-			delete(s.items, id)
+			s.deleteLocked(id)
 		}
 		s.mu.Unlock()
 		return false, nil

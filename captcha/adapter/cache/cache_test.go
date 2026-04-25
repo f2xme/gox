@@ -2,15 +2,35 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	rootcache "github.com/f2xme/gox/cache"
 	cachememory "github.com/f2xme/gox/cache/adapter/memory"
 	"github.com/f2xme/gox/captcha"
 )
 
 type existsStore interface {
 	Exists(ctx context.Context, id string) (bool, error)
+}
+
+type wrappedNotFoundBackend struct{}
+
+func (wrappedNotFoundBackend) Get(context.Context, string) ([]byte, error) {
+	return nil, fmt.Errorf("wrapped: %w", rootcache.ErrNotFound)
+}
+
+func (wrappedNotFoundBackend) Set(context.Context, string, []byte, time.Duration) error {
+	return nil
+}
+
+func (wrappedNotFoundBackend) Delete(context.Context, string) error {
+	return nil
+}
+
+func (wrappedNotFoundBackend) Exists(context.Context, string) (bool, error) {
+	return false, nil
 }
 
 func TestCacheStore_SetGet(t *testing.T) {
@@ -40,6 +60,15 @@ func TestCacheStore_GetNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := store.Get(ctx, "non-existent")
+	if err != captcha.ErrNotFound {
+		t.Errorf("Get() error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestCacheStore_GetWrappedNotFound(t *testing.T) {
+	store := New(wrappedNotFoundBackend{})
+
+	_, err := store.Get(context.Background(), "test-id")
 	if err != captcha.ErrNotFound {
 		t.Errorf("Get() error = %v, want ErrNotFound", err)
 	}

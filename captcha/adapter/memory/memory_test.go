@@ -153,6 +153,53 @@ func TestMemoryStore_Expiration(t *testing.T) {
 	}
 }
 
+func TestMemoryStore_GetExpiredRemovesOrderEntry(t *testing.T) {
+	store := New(WithTTL(time.Nanosecond)).(*memoryStore)
+	ctx := context.Background()
+
+	if err := store.Set(ctx, "test-id", "answer", 0); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	time.Sleep(time.Millisecond)
+
+	_, err := store.Get(ctx, "test-id")
+	if err != captcha.ErrNotFound {
+		t.Fatalf("Get() error = %v, want ErrNotFound", err)
+	}
+
+	store.mu.RLock()
+	orderLen := len(store.order)
+	store.mu.RUnlock()
+	if orderLen != 0 {
+		t.Errorf("order length = %v, want 0", orderLen)
+	}
+}
+
+func TestMemoryStore_ExistsExpiredRemovesOrderEntry(t *testing.T) {
+	store := New(WithTTL(time.Nanosecond)).(*memoryStore)
+	ctx := context.Background()
+
+	if err := store.Set(ctx, "test-id", "answer", 0); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+	time.Sleep(time.Millisecond)
+
+	exists, err := store.Exists(ctx, "test-id")
+	if err != nil {
+		t.Fatalf("Exists() error = %v", err)
+	}
+	if exists {
+		t.Fatal("Exists() = true, want false")
+	}
+
+	store.mu.RLock()
+	orderLen := len(store.order)
+	store.mu.RUnlock()
+	if orderLen != 0 {
+		t.Errorf("order length = %v, want 0", orderLen)
+	}
+}
+
 func TestMemoryStore_Cleanup(t *testing.T) {
 	store := New(
 		WithTTL(50*time.Millisecond),

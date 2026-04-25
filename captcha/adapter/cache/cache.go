@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/f2xme/gox/cache"
@@ -43,7 +44,7 @@ func (s *cacheStore) Get(ctx context.Context, id string) (string, error) {
 	key := s.opts.Prefix + id
 	data, err := s.cache.Get(ctx, key)
 	if err != nil {
-		if err == cache.ErrNotFound {
+		if errors.Is(err, cache.ErrNotFound) {
 			return "", captcha.ErrNotFound
 		}
 		return "", err
