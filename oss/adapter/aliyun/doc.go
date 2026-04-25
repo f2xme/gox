@@ -1,6 +1,6 @@
-// Package alioss 提供阿里云 OSS adapter。
+// Package aliyun 提供阿里云 OSS adapter。
 //
-// alioss 包实现 github.com/f2xme/gox/oss 的 Storage 和 BucketStorage 接口，
+// aliyun 包实现 github.com/f2xme/gox/oss 的 Storage 和 BucketStorage 接口，
 // 负责把统一的对象存储 API 映射到阿里云 OSS Go SDK。
 //
 // # 功能特性
@@ -24,14 +24,14 @@
 //		"time"
 //
 //		"github.com/f2xme/gox/oss"
-//		"github.com/f2xme/gox/oss/adapter/alioss"
+//		"github.com/f2xme/gox/oss/adapter/aliyun"
 //	)
 //
 //	func main() {
-//		storage, err := alioss.New(
-//			alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-//			alioss.WithCredentials("access-key-id", "access-key-secret"),
-//			alioss.WithBucket("my-bucket"),
+//		storage, err := aliyun.New(
+//			aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+//			aliyun.WithCredentials("access-key-id", "access-key-secret"),
+//			aliyun.WithBucket("my-bucket"),
 //		)
 //		if err != nil {
 //			return
@@ -55,18 +55,18 @@
 //
 // New 必须提供 Endpoint、访问凭证和默认 Bucket：
 //
-//	storage, err := alioss.New(
-//		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-//		alioss.WithCredentials("access-key-id", "access-key-secret"),
-//		alioss.WithBucket("my-bucket"),
-//		alioss.WithSecurityToken("sts-token"),
-//		alioss.WithEnableCRC(true),
-//		alioss.WithTimeout(60),
+//	storage, err := aliyun.New(
+//		aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+//		aliyun.WithCredentials("access-key-id", "access-key-secret"),
+//		aliyun.WithBucket("my-bucket"),
+//		aliyun.WithSecurityToken("sts-token"),
+//		aliyun.WithEnableCRC(true),
+//		aliyun.WithTimeout(60),
 //	)
 //
 // 也可以从 config.Config 读取配置，默认配置前缀为 oss：
 //
-//	storage, err := alioss.NewWithConfig(cfg)
+//	storage, err := aliyun.NewWithConfig(cfg)
 //
 // 初始化阶段可以使用 MustNew、MustNewWithOptions 或 MustNewWithConfig，在创建失败时直接终止程序。
 //
@@ -103,9 +103,9 @@
 //
 // 默认测试不会访问真实阿里云 OSS。需要运行集成测试时设置：
 //
-//   - GOX_ALIOSS_ENDPOINT
-//   - GOX_ALIOSS_ACCESS_KEY_ID
-//   - GOX_ALIOSS_ACCESS_KEY_SECRET
-//   - GOX_ALIOSS_BUCKET
-//   - GOX_ALIOSS_SECURITY_TOKEN（可选）
-package alioss
+//   - GOX_ALIYUN_ENDPOINT
+//   - GOX_ALIYUN_ACCESS_KEY_ID
+//   - GOX_ALIYUN_ACCESS_KEY_SECRET
+//   - GOX_ALIYUN_BUCKET
+//   - GOX_ALIYUN_SECURITY_TOKEN（可选）
+package aliyun

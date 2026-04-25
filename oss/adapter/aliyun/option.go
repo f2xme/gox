@@ -1,4 +1,4 @@
-package alioss
+package aliyun
 
 import (
 	aliyunoss "github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -30,7 +30,7 @@ type Option func(*Options)
 //
 // 示例：
 //
-//	alioss.New(alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"))
+//	aliyun.New(aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"))
 func WithEndpoint(endpoint string) Option {
 	return func(o *Options) {
 		o.Endpoint = endpoint
@@ -41,7 +41,7 @@ func WithEndpoint(endpoint string) Option {
 //
 // 示例：
 //
-//	alioss.New(alioss.WithCredentials("access-key-id", "access-key-secret"))
+//	aliyun.New(aliyun.WithCredentials("access-key-id", "access-key-secret"))
 func WithCredentials(accessKeyID, accessKeySecret string) Option {
 	return func(o *Options) {
 		o.AccessKeyID = accessKeyID
@@ -53,7 +53,7 @@ func WithCredentials(accessKeyID, accessKeySecret string) Option {
 //
 // 示例：
 //
-//	alioss.New(alioss.WithBucket("my-bucket"))
+//	aliyun.New(aliyun.WithBucket("my-bucket"))
 func WithBucket(bucket string) Option {
 	return func(o *Options) {
 		o.Bucket = bucket
@@ -64,9 +64,9 @@ func WithBucket(bucket string) Option {
 //
 // 示例：
 //
-//	alioss.New(
-//		alioss.WithCredentials(keyID, keySecret),
-//		alioss.WithSecurityToken("STS-token"))
+//	aliyun.New(
+//		aliyun.WithCredentials(keyID, keySecret),
+//		aliyun.WithSecurityToken("STS-token"))
 func WithSecurityToken(token string) Option {
 	return func(o *Options) {
 		o.SecurityToken = token
@@ -77,7 +77,7 @@ func WithSecurityToken(token string) Option {
 //
 // 示例：
 //
-//	alioss.New(alioss.WithEnableCRC(true))
+//	aliyun.New(aliyun.WithEnableCRC(true))
 func WithEnableCRC(enable bool) Option {
 	return func(o *Options) {
 		o.EnableCRC = enable
@@ -88,7 +88,7 @@ func WithEnableCRC(enable bool) Option {
 //
 // 示例：
 //
-//	alioss.New(alioss.WithTimeout(60))
+//	aliyun.New(aliyun.WithTimeout(60))
 func WithTimeout(timeout int64) Option {
 	return func(o *Options) {
 		o.Timeout = timeout

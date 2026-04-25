@@ -71,7 +71,7 @@ Repository: github.com/f2xme/gox
 - volcengine - Volcengine SMS adapter
 
 ### oss - Object Storage
-- adapter/aliossadapter - Alibaba Cloud OSS adapter
+- adapter/aliyun - Alibaba Cloud OSS adapter
 - adapter/minioossadapter - MinIO adapter
 - adapter/qiniuossadapter - Qiniu Cloud adapter
 

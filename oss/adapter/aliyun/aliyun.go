@@ -1,4 +1,4 @@
-package alioss
+package aliyun
 
 import (
 	"context"

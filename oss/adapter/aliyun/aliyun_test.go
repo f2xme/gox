@@ -1,4 +1,4 @@
-package alioss
+package aliyun
 
 import (
 	"context"
@@ -226,19 +226,19 @@ func TestStorage_Integration(t *testing.T) {
 func newIntegrationStorage(t *testing.T) *Storage {
 	t.Helper()
 
-	endpoint := os.Getenv("GOX_ALIOSS_ENDPOINT")
-	accessKeyID := os.Getenv("GOX_ALIOSS_ACCESS_KEY_ID")
-	accessKeySecret := os.Getenv("GOX_ALIOSS_ACCESS_KEY_SECRET")
-	bucket := os.Getenv("GOX_ALIOSS_BUCKET")
+	endpoint := os.Getenv("GOX_ALIYUN_ENDPOINT")
+	accessKeyID := os.Getenv("GOX_ALIYUN_ACCESS_KEY_ID")
+	accessKeySecret := os.Getenv("GOX_ALIYUN_ACCESS_KEY_SECRET")
+	bucket := os.Getenv("GOX_ALIYUN_BUCKET")
 	if endpoint == "" || accessKeyID == "" || accessKeySecret == "" || bucket == "" {
-		t.Skip("跳过阿里云 OSS 集成测试：需要设置 GOX_ALIOSS_ENDPOINT、GOX_ALIOSS_ACCESS_KEY_ID、GOX_ALIOSS_ACCESS_KEY_SECRET、GOX_ALIOSS_BUCKET")
+		t.Skip("跳过阿里云 OSS 集成测试：需要设置 GOX_ALIYUN_ENDPOINT、GOX_ALIYUN_ACCESS_KEY_ID、GOX_ALIYUN_ACCESS_KEY_SECRET、GOX_ALIYUN_BUCKET")
 	}
 
 	storage, err := New(
 		WithEndpoint(endpoint),
 		WithCredentials(accessKeyID, accessKeySecret),
 		WithBucket(bucket),
-		WithSecurityToken(os.Getenv("GOX_ALIOSS_SECURITY_TOKEN")),
+		WithSecurityToken(os.Getenv("GOX_ALIYUN_SECURITY_TOKEN")),
 	)
 	if err != nil {
 		t.Fatalf("创建集成测试存储实例失败: %v", err)

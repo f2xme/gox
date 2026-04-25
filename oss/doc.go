@@ -1,7 +1,7 @@
 // Package oss 提供统一的对象存储抽象。
 //
 // oss 包只定义对象存储的通用接口、选项、错误模型和数据结构，不绑定具体云厂商。
-// 具体实现放在 adapter 子包中，例如 github.com/f2xme/gox/oss/adapter/alioss。
+// 具体实现放在 adapter 子包中，例如 github.com/f2xme/gox/oss/adapter/aliyun。
 //
 // # 功能特性
 //
@@ -24,14 +24,14 @@
 //		"time"
 //
 //		"github.com/f2xme/gox/oss"
-//		"github.com/f2xme/gox/oss/adapter/alioss"
+//		"github.com/f2xme/gox/oss/adapter/aliyun"
 //	)
 //
 //	func main() {
-//		storage, err := alioss.New(
-//			alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-//			alioss.WithCredentials("access-key-id", "access-key-secret"),
-//			alioss.WithBucket("my-bucket"),
+//		storage, err := aliyun.New(
+//			aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+//			aliyun.WithCredentials("access-key-id", "access-key-secret"),
+//			aliyun.WithBucket("my-bucket"),
 //		)
 //		if err != nil {
 //			return

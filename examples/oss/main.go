@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/f2xme/gox/oss"
-	"github.com/f2xme/gox/oss/adapter/alioss"
+	"github.com/f2xme/gox/oss/adapter/aliyun"
 )
 
 func main() {
@@ -27,10 +27,10 @@ func exampleBasicUsage() {
 	fmt.Println("## 基本用法")
 
 	// 创建存储实例
-	storage, err := alioss.New(
-		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
-		alioss.WithBucket("your-bucket-name"),
+	storage, err := aliyun.New(
+		aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		aliyun.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		aliyun.WithBucket("your-bucket-name"),
 	)
 	if err != nil {
 		fmt.Println("创建存储实例失败:", err)
@@ -80,12 +80,12 @@ func exampleBasicUsage() {
 func exampleWithOptions() {
 	fmt.Println("## 使用选项")
 
-	storage, _ := alioss.New(
-		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
-		alioss.WithBucket("your-bucket-name"),
-		alioss.WithEnableCRC(true),
-		alioss.WithTimeout(60),
+	storage, _ := aliyun.New(
+		aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		aliyun.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		aliyun.WithBucket("your-bucket-name"),
+		aliyun.WithEnableCRC(true),
+		aliyun.WithTimeout(60),
 	)
 
 	ctx := context.Background()
@@ -121,10 +121,10 @@ func exampleWithOptions() {
 func exampleListObjects() {
 	fmt.Println("## 列出对象")
 
-	storage, _ := alioss.New(
-		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
-		alioss.WithBucket("your-bucket-name"),
+	storage, _ := aliyun.New(
+		aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		aliyun.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		aliyun.WithBucket("your-bucket-name"),
 	)
 
 	ctx := context.Background()
@@ -150,10 +150,10 @@ func exampleListObjects() {
 func examplePresignedURL() {
 	fmt.Println("## 预签名 URL")
 
-	storage, _ := alioss.New(
-		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
-		alioss.WithBucket("your-bucket-name"),
+	storage, _ := aliyun.New(
+		aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		aliyun.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		aliyun.WithBucket("your-bucket-name"),
 	)
 
 	ctx := context.Background()

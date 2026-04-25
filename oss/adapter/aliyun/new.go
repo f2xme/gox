@@ -1,4 +1,4 @@
-package alioss
+package aliyun
 
 import (
 	"log"
@@ -13,10 +13,10 @@ import (
 //
 // 示例：
 //
-//	storage, err := alioss.New(
-//		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
-//		alioss.WithCredentials("access-key-id", "access-key-secret"),
-//		alioss.WithBucket("my-bucket"),
+//	storage, err := aliyun.New(
+//		aliyun.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+//		aliyun.WithCredentials("access-key-id", "access-key-secret"),
+//		aliyun.WithBucket("my-bucket"),
 //	)
 //
 // 返回值：
@@ -35,7 +35,7 @@ func New(opts ...Option) (*Storage, error) {
 func MustNew(opts ...Option) *Storage {
 	storage, err := New(opts...)
 	if err != nil {
-		log.Fatalf("alioss: create storage instance failed: %v", err)
+		log.Fatalf("aliyun: create storage instance failed: %v", err)
 	}
 	return storage
 }
@@ -72,7 +72,7 @@ func NewWithOptions(opts *Options) (*Storage, error) {
 func MustNewWithOptions(opts *Options) *Storage {
 	storage, err := NewWithOptions(opts)
 	if err != nil {
-		log.Fatalf("alioss: use options to create storage instance failed: %v", err)
+		log.Fatalf("aliyun: use options to create storage instance failed: %v", err)
 	}
 	return storage
 }
@@ -125,7 +125,7 @@ func NewWithConfig(cfg config.Config, prefix ...string) (*Storage, error) {
 func MustNewWithConfig(cfg config.Config, prefix ...string) *Storage {
 	storage, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
-		log.Fatalf("alioss: use config to create storage instance failed: %v", err)
+		log.Fatalf("aliyun: use config to create storage instance failed: %v", err)
 	}
 	return storage
 }
