@@ -7,8 +7,6 @@ import (
 
 	"github.com/f2xme/gox/cache"
 	"github.com/f2xme/gox/cache/adapter/memory"
-	rediscache "github.com/f2xme/gox/cache/adapter/redis"
-	"github.com/redis/go-redis/v9"
 )
 
 // ExampleStore_basic 演示基本的缓存操作
@@ -106,12 +104,7 @@ func ExampleTyped_GetOrLoad() {
 
 // ExampleCache_batch 演示批量操作
 func Example_batch() {
-	// 创建 Redis 缓存（需要 Redis 服务器运行）
-	client := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
-	c, _ := rediscache.New(rediscache.WithClient(client))
+	c, _ := memory.New()
 	defer c.(cache.Closer).Close()
 
 	// 类型断言为 BatchStore
@@ -179,35 +172,6 @@ func Example_lock_mem() {
 
 	// Output:
 	// Lock acquired, performing critical operation...
-}
-
-// ExampleLocker_redis 演示 Redis 分布式锁
-func Example_lock_redis() {
-	client := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
-	c, _ := rediscache.New(rediscache.WithClient(client))
-	defer c.(cache.Closer).Close()
-
-	locker, ok := c.(cache.Locker)
-	if !ok {
-		fmt.Println("Cache does not support locking")
-		return
-	}
-
-	ctx := context.Background()
-
-	// 阻塞式获取锁
-	unlock, err := locker.Lock(ctx, "distributed:lock:1", 30*time.Second)
-	if err != nil {
-		fmt.Println("Redis not available, skipping example")
-		return
-	}
-	defer unlock()
-
-	// 执行分布式环境下需要保护的操作
-	fmt.Println("Distributed lock acquired")
 }
 
 // ExampleCache_serializer 演示自定义序列化器

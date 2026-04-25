@@ -5,15 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/f2xme/gox/cache"
 	"github.com/f2xme/gox/cache/adapter/memory"
-	rediscache "github.com/f2xme/gox/cache/adapter/redis"
-	"github.com/redis/go-redis/v9"
 )
 
 // setupAdapters 创建测试用的缓存适配器
-// 返回包含 memory 和 redis 适配器的 map
+// 返回核心包可直接测试的适配器。
 func setupAdapters(t *testing.T) map[string]cache.Store {
 	t.Helper()
 
@@ -26,22 +23,11 @@ func setupAdapters(t *testing.T) map[string]cache.Store {
 	}
 	adapters["memory"] = c
 
-	// Redis 适配器（使用 miniredis）
-	mr := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-	rc, err := rediscache.New(rediscache.WithClient(client))
-	if err != nil {
-		t.Fatalf("rediscache.New() error = %v", err)
-	}
-	adapters["redis"] = rc
-
 	return adapters
 }
 
 // TestAdapterConsistency 测试不同适配器的行为一致性
-// 验证 memory 和 redis 适配器在基本操作上的行为一致
+// 验证核心适配器在基本操作上的行为一致。
 func TestAdapterConsistency(t *testing.T) {
 	adapters := setupAdapters(t)
 	defer func() {
@@ -398,7 +384,7 @@ func TestLockConsistency(t *testing.T) {
 	}
 }
 
-// TestBatchStoreOperations 测试批量操作（仅 redis 支持）
+// TestBatchStoreOperations 测试批量操作
 // 验证 BatchStore 接口的批量操作功能
 func TestBatchStoreOperations(t *testing.T) {
 	adapters := setupAdapters(t)
