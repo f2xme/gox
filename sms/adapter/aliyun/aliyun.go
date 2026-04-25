@@ -8,8 +8,10 @@ import (
 	"strings"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	dysmsapi "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
+	dysmsapi "github.com/alibabacloud-go/dysmsapi-20170525/v5/client"
+	util "github.com/alibabacloud-go/tea-utils/v2/service"
 	"github.com/alibabacloud-go/tea/tea"
+	credential "github.com/aliyun/credentials-go/credentials"
 
 	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/sms"
@@ -23,7 +25,7 @@ type aliyunSMS struct {
 var _ sms.SMS = (*aliyunSMS)(nil)
 
 type aliyunSender interface {
-	SendSms(request *dysmsapi.SendSmsRequest) (*dysmsapi.SendSmsResponse, error)
+	SendSmsWithContext(ctx context.Context, request *dysmsapi.SendSmsRequest, runtime *util.RuntimeOptions) (*dysmsapi.SendSmsResponse, error)
 }
 
 // validateOptions 校验配置选项并设置默认值。
@@ -32,14 +34,17 @@ func validateOptions(o *Options) error {
 		o.Endpoint = "dysmsapi.aliyuncs.com"
 	}
 
-	if o.AccessKeyID == "" {
-		return fmt.Errorf("aliyun sms: access key id is required")
-	}
-	if o.AccessKeySecret == "" {
-		return fmt.Errorf("aliyun sms: access key secret is required")
-	}
 	if o.SignName == "" {
 		return fmt.Errorf("aliyun sms: sign name is required")
+	}
+
+	hasAccessKeyID := strings.TrimSpace(o.AccessKeyID) != ""
+	hasAccessKeySecret := strings.TrimSpace(o.AccessKeySecret) != ""
+	if hasAccessKeyID != hasAccessKeySecret {
+		if !hasAccessKeyID {
+			return fmt.Errorf("aliyun sms: access key id is required when access key secret is set")
+		}
+		return fmt.Errorf("aliyun sms: access key secret is required")
 	}
 
 	return nil
@@ -47,10 +52,14 @@ func validateOptions(o *Options) error {
 
 // createClient 根据已校验的配置创建阿里云短信客户端。
 func createClient(o *Options) (*dysmsapi.Client, error) {
+	cred, err := createCredential(o)
+	if err != nil {
+		return nil, err
+	}
+
 	aliConfig := &openapi.Config{
-		AccessKeyId:     tea.String(o.AccessKeyID),
-		AccessKeySecret: tea.String(o.AccessKeySecret),
-		Endpoint:        tea.String(o.Endpoint),
+		Credential: cred,
+		Endpoint:   tea.String(o.Endpoint),
 	}
 
 	client, err := dysmsapi.NewClient(aliConfig)
@@ -61,13 +70,35 @@ func createClient(o *Options) (*dysmsapi.Client, error) {
 	return client, nil
 }
 
+func createCredential(o *Options) (credential.Credential, error) {
+	if o.Credential != nil {
+		return o.Credential, nil
+	}
+
+	if strings.TrimSpace(o.AccessKeyID) == "" && strings.TrimSpace(o.AccessKeySecret) == "" {
+		cred, err := credential.NewCredential(nil)
+		if err != nil {
+			return nil, fmt.Errorf("aliyun sms: create default credential: %w", err)
+		}
+		return cred, nil
+	}
+
+	cred, err := credential.NewCredential(&credential.Config{
+		Type:            tea.String("access_key"),
+		AccessKeyId:     tea.String(o.AccessKeyID),
+		AccessKeySecret: tea.String(o.AccessKeySecret),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("aliyun sms: create access key credential: %w", err)
+	}
+	return cred, nil
+}
+
 // New 创建由阿里云支持的 sms.SMS
 //
 // 使用选项模式配置客户端：
 //
 //	client, err := aliyun.New(
-//		aliyun.WithAccessKeyID("your-key-id"),
-//		aliyun.WithAccessKeySecret("your-key-secret"),
 //		aliyun.WithSignName("your-sign-name"),
 //	)
 func New(opts ...Option) (sms.SMS, error) {
@@ -115,9 +146,9 @@ func (s *aliyunSMS) Send(ctx context.Context, message sms.Message) error {
 		TemplateParam: tea.String(templateParam),
 	}
 
-	resp, err := s.client.SendSms(request)
+	resp, err := s.send(ctx, request)
 	if err != nil {
-		return fmt.Errorf("aliyun sms: send sms: %w", err)
+		return formatSDKError(err)
 	}
 
 	if resp == nil || resp.Body == nil {
@@ -141,6 +172,54 @@ func (s *aliyunSMS) Send(ctx context.Context, message sms.Message) error {
 	}
 
 	return nil
+}
+
+func (s *aliyunSMS) send(ctx context.Context, request *dysmsapi.SendSmsRequest) (_resp *dysmsapi.SendSmsResponse, _err error) {
+	defer func() {
+		if r := tea.Recover(recover()); r != nil {
+			_err = r
+		}
+	}()
+	return s.client.SendSmsWithContext(ctx, request, &util.RuntimeOptions{})
+}
+
+func formatSDKError(err error) error {
+	sdkErr := &tea.SDKError{}
+	if typedErr, ok := err.(*tea.SDKError); ok {
+		sdkErr = typedErr
+	} else {
+		sdkErr.Message = tea.String(err.Error())
+	}
+
+	message := tea.StringValue(sdkErr.Message)
+	if message == "" {
+		message = err.Error()
+	}
+
+	recommend := sdkRecommend(sdkErr.Data)
+	if recommend != "" {
+		return fmt.Errorf("aliyun sms: send sms: %s; recommend=%s: %w", message, recommend, err)
+	}
+	if message == err.Error() {
+		return fmt.Errorf("aliyun sms: send sms: %w", err)
+	}
+	return fmt.Errorf("aliyun sms: send sms: %s: %w", message, err)
+}
+
+func sdkRecommend(data *string) string {
+	if data == nil || strings.TrimSpace(*data) == "" {
+		return ""
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(*data), &payload); err != nil {
+		return ""
+	}
+	recommend, ok := payload["Recommend"].(string)
+	if !ok {
+		return ""
+	}
+	return recommend
 }
 
 func validateMessage(message sms.Message) error {
@@ -196,10 +275,12 @@ func MustNew(opts ...Option) sms.SMS {
 // NewWithConfig 使用 config.Config 创建由阿里云支持的 sms.SMS。
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 // 配置键：
-//   - {prefix}.aliyun.accessKeyID：阿里云访问密钥 ID，必填
-//   - {prefix}.aliyun.accessKeySecret：阿里云访问密钥 Secret，必填
+//   - {prefix}.aliyun.accessKeyID：阿里云访问密钥 ID，选填
+//   - {prefix}.aliyun.accessKeySecret：阿里云访问密钥 Secret，选填
 //   - {prefix}.aliyun.endpoint：阿里云短信服务端点，选填，默认 dysmsapi.aliyuncs.com
 //   - {prefix}.aliyun.signName：短信签名名称，必填
+//
+// 未配置访问密钥时，将使用阿里云默认凭据链。
 func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	p := "sms"
 	if len(prefix) > 0 && prefix[0] != "" {

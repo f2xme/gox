@@ -1,11 +1,15 @@
 package aliyun
 
+import credential "github.com/aliyun/credentials-go/credentials"
+
 // Options 定义阿里云短信配置选项
 type Options struct {
 	// AccessKeyID 阿里云访问密钥 ID
 	AccessKeyID string
 	// AccessKeySecret 阿里云访问密钥 Secret
 	AccessKeySecret string
+	// Credential 阿里云凭据，优先于 AccessKeyID 和 AccessKeySecret。
+	Credential credential.Credential
 	// Endpoint 阿里云短信服务端点
 	Endpoint string
 	// SignName 短信签名名称
@@ -41,6 +45,15 @@ func WithAccessKeyID(id string) Option {
 func WithAccessKeySecret(secret string) Option {
 	return func(o *Options) {
 		o.AccessKeySecret = secret
+	}
+}
+
+// WithCredential 设置阿里云凭据。
+//
+// 未设置 Credential 且未设置访问密钥时，将使用阿里云默认凭据链。
+func WithCredential(cred credential.Credential) Option {
+	return func(o *Options) {
+		o.Credential = cred
 	}
 }
 
