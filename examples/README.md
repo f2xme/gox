@@ -73,11 +73,6 @@
   - 功能: 演示 Counter、Gauge、Histogram 指标类型
   - 特点: Mock 实现，展示指标监控的基本用法
 
-- **sms** - 短信服务示例
-  - 路径: `examples/sms/main.go`
-  - 功能: 演示短信发送接口（验证码、订单通知）
-  - 特点: Mock 实现，展示短信服务的抽象层
-
 - **pager** - 分页工具示例
   - 路径: `examples/pager/main.go`
   - 功能: 演示 Offset、Page、Cursor 三种分页策略
@@ -152,9 +147,6 @@ go run examples/graceful/main.go
 # 运行 metrics 示例
 go run examples/metrics/main.go
 
-# 运行 sms 示例
-go run examples/sms/main.go
-
 # 运行 pager 示例
 go run examples/pager/main.go
 
@@ -194,7 +186,6 @@ go build ./examples/captcha
 go build ./examples/encrypt
 go build ./examples/graceful
 go build ./examples/metrics
-go build ./examples/sms
 go build ./examples/pager
 go build ./examples/payment
 go build ./examples/queue
