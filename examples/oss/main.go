@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/f2xme/gox/oss"
-	"github.com/f2xme/gox/oss/alioss"
+	"github.com/f2xme/gox/oss/adapter/alioss"
 )
 
 func main() {
@@ -28,13 +28,12 @@ func exampleBasicUsage() {
 
 	// 创建存储实例
 	storage, err := alioss.New(
-		"oss-cn-hangzhou.aliyuncs.com",
-		"your-access-key-id",
-		"your-access-key-secret",
-		"your-bucket-name",
+		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		alioss.WithBucket("your-bucket-name"),
 	)
 	if err != nil {
-		fmt.Printf("创建存储实例失败: %v\n", err)
+		fmt.Println("创建存储实例失败:", err)
 		return
 	}
 
@@ -44,7 +43,7 @@ func exampleBasicUsage() {
 	reader := strings.NewReader("Hello, OSS!")
 	err = storage.Put(ctx, "hello.txt", reader)
 	if err != nil {
-		fmt.Printf("上传失败: %v\n", err)
+		fmt.Println("上传失败:", err)
 	} else {
 		fmt.Println("✓ 上传成功")
 	}
@@ -52,15 +51,15 @@ func exampleBasicUsage() {
 	// 检查对象是否存在
 	exists, err := storage.Exists(ctx, "hello.txt")
 	if err != nil {
-		fmt.Printf("检查失败: %v\n", err)
+		fmt.Println("检查失败:", err)
 	} else {
-		fmt.Printf("✓ 对象存在: %v\n", exists)
+		fmt.Println("✓ 对象存在:", exists)
 	}
 
 	// 下载对象
 	body, err := storage.Get(ctx, "hello.txt")
 	if err != nil {
-		fmt.Printf("下载失败: %v\n", err)
+		fmt.Println("下载失败:", err)
 	} else {
 		body.Close()
 		fmt.Println("✓ 下载成功")
@@ -69,7 +68,7 @@ func exampleBasicUsage() {
 	// 删除对象
 	err = storage.Delete(ctx, "hello.txt")
 	if err != nil {
-		fmt.Printf("删除失败: %v\n", err)
+		fmt.Println("删除失败:", err)
 	} else {
 		fmt.Println("✓ 删除成功")
 	}
@@ -82,10 +81,9 @@ func exampleWithOptions() {
 	fmt.Println("## 使用选项")
 
 	storage, _ := alioss.New(
-		"oss-cn-hangzhou.aliyuncs.com",
-		"your-access-key-id",
-		"your-access-key-secret",
-		"your-bucket-name",
+		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		alioss.WithBucket("your-bucket-name"),
 		alioss.WithEnableCRC(true),
 		alioss.WithTimeout(60),
 	)
@@ -102,18 +100,18 @@ func exampleWithOptions() {
 		}),
 	)
 	if err != nil {
-		fmt.Printf("上传失败: %v\n", err)
+		fmt.Println("上传失败:", err)
 	} else {
 		fmt.Println("✓ 上传成功（带选项）")
 	}
 
 	// 获取对象元信息
-	info, err := storage.Head(ctx, "photos/photo.jpg")
+	info, err := storage.Stat(ctx, "photos/photo.jpg")
 	if err != nil {
-		fmt.Printf("获取元信息失败: %v\n", err)
+		fmt.Println("获取元信息失败:", err)
 	} else {
-		fmt.Printf("✓ 文件大小: %d bytes\n", info.Size)
-		fmt.Printf("✓ Content-Type: %s\n", info.ContentType)
+		fmt.Println("✓ 文件大小:", info.Size, "bytes")
+		fmt.Println("✓ Content-Type:", info.ContentType)
 	}
 
 	fmt.Println()
@@ -124,25 +122,24 @@ func exampleListObjects() {
 	fmt.Println("## 列出对象")
 
 	storage, _ := alioss.New(
-		"oss-cn-hangzhou.aliyuncs.com",
-		"your-access-key-id",
-		"your-access-key-secret",
-		"your-bucket-name",
+		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		alioss.WithBucket("your-bucket-name"),
 	)
 
 	ctx := context.Background()
 
 	// 列出指定前缀的对象
-	objects, err := storage.List(ctx,
+	result, err := storage.List(ctx,
 		oss.WithPrefix("photos/"),
-		oss.WithMaxKeys(10),
+		oss.WithLimit(10),
 	)
 	if err != nil {
-		fmt.Printf("列出对象失败: %v\n", err)
+		fmt.Println("列出对象失败:", err)
 	} else {
-		fmt.Printf("✓ 找到 %d 个对象\n", len(objects))
-		for _, obj := range objects {
-			fmt.Printf("  - %s (%d bytes)\n", obj.Key, obj.Size)
+		fmt.Println("✓ 找到对象数量:", len(result.Objects))
+		for _, obj := range result.Objects {
+			fmt.Println("  -", obj.Key, "(", obj.Size, "bytes)")
 		}
 	}
 
@@ -154,34 +151,33 @@ func examplePresignedURL() {
 	fmt.Println("## 预签名 URL")
 
 	storage, _ := alioss.New(
-		"oss-cn-hangzhou.aliyuncs.com",
-		"your-access-key-id",
-		"your-access-key-secret",
-		"your-bucket-name",
+		alioss.WithEndpoint("oss-cn-hangzhou.aliyuncs.com"),
+		alioss.WithCredentials("your-access-key-id", "your-access-key-secret"),
+		alioss.WithBucket("your-bucket-name"),
 	)
 
 	ctx := context.Background()
 
 	// 生成下载 URL（有效期 15 分钟）
-	url, err := storage.PresignedURL(ctx, "photos/photo.jpg",
+	url, err := storage.SignURL(ctx, "photos/photo.jpg",
 		oss.WithMethod(oss.MethodGet),
 		oss.WithExpires(15*time.Minute),
 	)
 	if err != nil {
-		fmt.Printf("生成 URL 失败: %v\n", err)
+		fmt.Println("生成 URL 失败:", err)
 	} else {
-		fmt.Printf("✓ 下载 URL: %s\n", url)
+		fmt.Println("✓ 下载 URL:", url)
 	}
 
 	// 生成上传 URL（有效期 30 分钟）
-	url, err = storage.PresignedURL(ctx, "uploads/new-file.jpg",
+	url, err = storage.SignURL(ctx, "uploads/new-file.jpg",
 		oss.WithMethod(oss.MethodPut),
 		oss.WithExpires(30*time.Minute),
 	)
 	if err != nil {
-		fmt.Printf("生成 URL 失败: %v\n", err)
+		fmt.Println("生成 URL 失败:", err)
 	} else {
-		fmt.Printf("✓ 上传 URL: %s\n", url)
+		fmt.Println("✓ 上传 URL:", url)
 	}
 
 	fmt.Println()

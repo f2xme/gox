@@ -7,16 +7,19 @@ import (
 	"strings"
 	"time"
 
-	alioss "github.com/aliyun/aliyun-oss-go-sdk/oss"
+	aliyunoss "github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/f2xme/gox/oss"
 )
 
 // Storage 阿里云 OSS 存储实现
 type Storage struct {
-	client       *alioss.Client
+	client       *aliyunoss.Client
 	bucket       string
-	bucketHandle *alioss.Bucket
+	bucketHandle *aliyunoss.Bucket
 }
+
+var _ oss.Storage = (*Storage)(nil)
+var _ oss.BucketStorage = (*Storage)(nil)
 
 // convertError 转换阿里云错误为统一错误
 func (s *Storage) convertError(err error, key string) error {
@@ -27,12 +30,12 @@ func (s *Storage) convertError(err error, key string) error {
 	code := oss.ErrCodeInternal
 	message := err.Error()
 
-	if serviceErr, ok := err.(alioss.ServiceError); ok {
+	if serviceErr, ok := err.(aliyunoss.ServiceError); ok {
 		message = serviceErr.Message
 		switch serviceErr.Code {
-		case "NoSuchKey":
+		case "NoSuchBucket", "NoSuchKey", "NotFound":
 			code = oss.ErrCodeNotFound
-		case "AccessDenied":
+		case "AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch":
 			code = oss.ErrCodeAccessDenied
 		case "InvalidArgument":
 			code = oss.ErrCodeInvalidArgument
@@ -45,24 +48,22 @@ func (s *Storage) convertError(err error, key string) error {
 
 	return &oss.Error{Code: code, Message: message, Key: key, Err: err}
 }
+
+// Put 上传对象
 func (s *Storage) Put(ctx context.Context, key string, reader io.Reader, opts ...oss.PutOption) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	options := &oss.PutOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-
+	options := oss.ApplyPutOptions(opts...)
 	if options.ContentType == "" {
 		options.ContentType = oss.DetectContentType(key)
 	}
 
-	sdkOpts := make([]alioss.Option, 0, 1+len(options.Metadata))
-	sdkOpts = append(sdkOpts, alioss.ContentType(options.ContentType))
+	sdkOpts := make([]aliyunoss.Option, 0, 1+len(options.Metadata))
+	sdkOpts = append(sdkOpts, aliyunoss.ContentType(options.ContentType))
 	for k, v := range options.Metadata {
-		sdkOpts = append(sdkOpts, alioss.Meta(k, v))
+		sdkOpts = append(sdkOpts, aliyunoss.Meta(k, v))
 	}
 
 	if err := s.bucketHandle.PutObject(key, reader, sdkOpts...); err != nil {
@@ -78,14 +79,10 @@ func (s *Storage) Get(ctx context.Context, key string, opts ...oss.GetOption) (i
 		return nil, err
 	}
 
-	options := &oss.GetOptions{Start: -1}
-	for _, opt := range opts {
-		opt(options)
-	}
-
-	var sdkOpts []alioss.Option
-	if options.Start >= 0 {
-		sdkOpts = append(sdkOpts, alioss.Range(options.Start, options.End))
+	options := oss.ApplyGetOptions(opts...)
+	var sdkOpts []aliyunoss.Option
+	if options.RangeStart >= 0 {
+		sdkOpts = append(sdkOpts, aliyunoss.Range(options.RangeStart, options.RangeEnd))
 	}
 
 	body, err := s.bucketHandle.GetObject(key, sdkOpts...)
@@ -109,8 +106,8 @@ func (s *Storage) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// Head 获取对象元信息
-func (s *Storage) Head(ctx context.Context, key string) (*oss.ObjectInfo, error) {
+// Stat 获取对象元信息
+func (s *Storage) Stat(ctx context.Context, key string) (*oss.ObjectInfo, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -150,6 +147,13 @@ func (s *Storage) Head(ctx context.Context, key string) (*oss.ObjectInfo, error)
 	return info, nil
 }
 
+// Head 获取对象元信息
+//
+// Deprecated: 使用 Stat。
+func (s *Storage) Head(ctx context.Context, key string) (*oss.ObjectInfo, error) {
+	return s.Stat(ctx, key)
+}
+
 // Exists 检查对象是否存在
 func (s *Storage) Exists(ctx context.Context, key string) (bool, error) {
 	if err := ctx.Err(); err != nil {
@@ -165,28 +169,24 @@ func (s *Storage) Exists(ctx context.Context, key string) (bool, error) {
 }
 
 // List 列出对象
-func (s *Storage) List(ctx context.Context, opts ...oss.ListOption) ([]*oss.Object, error) {
+func (s *Storage) List(ctx context.Context, opts ...oss.ListOption) (*oss.ListResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	options := oss.DefaultListOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
-
-	sdkOpts := make([]alioss.Option, 0, 4)
+	options := oss.ApplyListOptions(opts...)
+	sdkOpts := make([]aliyunoss.Option, 0, 4)
 	if options.Prefix != "" {
-		sdkOpts = append(sdkOpts, alioss.Prefix(options.Prefix))
+		sdkOpts = append(sdkOpts, aliyunoss.Prefix(options.Prefix))
 	}
 	if options.Delimiter != "" {
-		sdkOpts = append(sdkOpts, alioss.Delimiter(options.Delimiter))
+		sdkOpts = append(sdkOpts, aliyunoss.Delimiter(options.Delimiter))
 	}
-	if options.MaxKeys > 0 {
-		sdkOpts = append(sdkOpts, alioss.MaxKeys(options.MaxKeys))
+	if options.Limit > 0 {
+		sdkOpts = append(sdkOpts, aliyunoss.MaxKeys(options.Limit))
 	}
-	if options.Marker != "" {
-		sdkOpts = append(sdkOpts, alioss.Marker(options.Marker))
+	if options.Token != "" {
+		sdkOpts = append(sdkOpts, aliyunoss.Marker(options.Token))
 	}
 
 	result, err := s.bucketHandle.ListObjects(sdkOpts...)
@@ -205,15 +205,27 @@ func (s *Storage) List(ctx context.Context, opts ...oss.ListOption) ([]*oss.Obje
 		}
 	}
 
-	return objects, nil
+	return &oss.ListResult{
+		Objects:   objects,
+		Prefixes:  result.CommonPrefixes,
+		NextToken: result.NextMarker,
+		Truncated: result.IsTruncated,
+	}, nil
 }
 
 // CreateBucket 创建存储桶
-func (s *Storage) CreateBucket(ctx context.Context, bucket string) error {
+func (s *Storage) CreateBucket(ctx context.Context, bucket string, opts ...oss.BucketOption) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := s.client.CreateBucket(bucket); err != nil {
+
+	options := oss.ApplyBucketOptions(opts...)
+	sdkOpts := make([]aliyunoss.Option, 0, 1)
+	if options.ACL != "" {
+		sdkOpts = append(sdkOpts, aliyunoss.ACL(aliyunoss.ACLType(options.ACL)))
+	}
+
+	if err := s.client.CreateBucket(bucket, sdkOpts...); err != nil {
 		return s.convertError(err, "")
 	}
 	return nil
@@ -253,26 +265,27 @@ func (s *Storage) ListBuckets(ctx context.Context) ([]*oss.Bucket, error) {
 	return buckets, nil
 }
 
-// PresignedURL 生成预签名 URL
-func (s *Storage) PresignedURL(ctx context.Context, key string, opts ...oss.PresignedOption) (string, error) {
+// SignURL 生成预签名 URL
+func (s *Storage) SignURL(ctx context.Context, key string, opts ...oss.SignOption) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 
-	options := oss.DefaultPresignedOptions()
-	for _, opt := range opts {
-		opt(options)
-	}
+	options := oss.ApplySignOptions(opts...)
 
+	sdkOpts := make([]aliyunoss.Option, 0, 1)
+	if options.ContentType != "" {
+		sdkOpts = append(sdkOpts, aliyunoss.ContentType(options.ContentType))
+	}
 	var url string
 	var err error
 	switch options.Method {
 	case oss.MethodGet:
-		url, err = s.bucketHandle.SignURL(key, alioss.HTTPGet, int64(options.Expires.Seconds()))
+		url, err = s.bucketHandle.SignURL(key, aliyunoss.HTTPGet, int64(options.Expires.Seconds()), sdkOpts...)
 	case oss.MethodPut:
-		url, err = s.bucketHandle.SignURL(key, alioss.HTTPPut, int64(options.Expires.Seconds()))
+		url, err = s.bucketHandle.SignURL(key, aliyunoss.HTTPPut, int64(options.Expires.Seconds()), sdkOpts...)
 	case oss.MethodDelete:
-		url, err = s.bucketHandle.SignURL(key, alioss.HTTPDelete, int64(options.Expires.Seconds()))
+		url, err = s.bucketHandle.SignURL(key, aliyunoss.HTTPDelete, int64(options.Expires.Seconds()), sdkOpts...)
 	default:
 		return "", oss.NewError(oss.ErrCodeInvalidArgument, "unsupported method: "+options.Method)
 	}

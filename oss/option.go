@@ -3,9 +3,12 @@ package oss
 import "time"
 
 const (
-	MethodGet    = "GET"    // HTTP GET 方法
-	MethodPut    = "PUT"    // HTTP PUT 方法
-	MethodDelete = "DELETE" // HTTP DELETE 方法
+	// MethodGet 表示 HTTP GET 方法
+	MethodGet = "GET"
+	// MethodPut 表示 HTTP PUT 方法
+	MethodPut = "PUT"
+	// MethodDelete 表示 HTTP DELETE 方法
+	MethodDelete = "DELETE"
 )
 
 // PutOption 定义上传选项函数
@@ -13,8 +16,14 @@ type PutOption func(*PutOptions)
 
 // PutOptions 定义上传配置选项
 type PutOptions struct {
-	ContentType string            // 内容类型
-	Metadata    map[string]string // 自定义元数据
+	// ContentType 内容类型，空值时根据对象键自动推断
+	ContentType string
+	// Metadata 用户自定义元数据
+	Metadata map[string]string
+}
+
+func defaultPutOptions() PutOptions {
+	return PutOptions{}
 }
 
 // WithContentType 设置内容类型
@@ -47,8 +56,14 @@ type GetOption func(*GetOptions)
 
 // GetOptions 定义下载配置选项
 type GetOptions struct {
-	Start int64 // 起始字节位置（-1 表示不使用范围下载）
-	End   int64 // 结束字节位置
+	// RangeStart 起始字节位置，-1 表示不使用范围下载
+	RangeStart int64
+	// RangeEnd 结束字节位置
+	RangeEnd int64
+}
+
+func defaultGetOptions() GetOptions {
+	return GetOptions{RangeStart: -1}
 }
 
 // WithRange 设置范围下载
@@ -59,8 +74,8 @@ type GetOptions struct {
 //	storage.Get(ctx, key, oss.WithRange(0, 1023))
 func WithRange(start, end int64) GetOption {
 	return func(o *GetOptions) {
-		o.Start = start
-		o.End = end
+		o.RangeStart = start
+		o.RangeEnd = end
 	}
 }
 
@@ -69,15 +84,18 @@ type ListOption func(*ListOptions)
 
 // ListOptions 定义列表配置选项
 type ListOptions struct {
-	Prefix    string // 对象键前缀
-	Delimiter string // 分隔符
-	MaxKeys   int    // 最大返回数量
-	Marker    string // 分页标记
+	// Prefix 对象键前缀
+	Prefix string
+	// Delimiter 分隔符，常用 "/" 模拟目录
+	Delimiter string
+	// Limit 最大返回数量
+	Limit int
+	// Token 分页令牌
+	Token string
 }
 
-// DefaultListOptions 返回默认列表选项
-func DefaultListOptions() *ListOptions {
-	return &ListOptions{MaxKeys: 1000}
+func defaultListOptions() ListOptions {
+	return ListOptions{Limit: 1000}
 }
 
 // WithPrefix 设置对象键前缀
@@ -109,33 +127,54 @@ func WithDelimiter(delimiter string) ListOption {
 //	storage.List(ctx, oss.WithMaxKeys(100))
 func WithMaxKeys(maxKeys int) ListOption {
 	return func(o *ListOptions) {
-		o.MaxKeys = maxKeys
+		o.Limit = maxKeys
 	}
 }
 
-// WithMarker 设置分页标记
+// WithLimit 设置最大返回数量
 //
 // 示例：
 //
-//	storage.List(ctx, oss.WithMarker("last-key"))
-func WithMarker(marker string) ListOption {
+//	storage.List(ctx, oss.WithLimit(100))
+func WithLimit(limit int) ListOption {
 	return func(o *ListOptions) {
-		o.Marker = marker
+		o.Limit = limit
 	}
 }
 
-// PresignedOption 定义预签名选项函数
-type PresignedOption func(*PresignedOptions)
-
-// PresignedOptions 定义预签名配置选项
-type PresignedOptions struct {
-	Method  string        // HTTP 方法
-	Expires time.Duration // 过期时间
+// WithToken 设置分页令牌
+//
+// 示例：
+//
+//	storage.List(ctx, oss.WithToken(result.NextToken))
+func WithToken(token string) ListOption {
+	return func(o *ListOptions) {
+		o.Token = token
+	}
 }
 
-// DefaultPresignedOptions 返回默认预签名选项
-func DefaultPresignedOptions() *PresignedOptions {
-	return &PresignedOptions{
+// WithMarker 设置兼容旧调用的分页标记
+//
+// Deprecated: 使用 WithToken。
+func WithMarker(marker string) ListOption {
+	return WithToken(marker)
+}
+
+// SignOption 定义预签名选项函数
+type SignOption func(*SignOptions)
+
+// SignOptions 定义预签名配置选项
+type SignOptions struct {
+	// Method HTTP 方法
+	Method string
+	// Expires 过期时间
+	Expires time.Duration
+	// ContentType PUT 预签名时使用的内容类型
+	ContentType string
+}
+
+func defaultSignOptions() SignOptions {
+	return SignOptions{
 		Method:  MethodGet,
 		Expires: 15 * time.Minute,
 	}
@@ -145,9 +184,9 @@ func DefaultPresignedOptions() *PresignedOptions {
 //
 // 示例：
 //
-//	storage.PresignedURL(ctx, key, oss.WithMethod(oss.MethodPut))
-func WithMethod(method string) PresignedOption {
-	return func(o *PresignedOptions) {
+//	storage.SignURL(ctx, key, oss.WithMethod(oss.MethodPut))
+func WithMethod(method string) SignOption {
+	return func(o *SignOptions) {
 		o.Method = method
 	}
 }
@@ -156,9 +195,112 @@ func WithMethod(method string) PresignedOption {
 //
 // 示例：
 //
-//	storage.PresignedURL(ctx, key, oss.WithExpires(30*time.Minute))
-func WithExpires(expires time.Duration) PresignedOption {
-	return func(o *PresignedOptions) {
+//	storage.SignURL(ctx, key, oss.WithExpires(30*time.Minute))
+func WithExpires(expires time.Duration) SignOption {
+	return func(o *SignOptions) {
 		o.Expires = expires
 	}
+}
+
+// WithSignContentType 设置预签名请求的内容类型
+//
+// 示例：
+//
+//	storage.SignURL(ctx, key, oss.WithMethod(oss.MethodPut), oss.WithSignContentType("image/png"))
+func WithSignContentType(contentType string) SignOption {
+	return func(o *SignOptions) {
+		o.ContentType = contentType
+	}
+}
+
+// PresignedOption 定义兼容旧名称的预签名选项函数
+//
+// Deprecated: 使用 SignOption。
+type PresignedOption = SignOption
+
+// PresignedOptions 定义兼容旧名称的预签名配置选项
+//
+// Deprecated: 使用 SignOptions。
+type PresignedOptions = SignOptions
+
+// BucketOption 定义存储桶配置选项
+type BucketOption func(*BucketOptions)
+
+// BucketOptions 定义存储桶配置选项
+type BucketOptions struct {
+	// Region 存储桶地域
+	Region string
+	// ACL 存储桶访问控制策略
+	ACL string
+}
+
+func defaultBucketOptions() BucketOptions {
+	return BucketOptions{}
+}
+
+// WithBucketRegion 设置存储桶地域
+//
+// 示例：
+//
+//	storage.CreateBucket(ctx, "my-bucket", oss.WithBucketRegion("oss-cn-hangzhou"))
+func WithBucketRegion(region string) BucketOption {
+	return func(o *BucketOptions) {
+		o.Region = region
+	}
+}
+
+// WithBucketACL 设置存储桶访问控制策略
+//
+// 示例：
+//
+//	storage.CreateBucket(ctx, "my-bucket", oss.WithBucketACL("private"))
+func WithBucketACL(acl string) BucketOption {
+	return func(o *BucketOptions) {
+		o.ACL = acl
+	}
+}
+
+// ApplyPutOptions 合并上传选项
+func ApplyPutOptions(opts ...PutOption) PutOptions {
+	options := defaultPutOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
+}
+
+// ApplyGetOptions 合并下载选项
+func ApplyGetOptions(opts ...GetOption) GetOptions {
+	options := defaultGetOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
+}
+
+// ApplyListOptions 合并列表选项
+func ApplyListOptions(opts ...ListOption) ListOptions {
+	options := defaultListOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
+}
+
+// ApplySignOptions 合并预签名选项
+func ApplySignOptions(opts ...SignOption) SignOptions {
+	options := defaultSignOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
+}
+
+// ApplyBucketOptions 合并存储桶选项
+func ApplyBucketOptions(opts ...BucketOption) BucketOptions {
+	options := defaultBucketOptions()
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return options
 }

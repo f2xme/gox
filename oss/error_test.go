@@ -107,3 +107,29 @@ func TestWrapErrorWithKey(t *testing.T) {
 		t.Errorf("Err = %v, want %v", err.Err, originalErr)
 	}
 }
+
+func TestErrorCode(t *testing.T) {
+	err := WrapError(ErrCodeAccessDenied, "access denied", errors.New("denied"))
+	if code := ErrorCode(err); code != ErrCodeAccessDenied {
+		t.Errorf("ErrorCode() = %q, want %q", code, ErrCodeAccessDenied)
+	}
+}
+
+func TestErrorCodeWithWrappedError(t *testing.T) {
+	err := WrapError(ErrCodeNotFound, "not found", errors.New("missing"))
+	wrapped := errors.Join(errors.New("outer"), err)
+
+	if !IsNotFound(wrapped) {
+		t.Fatal("IsNotFound() = false, want true")
+	}
+}
+
+func TestIsAccessDenied(t *testing.T) {
+	err := NewError(ErrCodeAccessDenied, "access denied")
+	if !IsAccessDenied(err) {
+		t.Fatal("IsAccessDenied() = false, want true")
+	}
+	if !IsPermissionDenied(err) {
+		t.Fatal("IsPermissionDenied() = false, want true")
+	}
+}
