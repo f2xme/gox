@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
-	github.com/f2xme/gox v0.0.0
+	github.com/f2xme/gox v0.15.4
 )
 
 require (
