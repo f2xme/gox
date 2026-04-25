@@ -8,14 +8,14 @@ import (
 	"github.com/f2xme/gox/cache"
 )
 
-// TestRedisAdvanced_TTL 测试 TTL 方法
-func TestRedisAdvanced_TTL(t *testing.T) {
+// TestRedisCapabilities_TTL 测试 TTL 方法
+func TestRedisCapabilities_TTL(t *testing.T) {
 	c, _ := setupTestRedis(t)
 	defer c.(cache.Closer).Close()
 
-	adv, ok := c.(cache.Advanced)
+	adv, ok := c.(cache.Expirer)
 	if !ok {
-		t.Fatal("Cache does not implement Advanced")
+		t.Fatal("Cache does not implement Expirer")
 	}
 
 	ctx := context.Background()
@@ -42,8 +42,8 @@ func TestRedisAdvanced_TTL(t *testing.T) {
 		if err != cache.ErrNotFound {
 			t.Errorf("TTL returned error %v, want %v", err, cache.ErrNotFound)
 		}
-		if ttl != -2*time.Second {
-			t.Errorf("TTL = %v, want -2s", ttl)
+		if ttl != cache.NoExpiration {
+			t.Errorf("TTL = %v, want NoExpiration", ttl)
 		}
 	})
 
@@ -59,20 +59,20 @@ func TestRedisAdvanced_TTL(t *testing.T) {
 			t.Fatalf("TTL failed: %v", err)
 		}
 
-		if ttl != -1*time.Second {
-			t.Errorf("TTL = %v, want -1s", ttl)
+		if ttl != cache.NoExpiration {
+			t.Errorf("TTL = %v, want NoExpiration", ttl)
 		}
 	})
 }
 
-// TestRedisAdvanced_SetNX 测试 SetNX 方法
-func TestRedisAdvanced_SetNX(t *testing.T) {
+// TestRedisCapabilities_SetNX 测试 SetNX 方法
+func TestRedisCapabilities_SetNX(t *testing.T) {
 	c, _ := setupTestRedis(t)
 	defer c.(cache.Closer).Close()
 
-	adv, ok := c.(cache.Advanced)
+	adv, ok := c.(cache.ConditionalStore)
 	if !ok {
-		t.Fatal("Cache does not implement Advanced")
+		t.Fatal("Cache does not implement ConditionalStore")
 	}
 
 	ctx := context.Background()
@@ -123,14 +123,17 @@ func TestRedisAdvanced_SetNX(t *testing.T) {
 	})
 }
 
-// TestRedisAdvanced_SetXX 测试 SetXX 方法
-func TestRedisAdvanced_SetXX(t *testing.T) {
+// TestRedisCapabilities_SetXX 测试 SetXX 方法
+func TestRedisCapabilities_SetXX(t *testing.T) {
 	c, _ := setupTestRedis(t)
 	defer c.(cache.Closer).Close()
 
-	adv, ok := c.(cache.Advanced)
+	adv, ok := c.(interface {
+		cache.ConditionalStore
+		cache.Expirer
+	})
 	if !ok {
-		t.Fatal("Cache does not implement Advanced")
+		t.Fatal("Cache does not implement ConditionalStore")
 	}
 
 	ctx := context.Background()
@@ -180,19 +183,22 @@ func TestRedisAdvanced_SetXX(t *testing.T) {
 	})
 }
 
-// TestRedisAdvanced_GetSet 测试 GetSet 方法
-func TestRedisAdvanced_GetSet(t *testing.T) {
+// TestRedisCapabilities_Swap 测试 Swap 方法
+func TestRedisCapabilities_Swap(t *testing.T) {
 	c, _ := setupTestRedis(t)
 	defer c.(cache.Closer).Close()
 
-	adv, ok := c.(cache.Advanced)
+	adv, ok := c.(interface {
+		cache.ConditionalStore
+		cache.Expirer
+	})
 	if !ok {
-		t.Fatal("Cache does not implement Advanced")
+		t.Fatal("Cache does not implement ConditionalStore")
 	}
 
 	ctx := context.Background()
 
-	t.Run("GetSet on existing key", func(t *testing.T) {
+	t.Run("Swap on existing key", func(t *testing.T) {
 		key := "getset-key"
 		oldValue := []byte("old")
 		newValue := []byte("new")
@@ -202,12 +208,12 @@ func TestRedisAdvanced_GetSet(t *testing.T) {
 			t.Fatalf("Set failed: %v", err)
 		}
 
-		got, err := adv.GetSet(ctx, key, newValue, 0)
+		got, err := adv.Swap(ctx, key, newValue, cache.NoExpiration)
 		if err != nil {
-			t.Fatalf("GetSet failed: %v", err)
+			t.Fatalf("Swap failed: %v", err)
 		}
 		if string(got) != string(oldValue) {
-			t.Errorf("GetSet returned %q, want %q", got, oldValue)
+			t.Errorf("Swap returned %q, want %q", got, oldValue)
 		}
 
 		current, err := c.Get(ctx, key)
@@ -219,37 +225,29 @@ func TestRedisAdvanced_GetSet(t *testing.T) {
 		}
 	})
 
-	t.Run("GetSet on non-existent key", func(t *testing.T) {
+	t.Run("Swap on non-existent key", func(t *testing.T) {
 		key := "getset-nonexistent"
 		newValue := []byte("new")
 
-		got, err := adv.GetSet(ctx, key, newValue, 0)
+		got, err := adv.Swap(ctx, key, newValue, cache.NoExpiration)
 		if err != cache.ErrNotFound {
-			t.Errorf("GetSet returned error %v, want %v", err, cache.ErrNotFound)
+			t.Errorf("Swap returned error %v, want %v", err, cache.ErrNotFound)
 		}
 		if got != nil {
-			t.Errorf("GetSet returned %v, want nil", got)
-		}
-
-		current, err := c.Get(ctx, key)
-		if err != nil {
-			t.Fatalf("Get failed: %v", err)
-		}
-		if string(current) != string(newValue) {
-			t.Errorf("Get = %q, want %q", current, newValue)
+			t.Errorf("Swap returned %v, want nil", got)
 		}
 	})
 
-	t.Run("GetSet with TTL", func(t *testing.T) {
+	t.Run("Swap with TTL", func(t *testing.T) {
 		key := "getset-ttl"
 		err := c.Set(ctx, key, []byte("old"), 0)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
 
-		_, err = adv.GetSet(ctx, key, []byte("new"), 5*time.Second)
+		_, err = adv.Swap(ctx, key, []byte("new"), 5*time.Second)
 		if err != nil {
-			t.Fatalf("GetSet failed: %v", err)
+			t.Fatalf("Swap failed: %v", err)
 		}
 
 		ttl, err := adv.TTL(ctx, key)
@@ -262,14 +260,14 @@ func TestRedisAdvanced_GetSet(t *testing.T) {
 	})
 }
 
-// TestRedisAdvanced_Expire 测试 Expire 方法
-func TestRedisAdvanced_Expire(t *testing.T) {
+// TestRedisCapabilities_Expire 测试 Expire 方法
+func TestRedisCapabilities_Expire(t *testing.T) {
 	c, mr := setupTestRedis(t)
 	defer c.(cache.Closer).Close()
 
-	adv, ok := c.(cache.Advanced)
+	adv, ok := c.(cache.Expirer)
 	if !ok {
-		t.Fatal("Cache does not implement Advanced")
+		t.Fatal("Cache does not implement Expirer")
 	}
 
 	ctx := context.Background()

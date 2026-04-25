@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/f2xme/gox/cache"
-	"github.com/f2xme/gox/cache/adapter/mem"
+	"github.com/f2xme/gox/cache/adapter/memory"
 )
 
-func TestCounter_Increment(t *testing.T) {
-	c, err := mem.New()
+func TestCounter_Incr(t *testing.T) {
+	c, err := memory.New()
 	if err != nil {
 		t.Fatalf("Failed to create cache: %v", err)
 	}
@@ -17,41 +17,41 @@ func TestCounter_Increment(t *testing.T) {
 
 	counter, ok := c.(cache.Counter)
 	if !ok {
-		t.Fatal("mem cache should implement Counter interface")
+		t.Fatal("memory cache should implement Counter interface")
 	}
 
 	ctx := context.Background()
 
 	// 测试从 0 开始递增
-	val, err := counter.Increment(ctx, "counter:1", 1)
+	val, err := counter.Incr(ctx, "counter:1", 1)
 	if err != nil {
-		t.Fatalf("Increment failed: %v", err)
+		t.Fatalf("Incr failed: %v", err)
 	}
 	if val != 1 {
 		t.Errorf("Expected 1, got %d", val)
 	}
 
 	// 再次递增
-	val, err = counter.Increment(ctx, "counter:1", 5)
+	val, err = counter.Incr(ctx, "counter:1", 5)
 	if err != nil {
-		t.Fatalf("Increment failed: %v", err)
+		t.Fatalf("Incr failed: %v", err)
 	}
 	if val != 6 {
 		t.Errorf("Expected 6, got %d", val)
 	}
 
 	// 测试递减
-	val, err = counter.Increment(ctx, "counter:1", -3)
+	val, err = counter.Incr(ctx, "counter:1", -3)
 	if err != nil {
-		t.Fatalf("Increment failed: %v", err)
+		t.Fatalf("Incr failed: %v", err)
 	}
 	if val != 3 {
 		t.Errorf("Expected 3, got %d", val)
 	}
 }
 
-func TestCounter_IncrementFloat(t *testing.T) {
-	c, err := mem.New()
+func TestCounter_IncrFloat(t *testing.T) {
+	c, err := memory.New()
 	if err != nil {
 		t.Fatalf("Failed to create cache: %v", err)
 	}
@@ -59,33 +59,33 @@ func TestCounter_IncrementFloat(t *testing.T) {
 
 	counter, ok := c.(cache.Counter)
 	if !ok {
-		t.Fatal("mem cache should implement Counter interface")
+		t.Fatal("memory cache should implement Counter interface")
 	}
 
 	ctx := context.Background()
 
 	// 测试从 0.0 开始递增
-	val, err := counter.IncrementFloat(ctx, "balance", 10.5)
+	val, err := counter.IncrFloat(ctx, "balance", 10.5)
 	if err != nil {
-		t.Fatalf("IncrementFloat failed: %v", err)
+		t.Fatalf("IncrFloat failed: %v", err)
 	}
 	if val != 10.5 {
 		t.Errorf("Expected 10.5, got %f", val)
 	}
 
 	// 再次递增
-	val, err = counter.IncrementFloat(ctx, "balance", 5.25)
+	val, err = counter.IncrFloat(ctx, "balance", 5.25)
 	if err != nil {
-		t.Fatalf("IncrementFloat failed: %v", err)
+		t.Fatalf("IncrFloat failed: %v", err)
 	}
 	if val != 15.75 {
 		t.Errorf("Expected 15.75, got %f", val)
 	}
 
 	// 测试递减
-	val, err = counter.IncrementFloat(ctx, "balance", -3.5)
+	val, err = counter.IncrFloat(ctx, "balance", -3.5)
 	if err != nil {
-		t.Fatalf("IncrementFloat failed: %v", err)
+		t.Fatalf("IncrFloat failed: %v", err)
 	}
 	if val != 12.25 {
 		t.Errorf("Expected 12.25, got %f", val)
@@ -93,7 +93,7 @@ func TestCounter_IncrementFloat(t *testing.T) {
 }
 
 func TestCounter_Concurrent(t *testing.T) {
-	c, err := mem.New()
+	c, err := memory.New()
 	if err != nil {
 		t.Fatalf("Failed to create cache: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestCounter_Concurrent(t *testing.T) {
 
 	counter, ok := c.(cache.Counter)
 	if !ok {
-		t.Fatal("mem cache should implement Counter interface")
+		t.Fatal("memory cache should implement Counter interface")
 	}
 
 	ctx := context.Background()
@@ -115,9 +115,9 @@ func TestCounter_Concurrent(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func() {
 			for j := 0; j < increments; j++ {
-				_, err := counter.Increment(ctx, key, 1)
+				_, err := counter.Incr(ctx, key, 1)
 				if err != nil {
-					t.Errorf("Increment failed: %v", err)
+					t.Errorf("Incr failed: %v", err)
 				}
 			}
 			done <- true
@@ -130,9 +130,9 @@ func TestCounter_Concurrent(t *testing.T) {
 	}
 
 	// 验证最终值
-	val, err := counter.Increment(ctx, key, 0)
+	val, err := counter.Incr(ctx, key, 0)
 	if err != nil {
-		t.Fatalf("Increment failed: %v", err)
+		t.Fatalf("Incr failed: %v", err)
 	}
 
 	expected := int64(goroutines * increments)

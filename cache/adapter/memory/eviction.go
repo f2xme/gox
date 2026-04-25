@@ -1,4 +1,4 @@
-package mem
+package memory
 
 // evictionPolicy 定义缓存淘汰策略的接口。
 type evictionPolicy interface {
@@ -19,7 +19,7 @@ type evictionPolicy interface {
 // lruPolicy 实现最近最少使用淘汰策略。
 type lruPolicy struct {
 	accessOrder map[string]uint64 // key -> 单调递增的访问序列
-	nextOrder   uint64             // 注意：理论上在 2^64 次访问时溢出（实际上不可能）
+	nextOrder   uint64            // 注意：理论上在 2^64 次访问时溢出（实际上不可能）
 }
 
 // newLRUPolicy 创建一个新的 LRU 淘汰策略。

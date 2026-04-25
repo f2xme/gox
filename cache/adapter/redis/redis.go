@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/f2xme/gox/cache"
@@ -24,9 +25,24 @@ else
 end
 `
 
-// redisCache 使用 Redis 实现 cache.Cache、cache.MultiCache、cache.Locker 和 cache.Closer。
+const renewScript = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("pexpire", KEYS[1], ARGV[2])
+else
+    return 0
+end
+`
+
+// redisCache 使用 Redis 实现 cache.Store、cache.BatchStore、cache.Locker 和 cache.Closer。
 type redisCache struct {
 	client redis.UniversalClient
+}
+
+func validateTTL(ttl time.Duration) error {
+	if ttl == cache.KeepTTL || ttl < cache.KeepTTL {
+		return cache.ErrInvalidTTL
+	}
+	return nil
 }
 
 // Get 获取给定键的值。
@@ -45,6 +61,9 @@ func (r *redisCache) Get(ctx context.Context, key string) ([]byte, error) {
 // Set 使用给定的键和 TTL 存储值。
 // TTL 为 0 表示无过期时间。
 func (r *redisCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if err := validateTTL(ttl); err != nil {
+		return err
+	}
 	return r.client.Set(ctx, key, value, ttl).Err()
 }
 
@@ -63,9 +82,9 @@ func (r *redisCache) Exists(ctx context.Context, key string) (bool, error) {
 	return n > 0, nil
 }
 
-// GetMulti 在单次操作中获取多个键。
+// GetMany 在单次操作中获取多个键。
 // 不存在的键不会包含在返回的 map 中。
-func (r *redisCache) GetMulti(ctx context.Context, keys []string) (map[string][]byte, error) {
+func (r *redisCache) GetMany(ctx context.Context, keys []string) (map[string][]byte, error) {
 	if len(keys) == 0 {
 		return make(map[string][]byte), nil
 	}
@@ -97,9 +116,12 @@ func (r *redisCache) GetMulti(ctx context.Context, keys []string) (map[string][]
 	return result, nil
 }
 
-// SetMulti 使用相同的 TTL 存储多个键值对。
+// SetMany 使用相同的 TTL 存储多个键值对。
 // TTL 为 0 表示无过期时间。
-func (r *redisCache) SetMulti(ctx context.Context, items map[string][]byte, ttl time.Duration) error {
+func (r *redisCache) SetMany(ctx context.Context, items map[string][]byte, ttl time.Duration) error {
+	if err := validateTTL(ttl); err != nil {
+		return err
+	}
 	if len(items) == 0 {
 		return nil
 	}
@@ -114,8 +136,8 @@ func (r *redisCache) SetMulti(ctx context.Context, items map[string][]byte, ttl 
 	return err
 }
 
-// DeleteMulti 在单次操作中删除多个键。
-func (r *redisCache) DeleteMulti(ctx context.Context, keys []string) error {
+// DeleteMany 在单次操作中删除多个键。
+func (r *redisCache) DeleteMany(ctx context.Context, keys []string) error {
 	if len(keys) == 0 {
 		return nil
 	}
@@ -136,7 +158,7 @@ func (r *redisCache) Close() error {
 }
 
 // TryLock 尝试为给定的键获取锁，使用指定的 TTL。
-// 如果锁已被持有则立即返回 cache.ErrLockFailed。
+// 如果锁已被持有则立即返回 cache.ErrLocked。
 //
 // 重要：锁将在 TTL 持续时间后自动过期。
 // 对于长时间运行的任务，确保 TTL 长于任务持续时间，
@@ -157,7 +179,7 @@ func (r *redisCache) TryLock(ctx context.Context, key string, ttl time.Duration)
 	}
 
 	if !ok {
-		return nil, cache.ErrLockFailed
+		return nil, cache.ErrLocked
 	}
 
 	// 返回 unlock 函数
@@ -199,7 +221,7 @@ func (r *redisCache) Lock(ctx context.Context, key string, ttl time.Duration) (f
 			return unlock, nil
 		}
 
-		if err != cache.ErrLockFailed {
+		if err != cache.ErrLocked {
 			return nil, err
 		}
 
@@ -214,15 +236,15 @@ func (r *redisCache) Lock(ctx context.Context, key string, ttl time.Duration) (f
 	}
 }
 
-// Increment 原子性地增加键的值，并返回增加后的值。
+// Incr 原子性地增加键的值，并返回增加后的值。
 // 如果键不存在，则初始化为 0 后再增加。
-func (r *redisCache) Increment(ctx context.Context, key string, delta int64) (int64, error) {
+func (r *redisCache) Incr(ctx context.Context, key string, delta int64) (int64, error) {
 	return r.client.IncrBy(ctx, key, delta).Result()
 }
 
-// IncrementFloat 原子性地增加键的浮点值，并返回增加后的值。
+// IncrFloat 原子性地增加键的浮点值，并返回增加后的值。
 // 如果键不存在，则初始化为 0.0 后再增加。
-func (r *redisCache) IncrementFloat(ctx context.Context, key string, delta float64) (float64, error) {
+func (r *redisCache) IncrFloat(ctx context.Context, key string, delta float64) (float64, error) {
 	return r.client.IncrByFloat(ctx, key, delta).Result()
 }
 
@@ -236,7 +258,7 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// TTL 实现 cache.Advanced 接口。
+// TTL 实现对应能力接口。
 func (r *redisCache) TTL(ctx context.Context, key string) (time.Duration, error) {
 	ttl, err := r.client.TTL(ctx, key).Result()
 	if err != nil {
@@ -251,18 +273,38 @@ func (r *redisCache) TTL(ctx context.Context, key string) (time.Duration, error)
 	return ttl, nil
 }
 
-// SetNX 实现 cache.Advanced 接口。
+// SetNX 实现对应能力接口。
 func (r *redisCache) SetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
+	if err := validateTTL(ttl); err != nil {
+		return false, err
+	}
 	return r.client.SetNX(ctx, key, value, ttl).Result()
 }
 
-// SetXX 实现 cache.Advanced 接口。
+// SetXX 实现对应能力接口。
 func (r *redisCache) SetXX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
-	return r.client.SetXX(ctx, key, value, ttl).Result()
+	args := redis.SetArgs{Mode: "XX"}
+	if ttl == cache.KeepTTL {
+		args.KeepTTL = true
+	} else {
+		if err := validateTTL(ttl); err != nil {
+			return false, err
+		}
+		args.TTL = ttl
+	}
+
+	err := r.client.SetArgs(ctx, key, value, args).Err()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
-// GetSet 实现 cache.Advanced 接口。
-func (r *redisCache) GetSet(ctx context.Context, key string, value []byte, ttl time.Duration) ([]byte, error) {
+// Swap 原子性地获取旧值并设置新值。
+func (r *redisCache) Swap(ctx context.Context, key string, value []byte, ttl time.Duration) ([]byte, error) {
 	// 使用 Lua 脚本实现原子操作
 	script := `
 		local old = redis.call("GET", KEYS[1])
@@ -272,16 +314,22 @@ func (r *redisCache) GetSet(ctx context.Context, key string, value []byte, ttl t
 		if tonumber(ARGV[2]) > 0 then
 			redis.call("SET", KEYS[1], ARGV[1], "PX", ARGV[2])
 		elseif tonumber(ARGV[2]) == -1 then
-			redis.call("SET", KEYS[1], ARGV[1])
-		else
 			redis.call("SET", KEYS[1], ARGV[1], "KEEPTTL")
+		else
+			redis.call("SET", KEYS[1], ARGV[1])
 		end
 		return old
 	`
 
+	if ttl < cache.KeepTTL {
+		return nil, cache.ErrInvalidTTL
+	}
 	ttlMs := int64(ttl / time.Millisecond)
 	result, err := r.client.Eval(ctx, script, []string{key}, value, ttlMs).Result()
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, cache.ErrNotFound
+		}
 		return nil, err
 	}
 	if result == nil {
@@ -290,8 +338,14 @@ func (r *redisCache) GetSet(ctx context.Context, key string, value []byte, ttl t
 	return []byte(result.(string)), nil
 }
 
-// Expire 实现 cache.Advanced 接口。
+// Expire 实现对应能力接口。
 func (r *redisCache) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	if ttl == cache.KeepTTL || ttl < cache.KeepTTL {
+		return cache.ErrInvalidTTL
+	}
+	if ttl == cache.NoExpiration {
+		return r.Persist(ctx, key)
+	}
 	ok, err := r.client.Expire(ctx, key, ttl).Result()
 	if err != nil {
 		return err
@@ -302,8 +356,26 @@ func (r *redisCache) Expire(ctx context.Context, key string, ttl time.Duration) 
 	return nil
 }
 
-// ExistsMulti 实现 cache.MultiCacheV2 接口。
-func (r *redisCache) ExistsMulti(ctx context.Context, keys []string) (map[string]bool, error) {
+// Persist 移除键的过期时间。
+func (r *redisCache) Persist(ctx context.Context, key string) error {
+	ok, err := r.client.Persist(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		exists, err := r.Exists(ctx, key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return cache.ErrNotFound
+		}
+	}
+	return nil
+}
+
+// ExistsMany 实现 cache.BatchStore 接口。
+func (r *redisCache) ExistsMany(ctx context.Context, keys []string) (map[string]bool, error) {
 	if len(keys) == 0 {
 		return make(map[string]bool), nil
 	}
@@ -338,8 +410,36 @@ func (r *redisCache) Scan(ctx context.Context, pattern string, cursor uint64, co
 	return keys, nextCursor, err
 }
 
-// LockWithRenewal 实现 cache.LockerV2 接口。
+// LockWithRenewal 获取带自动续期的锁。
 func (r *redisCache) LockWithRenewal(ctx context.Context, key string, ttl, renewInterval time.Duration) (func() error, error) {
+	backoff := lockRetryBaseBackoff
+
+	for {
+		unlock, err := r.TryLockWithRenewal(ctx, key, ttl, renewInterval)
+		if err == nil {
+			return unlock, nil
+		}
+
+		if err != cache.ErrLocked {
+			return nil, err
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+			nextBackoff := time.Duration(rand.Int63n(int64(backoff*3-lockRetryBaseBackoff))) + lockRetryBaseBackoff
+			backoff = min(nextBackoff, lockRetryMaxBackoff)
+		}
+	}
+}
+
+// TryLockWithRenewal 尝试获取带自动续期的锁。
+func (r *redisCache) TryLockWithRenewal(ctx context.Context, key string, ttl, renewInterval time.Duration) (func() error, error) {
+	if err := validateTTL(ttl); err != nil {
+		return nil, err
+	}
+
 	// 生成唯一 token
 	token, err := generateToken()
 	if err != nil {
@@ -352,11 +452,16 @@ func (r *redisCache) LockWithRenewal(ctx context.Context, key string, ttl, renew
 		return nil, err
 	}
 	if !ok {
-		return nil, cache.ErrLockFailed
+		return nil, cache.ErrLocked
+	}
+
+	if renewInterval <= 0 || ttl == cache.NoExpiration {
+		return r.unlockWithToken(key, token), nil
 	}
 
 	// 启动续期 goroutine
 	stopCh := make(chan struct{})
+	renewCtx, cancelRenew := context.WithCancel(context.Background())
 	go func() {
 		ticker := time.NewTicker(renewInterval)
 		defer ticker.Stop()
@@ -364,31 +469,47 @@ func (r *redisCache) LockWithRenewal(ctx context.Context, key string, ttl, renew
 		for {
 			select {
 			case <-ticker.C:
-				// 续期锁
-				r.client.Expire(ctx, key, ttl)
+				renewed, err := r.client.Eval(renewCtx, renewScript, []string{key}, token, ttl.Milliseconds()).Int()
+				if err != nil || renewed == 0 {
+					cancelRenew()
+					return
+				}
 			case <-stopCh:
+				return
+			case <-renewCtx.Done():
 				return
 			}
 		}
 	}()
 
 	// 包装 unlock 函数
+	var once sync.Once
+	var unlockErr error
 	wrappedUnlock := func() error {
-		close(stopCh)
-		// 使用 Lua 脚本原子性地检查和删除
-		_, err := r.client.Eval(ctx, unlockScript, []string{key}, token).Result()
-		return err
+		once.Do(func() {
+			cancelRenew()
+			close(stopCh)
+			// 使用 Lua 脚本原子性地检查和删除
+			unlockErr = r.unlockWithToken(key, token)()
+		})
+		return unlockErr
 	}
 
 	return wrappedUnlock, nil
 }
 
-// TryLockWithRenewal 实现 cache.LockerV2 接口。
-func (r *redisCache) TryLockWithRenewal(ctx context.Context, key string, ttl, renewInterval time.Duration) (func() error, error) {
-	return r.LockWithRenewal(ctx, key, ttl, renewInterval)
+func (r *redisCache) unlockWithToken(key, token string) func() error {
+	var once sync.Once
+	var err error
+	return func() error {
+		once.Do(func() {
+			_, err = r.client.Eval(context.Background(), unlockScript, []string{key}, token).Result()
+		})
+		return err
+	}
 }
 
-// LockReentrant 实现 cache.LockerV2 接口。
+// LockReentrant 获取可重入锁。
 func (r *redisCache) LockReentrant(ctx context.Context, key string, ownerID string, ttl time.Duration) (func() error, error) {
 	script := `
 		local current = redis.call("HGET", KEYS[1], "owner")
@@ -419,8 +540,8 @@ func (r *redisCache) LockReentrant(ctx context.Context, key string, ownerID stri
 
 		// 使用 decorrelated jitter 退避
 		sleep := time.Duration(lockRetryBaseBackoff.Nanoseconds() +
-			int64(float64(lockRetryMaxBackoff.Nanoseconds()-lockRetryBaseBackoff.Nanoseconds()) *
-			float64(time.Now().UnixNano()%1000) / 1000.0))
+			int64(float64(lockRetryMaxBackoff.Nanoseconds()-lockRetryBaseBackoff.Nanoseconds())*
+				float64(time.Now().UnixNano()%1000)/1000.0))
 
 		select {
 		case <-ctx.Done():
@@ -448,7 +569,7 @@ func (r *redisCache) LockReentrant(ctx context.Context, key string, ownerID stri
 	return unlock, nil
 }
 
-// TryLockReentrant 实现 cache.LockerV2 接口。
+// TryLockReentrant 尝试获取可重入锁。
 func (r *redisCache) TryLockReentrant(ctx context.Context, key string, ownerID string, ttl time.Duration) (func() error, error) {
 	script := `
 		local current = redis.call("HGET", KEYS[1], "owner")
@@ -473,7 +594,7 @@ func (r *redisCache) TryLockReentrant(ctx context.Context, key string, ownerID s
 		return nil, err
 	}
 	if result.(int64) == 0 {
-		return nil, cache.ErrLockFailed
+		return nil, cache.ErrLocked
 	}
 
 	unlock := func() error {

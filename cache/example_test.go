@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/f2xme/gox/cache"
-	"github.com/f2xme/gox/cache/adapter/mem"
+	"github.com/f2xme/gox/cache/adapter/memory"
 	rediscache "github.com/f2xme/gox/cache/adapter/redis"
 	"github.com/redis/go-redis/v9"
 )
 
-// ExampleCache_basic 演示基本的缓存操作
-func ExampleCache_basic() {
+// ExampleStore_basic 演示基本的缓存操作
+func ExampleStore_basic() {
 	// 创建内存缓存
-	c, _ := mem.New()
+	c, _ := memory.New()
 	defer c.(cache.Closer).Close()
 
 	ctx := context.Background()
@@ -48,7 +48,7 @@ func ExampleTyped() {
 	}
 
 	// 创建内存缓存
-	c, _ := mem.New()
+	c, _ := memory.New()
 	defer c.(cache.Closer).Close()
 
 	// 创建类型安全的包装器
@@ -70,32 +70,32 @@ func ExampleTyped() {
 	// Alice (ID: 1)
 }
 
-// ExampleTyped_GetOrSet 演示 cache-aside 模式
-func ExampleTyped_GetOrSet() {
+// ExampleTyped_GetOrLoad 演示 cache-aside 模式
+func ExampleTyped_GetOrLoad() {
 	type Product struct {
 		ID    int
 		Name  string
 		Price float64
 	}
 
-	c, _ := mem.New()
+	c, _ := memory.New()
 	defer c.(cache.Closer).Close()
 
 	typed := cache.NewTyped[Product](c)
 	ctx := context.Background()
 
 	// 模拟数据库查询函数
-	loadFromDB := func() (Product, error) {
+	loadFromDB := func(context.Context) (Product, error) {
 		fmt.Println("Loading from database...")
 		return Product{ID: 1, Name: "Laptop", Price: 999.99}, nil
 	}
 
 	// 第一次调用：缓存未命中，从数据库加载
-	product, _ := typed.GetOrSet(ctx, "product:1", 5*time.Minute, loadFromDB)
+	product, _ := typed.GetOrLoad(ctx, "product:1", 5*time.Minute, loadFromDB)
 	fmt.Printf("%s: $%.2f\n", product.Name, product.Price)
 
 	// 第二次调用：缓存命中，不会调用 loadFromDB
-	product, _ = typed.GetOrSet(ctx, "product:1", 5*time.Minute, loadFromDB)
+	product, _ = typed.GetOrLoad(ctx, "product:1", 5*time.Minute, loadFromDB)
 	fmt.Printf("%s: $%.2f\n", product.Name, product.Price)
 
 	// Output:
@@ -114,8 +114,8 @@ func Example_batch() {
 	c, _ := rediscache.New(rediscache.WithClient(client))
 	defer c.(cache.Closer).Close()
 
-	// 类型断言为 MultiCache
-	mc, ok := c.(cache.MultiCache)
+	// 类型断言为 BatchStore
+	mc, ok := c.(cache.BatchStore)
 	if !ok {
 		fmt.Println("Cache does not support batch operations")
 		return
@@ -129,7 +129,7 @@ func Example_batch() {
 		"key2": []byte("value2"),
 		"key3": []byte("value3"),
 	}
-	err := mc.SetMulti(ctx, items, 5*time.Minute)
+	err := mc.SetMany(ctx, items, 5*time.Minute)
 	if err != nil {
 		fmt.Println("Redis not available, skipping example")
 		return
@@ -137,7 +137,7 @@ func Example_batch() {
 
 	// 批量获取
 	keys := []string{"key1", "key2", "key3"}
-	results, err := mc.GetMulti(ctx, keys)
+	results, err := mc.GetMany(ctx, keys)
 	if err != nil {
 		fmt.Println("Redis not available, skipping example")
 		return
@@ -150,12 +150,12 @@ func Example_batch() {
 	}
 
 	// 批量删除
-	_ = mc.DeleteMulti(ctx, keys)
+	_ = mc.DeleteMany(ctx, keys)
 }
 
 // ExampleLocker_mem 演示内存缓存的锁
 func Example_lock_mem() {
-	c, _ := mem.New()
+	c, _ := memory.New()
 	defer c.(cache.Closer).Close()
 
 	locker, ok := c.(cache.Locker)
@@ -217,7 +217,7 @@ func Example_serializer() {
 		Port int
 	}
 
-	c, _ := mem.New()
+	c, _ := memory.New()
 	defer c.(cache.Closer).Close()
 
 	// 使用 Gob 序列化器（更快，但仅限 Go）

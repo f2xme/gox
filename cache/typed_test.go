@@ -69,9 +69,9 @@ func TestTypedBasicOperations(t *testing.T) {
 	}
 }
 
-// TestTypedGetOrSet 测试 GetOrSet 的 cache-aside 模式
+// TestTypedGetOrLoad 测试 GetOrLoad 的 cache-aside 模式
 // 验证缓存命中和未命中时的行为
-func TestTypedGetOrSet(t *testing.T) {
+func TestTypedGetOrLoad(t *testing.T) {
 	ctx := context.Background()
 	cache := newMockCache()
 	typed := NewTyped[User](cache)
@@ -79,30 +79,30 @@ func TestTypedGetOrSet(t *testing.T) {
 	user := User{ID: 2, Name: "Bob", Age: 25}
 	callCount := 0
 
-	loader := func() (User, error) {
+	loader := func(context.Context) (User, error) {
 		callCount++
 		return user, nil
 	}
 
 	// 第一次调用：缓存未命中，应调用 loader
-	got, err := typed.GetOrSet(ctx, "user:2", time.Minute, loader)
+	got, err := typed.GetOrLoad(ctx, "user:2", time.Minute, loader)
 	if err != nil {
-		t.Fatalf("GetOrSet failed: %v", err)
+		t.Fatalf("GetOrLoad failed: %v", err)
 	}
 	if got.ID != user.ID || got.Name != user.Name || got.Age != user.Age {
-		t.Errorf("GetOrSet returned %+v, want %+v", got, user)
+		t.Errorf("GetOrLoad returned %+v, want %+v", got, user)
 	}
 	if callCount != 1 {
 		t.Errorf("loader called %d times, want 1", callCount)
 	}
 
 	// 第二次调用：缓存命中，不应调用 loader
-	got, err = typed.GetOrSet(ctx, "user:2", time.Minute, loader)
+	got, err = typed.GetOrLoad(ctx, "user:2", time.Minute, loader)
 	if err != nil {
-		t.Fatalf("GetOrSet failed: %v", err)
+		t.Fatalf("GetOrLoad failed: %v", err)
 	}
 	if got.ID != user.ID || got.Name != user.Name || got.Age != user.Age {
-		t.Errorf("GetOrSet returned %+v, want %+v", got, user)
+		t.Errorf("GetOrLoad returned %+v, want %+v", got, user)
 	}
 	if callCount != 1 {
 		t.Errorf("loader called %d times, want 1 (should use cached value)", callCount)
@@ -134,25 +134,31 @@ func TestTypedWithGobSerializer(t *testing.T) {
 	}
 }
 
-// TestTypedGetOrSetCacheFailure 测试缓存失败时 GetOrSet 的行为
-// 验证即使缓存 Set 失败，GetOrSet 仍能返回加载的数据
-func TestTypedGetOrSetCacheFailure(t *testing.T) {
+// TestTypedGetOrLoadCacheFailure 测试缓存写入失败时 GetOrLoad 的默认行为。
+func TestTypedGetOrLoadCacheFailure(t *testing.T) {
 	ctx := context.Background()
 	cache := &failingCache{mockCache: newMockCache()}
 	typed := NewTyped[User](cache)
 
 	user := User{ID: 4, Name: "Dave", Age: 40}
-	loader := func() (User, error) {
+	loader := func(context.Context) (User, error) {
 		return user, nil
 	}
 
-	// GetOrSet 即使缓存 Set 失败也应成功
-	got, err := typed.GetOrSet(ctx, "user:4", time.Minute, loader)
-	if err != nil {
-		t.Errorf("GetOrSet should succeed even if cache Set fails, got error: %v", err)
+	_, err := typed.GetOrLoad(ctx, "user:4", time.Minute, loader)
+	if err == nil {
+		t.Fatal("GetOrLoad should return cache Set error by default")
 	}
+
+	typed = NewTyped[User](cache, WithIgnoreSetErrors())
+
+	got, err := typed.GetOrLoad(ctx, "user:4", time.Minute, loader)
+	if err != nil {
+		t.Errorf("GetOrLoad should succeed with WithIgnoreSetErrors, got error: %v", err)
+	}
+
 	if got.ID != user.ID || got.Name != user.Name || got.Age != user.Age {
-		t.Errorf("GetOrSet returned %+v, want %+v", got, user)
+		t.Errorf("GetOrLoad returned %+v, want %+v", got, user)
 	}
 }
 

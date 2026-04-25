@@ -3,7 +3,7 @@
 // # 功能特性
 //
 //   - 分布式缓存（跨进程共享）
-//   - 批量操作（MultiCache 接口）
+//   - 批量操作（BatchStore 接口）
 //   - 分布式锁（基于 Redis）
 //   - 持久化支持
 //   - 线程安全
@@ -93,9 +93,9 @@
 //
 // # 批量操作
 //
-// redis 包实现了 MultiCache 接口，支持批量操作以提高性能：
+// redis 包实现了 BatchStore 接口，支持批量操作以提高性能：
 //
-//	mc := c.(cache.MultiCache)
+//	mc := c.(cache.BatchStore)
 //
 //	// 批量设置
 //	items := map[string][]byte{
@@ -103,14 +103,14 @@
 //		"key2": []byte("value2"),
 //		"key3": []byte("value3"),
 //	}
-//	mc.SetMulti(ctx, items, 5*time.Minute)
+//	mc.SetMany(ctx, items, 5*time.Minute)
 //
 //	// 批量获取
 //	keys := []string{"key1", "key2", "key3"}
-//	results, err := mc.GetMulti(ctx, keys)
+//	results, err := mc.GetMany(ctx, keys)
 //
 //	// 批量删除
-//	mc.DeleteMulti(ctx, keys)
+//	mc.DeleteMany(ctx, keys)
 //
 // # 分布式锁
 //
@@ -130,7 +130,7 @@
 //
 //	// 非阻塞式尝试获取锁
 //	unlock, err := locker.TryLock(ctx, "resource:2", 30*time.Second)
-//	if err == cache.ErrLockFailed {
+//	if err == cache.ErrLocked {
 //		// 锁已被占用
 //	}
 //

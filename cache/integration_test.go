@@ -7,24 +7,24 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/f2xme/gox/cache"
-	"github.com/f2xme/gox/cache/adapter/mem"
+	"github.com/f2xme/gox/cache/adapter/memory"
 	rediscache "github.com/f2xme/gox/cache/adapter/redis"
 	"github.com/redis/go-redis/v9"
 )
 
 // setupAdapters 创建测试用的缓存适配器
-// 返回包含 mem 和 redis 适配器的 map
-func setupAdapters(t *testing.T) map[string]cache.Cache {
+// 返回包含 memory 和 redis 适配器的 map
+func setupAdapters(t *testing.T) map[string]cache.Store {
 	t.Helper()
 
-	adapters := make(map[string]cache.Cache)
+	adapters := make(map[string]cache.Store)
 
 	// 内存适配器
-	c, err := mem.New()
+	c, err := memory.New()
 	if err != nil {
-		t.Fatalf("mem.New() error = %v", err)
+		t.Fatalf("memory.New() error = %v", err)
 	}
-	adapters["mem"] = c
+	adapters["memory"] = c
 
 	// Redis 适配器（使用 miniredis）
 	mr := miniredis.RunT(t)
@@ -41,7 +41,7 @@ func setupAdapters(t *testing.T) map[string]cache.Cache {
 }
 
 // TestAdapterConsistency 测试不同适配器的行为一致性
-// 验证 mem 和 redis 适配器在基本操作上的行为一致
+// 验证 memory 和 redis 适配器在基本操作上的行为一致
 func TestAdapterConsistency(t *testing.T) {
 	adapters := setupAdapters(t)
 	defer func() {
@@ -213,9 +213,9 @@ func TestTypedWithAdapters(t *testing.T) {
 	}
 }
 
-// TestTypedGetOrSet 测试 GetOrSet 在不同适配器上的行为
+// TestTypedGetOrLoad 测试 GetOrLoad 在不同适配器上的行为
 // 验证 cache-aside 模式的正确实现
-func TestTypedGetOrSet(t *testing.T) {
+func TestTypedGetOrLoad(t *testing.T) {
 	type Product struct {
 		ID    int
 		Name  string
@@ -239,33 +239,33 @@ func TestTypedGetOrSet(t *testing.T) {
 			key := "product:1"
 
 			callCount := 0
-			loadFunc := func() (Product, error) {
+			loadFunc := func(context.Context) (Product, error) {
 				callCount++
 				return Product{ID: 1, Name: "Laptop", Price: 999.99}, nil
 			}
 
 			// 第一次调用：缓存未命中
-			product, err := typed.GetOrSet(ctx, key, 5*time.Minute, loadFunc)
+			product, err := typed.GetOrLoad(ctx, key, 5*time.Minute, loadFunc)
 			if err != nil {
-				t.Fatalf("GetOrSet failed: %v", err)
+				t.Fatalf("GetOrLoad failed: %v", err)
 			}
 			if callCount != 1 {
 				t.Errorf("loadFunc called %d times, want 1", callCount)
 			}
 			if product.Name != "Laptop" {
-				t.Errorf("GetOrSet returned product %q, want %q", product.Name, "Laptop")
+				t.Errorf("GetOrLoad returned product %q, want %q", product.Name, "Laptop")
 			}
 
 			// 第二次调用：缓存命中
-			product, err = typed.GetOrSet(ctx, key, 5*time.Minute, loadFunc)
+			product, err = typed.GetOrLoad(ctx, key, 5*time.Minute, loadFunc)
 			if err != nil {
-				t.Fatalf("GetOrSet failed: %v", err)
+				t.Fatalf("GetOrLoad failed: %v", err)
 			}
 			if callCount != 1 {
 				t.Errorf("loadFunc called %d times, want 1 (should use cache)", callCount)
 			}
 			if product.Name != "Laptop" {
-				t.Errorf("GetOrSet returned product %q, want %q", product.Name, "Laptop")
+				t.Errorf("GetOrLoad returned product %q, want %q", product.Name, "Laptop")
 			}
 
 			// Cleanup
@@ -313,8 +313,8 @@ func TestLockConsistency(t *testing.T) {
 				defer unlock1()
 
 				_, err = locker.TryLock(ctx, key, 5*time.Second)
-				if err != cache.ErrLockFailed {
-					t.Errorf("Second TryLock returned error %v, want %v", err, cache.ErrLockFailed)
+				if err != cache.ErrLocked {
+					t.Errorf("Second TryLock returned error %v, want %v", err, cache.ErrLocked)
 				}
 			})
 
@@ -398,9 +398,9 @@ func TestLockConsistency(t *testing.T) {
 	}
 }
 
-// TestMultiCacheOperations 测试批量操作（仅 redis 支持）
-// 验证 MultiCache 接口的批量操作功能
-func TestMultiCacheOperations(t *testing.T) {
+// TestBatchStoreOperations 测试批量操作（仅 redis 支持）
+// 验证 BatchStore 接口的批量操作功能
+func TestBatchStoreOperations(t *testing.T) {
 	adapters := setupAdapters(t)
 	defer func() {
 		for _, c := range adapters {
@@ -413,93 +413,93 @@ func TestMultiCacheOperations(t *testing.T) {
 	ctx := context.Background()
 
 	for name, c := range adapters {
-		mc, ok := c.(cache.MultiCache)
+		mc, ok := c.(cache.BatchStore)
 		if !ok {
-			t.Logf("%s does not implement MultiCache, skipping", name)
+			t.Logf("%s does not implement BatchStore, skipping", name)
 			continue
 		}
 
 		t.Run(name, func(t *testing.T) {
-			t.Run("SetMulti and GetMulti", func(t *testing.T) {
+			t.Run("SetMany and GetMany", func(t *testing.T) {
 				items := map[string][]byte{
 					"multi:key1": []byte("value1"),
 					"multi:key2": []byte("value2"),
 					"multi:key3": []byte("value3"),
 				}
 
-				err := mc.SetMulti(ctx, items, 0)
+				err := mc.SetMany(ctx, items, 0)
 				if err != nil {
-					t.Fatalf("SetMulti failed: %v", err)
+					t.Fatalf("SetMany failed: %v", err)
 				}
 
 				keys := []string{"multi:key1", "multi:key2", "multi:key3", "multi:non-existent"}
-				got, err := mc.GetMulti(ctx, keys)
+				got, err := mc.GetMany(ctx, keys)
 				if err != nil {
-					t.Fatalf("GetMulti failed: %v", err)
+					t.Fatalf("GetMany failed: %v", err)
 				}
 
 				if len(got) != 3 {
-					t.Errorf("GetMulti returned %d items, want 3", len(got))
+					t.Errorf("GetMany returned %d items, want 3", len(got))
 				}
 
 				for k, v := range items {
 					if string(got[k]) != string(v) {
-						t.Errorf("GetMulti[%q] = %q, want %q", k, got[k], v)
+						t.Errorf("GetMany[%q] = %q, want %q", k, got[k], v)
 					}
 				}
 
 				if _, exists := got["multi:non-existent"]; exists {
-					t.Error("GetMulti returned non-existent key")
+					t.Error("GetMany returned non-existent key")
 				}
 			})
 
-			t.Run("DeleteMulti", func(t *testing.T) {
+			t.Run("DeleteMany", func(t *testing.T) {
 				items := map[string][]byte{
 					"del:key1": []byte("value1"),
 					"del:key2": []byte("value2"),
 				}
 
-				err := mc.SetMulti(ctx, items, 0)
+				err := mc.SetMany(ctx, items, 0)
 				if err != nil {
-					t.Fatalf("SetMulti failed: %v", err)
+					t.Fatalf("SetMany failed: %v", err)
 				}
 
 				keys := []string{"del:key1", "del:key2"}
-				err = mc.DeleteMulti(ctx, keys)
+				err = mc.DeleteMany(ctx, keys)
 				if err != nil {
-					t.Fatalf("DeleteMulti failed: %v", err)
+					t.Fatalf("DeleteMany failed: %v", err)
 				}
 
-				got, err := mc.GetMulti(ctx, keys)
+				got, err := mc.GetMany(ctx, keys)
 				if err != nil {
-					t.Fatalf("GetMulti failed: %v", err)
+					t.Fatalf("GetMany failed: %v", err)
 				}
 
 				if len(got) != 0 {
-					t.Errorf("GetMulti after DeleteMulti returned %d items, want 0", len(got))
+					t.Errorf("GetMany after DeleteMany returned %d items, want 0", len(got))
 				}
 			})
 
 			t.Run("Empty operations", func(t *testing.T) {
-				// Empty SetMulti
-				err := mc.SetMulti(ctx, map[string][]byte{}, 0)
+				// Empty SetMany
+				err := mc.SetMany(ctx, map[string][]byte{}, 0)
 				if err != nil {
-					t.Errorf("SetMulti with empty map failed: %v", err)
+					t.Errorf("SetMany with empty map failed: %v", err)
 				}
 
-				// Empty GetMulti
-				got, err := mc.GetMulti(ctx, []string{})
+				// Empty GetMany
+				got, err := mc.GetMany(ctx, []string{})
 				if err != nil {
-					t.Errorf("GetMulti with empty keys failed: %v", err)
+					t.Errorf("GetMany with empty keys failed: %v", err)
 				}
 				if len(got) != 0 {
-					t.Errorf("GetMulti with empty keys returned %d items, want 0", len(got))
+					t.Errorf("GetMany with empty keys returned %d items, want 0", len(got))
 				}
 
-				// Empty DeleteMulti
-				err = mc.DeleteMulti(ctx, []string{})
+				// Empty DeleteMany
+				err = mc.DeleteMany(ctx, []string{})
 				if err != nil {
-					t.Errorf("DeleteMulti with empty keys failed: %v", err)
+					t.Errorf("DeleteMany with empty keys failed: %v", err)
 				}
 			})
 		})

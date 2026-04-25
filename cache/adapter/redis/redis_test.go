@@ -11,7 +11,7 @@ import (
 )
 
 // setupTestRedis 创建测试用的 Redis 缓存实例
-func setupTestRedis(t *testing.T) (cache.Cache, *miniredis.Miniredis) {
+func setupTestRedis(t *testing.T) (cache.Store, *miniredis.Miniredis) {
 	t.Helper()
 
 	mr := miniredis.RunT(t)
@@ -155,71 +155,71 @@ func TestRedisCacheBatchOperations(t *testing.T) {
 	c, _ := setupTestRedis(t)
 	defer c.(cache.Closer).Close()
 
-	mc, ok := c.(cache.MultiCache)
+	mc, ok := c.(cache.BatchStore)
 	if !ok {
-		t.Fatal("Cache does not implement MultiCache")
+		t.Fatal("Cache does not implement BatchStore")
 	}
 
 	ctx := context.Background()
 
-	t.Run("SetMulti and GetMulti", func(t *testing.T) {
+	t.Run("SetMany and GetMany", func(t *testing.T) {
 		items := map[string][]byte{
 			"key1": []byte("value1"),
 			"key2": []byte("value2"),
 			"key3": []byte("value3"),
 		}
 
-		err := mc.SetMulti(ctx, items, 0)
+		err := mc.SetMany(ctx, items, 0)
 		if err != nil {
-			t.Fatalf("SetMulti failed: %v", err)
+			t.Fatalf("SetMany failed: %v", err)
 		}
 
 		keys := []string{"key1", "key2", "key3", "non-existent"}
-		got, err := mc.GetMulti(ctx, keys)
+		got, err := mc.GetMany(ctx, keys)
 		if err != nil {
-			t.Fatalf("GetMulti failed: %v", err)
+			t.Fatalf("GetMany failed: %v", err)
 		}
 
 		if len(got) != 3 {
-			t.Errorf("GetMulti returned %d items, want 3", len(got))
+			t.Errorf("GetMany returned %d items, want 3", len(got))
 		}
 
 		for k, v := range items {
 			if string(got[k]) != string(v) {
-				t.Errorf("GetMulti[%q] = %q, want %q", k, got[k], v)
+				t.Errorf("GetMany[%q] = %q, want %q", k, got[k], v)
 			}
 		}
 
 		if _, exists := got["non-existent"]; exists {
-			t.Error("GetMulti returned non-existent key")
+			t.Error("GetMany returned non-existent key")
 		}
 	})
 
-	t.Run("DeleteMulti", func(t *testing.T) {
+	t.Run("DeleteMany", func(t *testing.T) {
 		items := map[string][]byte{
 			"del1": []byte("value1"),
 			"del2": []byte("value2"),
 			"del3": []byte("value3"),
 		}
 
-		err := mc.SetMulti(ctx, items, 0)
+		err := mc.SetMany(ctx, items, 0)
 		if err != nil {
-			t.Fatalf("SetMulti failed: %v", err)
+			t.Fatalf("SetMany failed: %v", err)
 		}
 
 		keys := []string{"del1", "del2", "del3"}
-		err = mc.DeleteMulti(ctx, keys)
+		err = mc.DeleteMany(ctx, keys)
 		if err != nil {
-			t.Fatalf("DeleteMulti failed: %v", err)
+			t.Fatalf("DeleteMany failed: %v", err)
 		}
 
-		got, err := mc.GetMulti(ctx, keys)
+		got, err := mc.GetMany(ctx, keys)
 		if err != nil {
-			t.Fatalf("GetMulti failed: %v", err)
+			t.Fatalf("GetMany failed: %v", err)
 		}
 
 		if len(got) != 0 {
-			t.Errorf("GetMulti after DeleteMulti returned %d items, want 0", len(got))
+			t.Errorf("GetMany after DeleteMany returned %d items, want 0", len(got))
 		}
 	})
 }
@@ -268,7 +268,7 @@ func TestRedisCacheTryLock(t *testing.T) {
 		}
 	})
 
-	t.Run("TryLock returns ErrLockFailed when already held", func(t *testing.T) {
+	t.Run("TryLock returns ErrLocked when already held", func(t *testing.T) {
 		unlock1, err := locker.TryLock(ctx, key, 5*time.Second)
 		if err != nil {
 			t.Fatalf("First TryLock failed: %v", err)
@@ -277,8 +277,8 @@ func TestRedisCacheTryLock(t *testing.T) {
 
 		// Second TryLock should fail immediately
 		_, err = locker.TryLock(ctx, key, 5*time.Second)
-		if err != cache.ErrLockFailed {
-			t.Errorf("Second TryLock returned error %v, want %v", err, cache.ErrLockFailed)
+		if err != cache.ErrLocked {
+			t.Errorf("Second TryLock returned error %v, want %v", err, cache.ErrLocked)
 		}
 	})
 

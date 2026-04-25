@@ -1,4 +1,4 @@
-package mem
+package memory
 
 import (
 	"context"
@@ -267,5 +267,95 @@ func TestEvictionWithExpiration(t *testing.T) {
 		if !exists {
 			t.Errorf("%s should exist but doesn't", key)
 		}
+	}
+}
+
+func TestEvictionOnSetNXAndCounterCreation(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("SetNX evicts when creating new key", func(t *testing.T) {
+		c, err := New(WithMaxSize(2), WithEvictionPolicy("lru"))
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		defer c.(cache.Closer).Close()
+
+		if err := c.Set(ctx, "key1", []byte("value1"), 0); err != nil {
+			t.Fatalf("Set key1 failed: %v", err)
+		}
+		if err := c.Set(ctx, "key2", []byte("value2"), 0); err != nil {
+			t.Fatalf("Set key2 failed: %v", err)
+		}
+
+		ok, err := c.(cache.ConditionalStore).SetNX(ctx, "key3", []byte("value3"), 0)
+		if err != nil {
+			t.Fatalf("SetNX key3 failed: %v", err)
+		}
+		if !ok {
+			t.Fatal("SetNX key3 returned false")
+		}
+
+		assertMaxSize(t, c, []string{"key1", "key2", "key3"}, 2)
+	})
+
+	t.Run("Incr evicts when creating new key", func(t *testing.T) {
+		c, err := New(WithMaxSize(2), WithEvictionPolicy("lru"))
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		defer c.(cache.Closer).Close()
+
+		if err := c.Set(ctx, "key1", []byte("value1"), 0); err != nil {
+			t.Fatalf("Set key1 failed: %v", err)
+		}
+		if err := c.Set(ctx, "key2", []byte("value2"), 0); err != nil {
+			t.Fatalf("Set key2 failed: %v", err)
+		}
+
+		if _, err := c.(cache.Counter).Incr(ctx, "counter", 1); err != nil {
+			t.Fatalf("Incr counter failed: %v", err)
+		}
+
+		assertMaxSize(t, c, []string{"key1", "key2", "counter"}, 2)
+	})
+
+	t.Run("IncrFloat evicts when creating new key", func(t *testing.T) {
+		c, err := New(WithMaxSize(2), WithEvictionPolicy("lru"))
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		defer c.(cache.Closer).Close()
+
+		if err := c.Set(ctx, "key1", []byte("value1"), 0); err != nil {
+			t.Fatalf("Set key1 failed: %v", err)
+		}
+		if err := c.Set(ctx, "key2", []byte("value2"), 0); err != nil {
+			t.Fatalf("Set key2 failed: %v", err)
+		}
+
+		if _, err := c.(cache.Counter).IncrFloat(ctx, "float-counter", 1.5); err != nil {
+			t.Fatalf("IncrFloat counter failed: %v", err)
+		}
+
+		assertMaxSize(t, c, []string{"key1", "key2", "float-counter"}, 2)
+	})
+}
+
+func assertMaxSize(t *testing.T, c cache.Store, keys []string, max int) {
+	t.Helper()
+
+	ctx := context.Background()
+	count := 0
+	for _, key := range keys {
+		exists, err := c.Exists(ctx, key)
+		if err != nil {
+			t.Fatalf("Exists %s failed: %v", key, err)
+		}
+		if exists {
+			count++
+		}
+	}
+	if count > max {
+		t.Fatalf("cache has %d keys, want at most %d", count, max)
 	}
 }

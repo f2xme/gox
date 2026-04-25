@@ -1,4 +1,4 @@
-package mem
+package memory
 
 import (
 	"errors"
@@ -37,12 +37,12 @@ func (o *Options) Validate() error {
 
 	// 验证 CleanupInterval
 	if o.CleanupInterval <= 0 {
-		return errors.New("mem: cleanup interval must be positive")
+		return errors.New("memory: cleanup interval must be positive")
 	}
 
 	// 验证 EvictionPolicy
 	if o.EvictionPolicy != "lru" && o.EvictionPolicy != "lfu" {
-		return errors.New("mem: eviction policy must be 'lru' or 'lfu'")
+		return errors.New("memory: eviction policy must be 'lru' or 'lfu'")
 	}
 
 	return nil
@@ -56,7 +56,7 @@ type Option func(*Options)
 //
 // 示例：
 //
-//	mem.New(mem.WithMaxSize(1000))
+//	memory.New(memory.WithMaxSize(1000))
 func WithMaxSize(size int) Option {
 	return func(o *Options) {
 		if size < 0 {
@@ -71,7 +71,7 @@ func WithMaxSize(size int) Option {
 //
 // 示例：
 //
-//	mem.New(mem.WithCleanupInterval(5 * time.Minute))
+//	memory.New(memory.WithCleanupInterval(5 * time.Minute))
 func WithCleanupInterval(interval time.Duration) Option {
 	return func(o *Options) {
 		if interval <= 0 {
@@ -87,7 +87,7 @@ func WithCleanupInterval(interval time.Duration) Option {
 //
 // 示例：
 //
-//	mem.New(mem.WithEvictionPolicy("lfu"))
+//	memory.New(memory.WithEvictionPolicy("lfu"))
 func WithEvictionPolicy(policy string) Option {
 	return func(o *Options) {
 		if policy != "lru" && policy != "lfu" {

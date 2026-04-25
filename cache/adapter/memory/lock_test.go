@@ -1,4 +1,4 @@
-package mem
+package memory
 
 import (
 	"context"
@@ -30,10 +30,10 @@ func TestMemCacheTryLock(t *testing.T) {
 		t.Fatal("unlock function is nil")
 	}
 
-	// Second TryLock should fail with ErrLockFailed
+	// Second TryLock should fail with ErrLocked
 	_, err = mc.TryLock(ctx, key, ttl)
-	if err != cache.ErrLockFailed {
-		t.Fatalf("Expected ErrLockFailed, got: %v", err)
+	if err != cache.ErrLocked {
+		t.Fatalf("Expected ErrLocked, got: %v", err)
 	}
 
 	// Unlock

@@ -1,4 +1,4 @@
-// Package mem 提供基于内存的缓存实现。
+// Package memory 提供基于内存的缓存实现。
 //
 // # 功能特性
 //
@@ -20,12 +20,12 @@
 //		"time"
 //
 //		"github.com/f2xme/gox/cache"
-//		"github.com/f2xme/gox/cache/adapter/mem"
+//		"github.com/f2xme/gox/cache/adapter/memory"
 //	)
 //
 //	func main() {
 //		// 创建内存缓存
-//		c, err := mem.New()
+//		c, err := memory.New()
 //		if err != nil {
 //			panic(err)
 //		}
@@ -48,28 +48,28 @@
 //
 // 限制缓存大小：
 //
-//	c, _ := mem.New(
-//		mem.WithMaxSize(1000), // 最多存储 1000 个条目
+//	c, _ := memory.New(
+//		memory.WithMaxSize(1000), // 最多存储 1000 个条目
 //	)
 //
 // 设置淘汰策略：
 //
 //	// LRU（最近最少使用，默认）
-//	c, _ := mem.New(
-//		mem.WithMaxSize(1000),
-//		mem.WithEvictionPolicy("lru"),
+//	c, _ := memory.New(
+//		memory.WithMaxSize(1000),
+//		memory.WithEvictionPolicy("lru"),
 //	)
 //
 //	// LFU（最不经常使用）
-//	c, _ := mem.New(
-//		mem.WithMaxSize(1000),
-//		mem.WithEvictionPolicy("lfu"),
+//	c, _ := memory.New(
+//		memory.WithMaxSize(1000),
+//		memory.WithEvictionPolicy("lfu"),
 //	)
 //
 // 自定义清理间隔：
 //
-//	c, _ := mem.New(
-//		mem.WithCleanupInterval(5 * time.Minute), // 每 5 分钟清理一次过期条目
+//	c, _ := memory.New(
+//		memory.WithCleanupInterval(5 * time.Minute), // 每 5 分钟清理一次过期条目
 //	)
 //
 // # 使用配置文件
@@ -78,16 +78,16 @@
 //
 //	// 配置文件（YAML）
 //	// cache:
-//	//   mem:
+//	//   memory:
 //	//     maxSize: 1000
 //	//     cleanupInterval: 5m
 //	//     evictionPolicy: lru
 //
-//	c, err := mem.NewWithConfig(cfg)
+//	c, err := memory.NewWithConfig(cfg)
 //
 // # 分布式锁
 //
-// mem 包实现了进程内锁（适用于单机应用）：
+// memory 包实现了进程内锁（适用于单机应用）：
 //
 //	locker := c.(cache.Locker)
 //
@@ -103,7 +103,7 @@
 //
 //	// 非阻塞式尝试获取锁
 //	unlock, err := locker.TryLock(ctx, "resource:2", 30*time.Second)
-//	if err == cache.ErrLockFailed {
+//	if err == cache.ErrLocked {
 //		// 锁已被占用
 //	}
 //
@@ -111,7 +111,7 @@
 //
 // 内存缓存会启动后台 goroutine 进行清理，使用完毕后必须调用 Close()：
 //
-//	c, _ := mem.New()
+//	c, _ := memory.New()
 //	defer c.(cache.Closer).Close()
 //
 // # 注意事项
@@ -121,4 +121,4 @@
 //   - MaxSize 为 0 表示无限制，可能导致内存溢出
 //   - 锁仅在当前进程内有效，不适用于分布式场景
 //   - 必须调用 Close() 以防止 goroutine 泄漏
-package mem
+package memory

@@ -18,7 +18,7 @@ import (
 //		redis.WithPassword("secret"),
 //		redis.WithDB(1),
 //	)
-func New(opts ...Option) (cache.Cache, error) {
+func New(opts ...Option) (cache.Store, error) {
 	cfg := defaultOptions()
 
 	for _, opt := range opts {
@@ -48,7 +48,7 @@ func New(opts ...Option) (cache.Cache, error) {
 }
 
 // MustNew 创建一个新的 Redis 缓存，出错时终止程序。
-func MustNew(opts ...Option) cache.Cache {
+func MustNew(opts ...Option) cache.Store {
 	c, err := New(opts...)
 	if err != nil {
 		log.Fatalf("redis: failed to create cache: %v", err)
@@ -65,7 +65,7 @@ func MustNew(opts ...Option) cache.Cache {
 // 示例：
 //
 //	c, err := redis.NewWithConfig(cfg)
-func NewWithConfig(cfg config.Config) (cache.Cache, error) {
+func NewWithConfig(cfg config.Config) (cache.Store, error) {
 	opts := []Option{}
 
 	if addr := cfg.GetString("cache.redis.addr"); addr != "" {
@@ -84,7 +84,7 @@ func NewWithConfig(cfg config.Config) (cache.Cache, error) {
 }
 
 // MustNewWithConfig 使用配置创建一个新的 Redis 缓存，出错时终止程序。
-func MustNewWithConfig(cfg config.Config) cache.Cache {
+func MustNewWithConfig(cfg config.Config) cache.Store {
 	c, err := NewWithConfig(cfg)
 	if err != nil {
 		log.Fatalf("redis: failed to create cache from config: %v", err)

@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/f2xme/gox/cache"
-	"github.com/f2xme/gox/cache/adapter/mem"
+	"github.com/f2xme/gox/cache/adapter/memory"
 )
 
 func main() {
 	fmt.Println("=== Cache 使用示例 ===")
 
 	// 1. 创建内存缓存实例
-	c, err := mem.New()
+	c, err := memory.New()
 	if err != nil {
 		fmt.Printf("创建缓存失败: %v\n", err)
 		return
