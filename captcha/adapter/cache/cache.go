@@ -10,8 +10,23 @@ import (
 
 // cacheStore 基于 gox/cache 包的存储实现。
 type cacheStore struct {
-	cache cache.Cache
+	cache Backend
 	opts  Options
+}
+
+// Backend 定义 cache 适配器需要的最小缓存后端能力。
+type Backend interface {
+	// Get 获取指定键的值。
+	Get(ctx context.Context, key string) ([]byte, error)
+
+	// Set 使用指定的键和 TTL 存储值。
+	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+
+	// Delete 从缓存中删除键。
+	Delete(ctx context.Context, key string) error
+
+	// Exists 检查键是否存在。
+	Exists(ctx context.Context, key string) (bool, error)
 }
 
 // Set 存储验证码答案。

@@ -1,13 +1,12 @@
 package cache
 
 import (
-	"github.com/f2xme/gox/cache"
 	"github.com/f2xme/gox/captcha"
 	"github.com/f2xme/gox/captcha/generator/base64"
 )
 
-// NewCaptcha 创建使用 cache 存储的 Captcha 实例。
-func NewCaptcha(c cache.Cache, opts ...CaptchaOption) (captcha.Service, error) {
+// NewCaptcha 创建使用 cache 存储的 Service 实例。
+func NewCaptcha(c Backend, opts ...CaptchaOption) (captcha.Service, error) {
 	cfg := captchaConfig{}
 	for _, opt := range opts {
 		opt(&cfg)
