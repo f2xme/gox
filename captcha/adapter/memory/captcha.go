@@ -5,7 +5,7 @@ import (
 	"github.com/f2xme/gox/captcha/generator/base64"
 )
 
-// NewCaptcha 创建使用内存存储的 Captcha 实例。
+// NewCaptcha 创建使用内存存储的 Service 实例。
 func NewCaptcha(opts ...CaptchaOption) (captcha.Service, error) {
 	cfg := captchaConfig{}
 	for _, opt := range opts {

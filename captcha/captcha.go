@@ -28,9 +28,6 @@ type Service interface {
 	Regenerate(ctx context.Context, id string) (Challenge, error)
 }
 
-// Captcha 是 Service 的兼容别名。
-type Captcha = Service
-
 type service struct {
 	store     Store
 	generator Generator
