@@ -57,26 +57,35 @@ func MustNew(opts ...Option) cache.Store {
 }
 
 // NewWithConfig 使用 config.Config 中的配置创建一个新的 Redis 缓存。
+// prefix 是可选配置前缀，默认使用 "cache"。
 // 配置键：
 //   - cache.redis.addr (string): Redis 服务器地址（默认："localhost:6379"）
 //   - cache.redis.password (string): Redis 认证密码
 //   - cache.redis.db (int): Redis 数据库编号（默认：0）
+//   - <prefix>.redis.addr (string): 自定义前缀下的 Redis 服务器地址
+//   - <prefix>.redis.password (string): 自定义前缀下的 Redis 认证密码
+//   - <prefix>.redis.db (int): 自定义前缀下的 Redis 数据库编号
 //
 // 示例：
 //
 //	c, err := redis.NewWithConfig(cfg)
-func NewWithConfig(cfg config.Config) (cache.Store, error) {
+//	c, err := redis.NewWithConfig(cfg, "app")
+func NewWithConfig(cfg config.Config, prefix ...string) (cache.Store, error) {
 	opts := []Option{}
+	configPrefix := "cache"
+	if len(prefix) > 0 && prefix[0] != "" {
+		configPrefix = prefix[0]
+	}
 
-	if addr := cfg.GetString("cache.redis.addr"); addr != "" {
+	if addr := cfg.GetString(configPrefix + ".redis.addr"); addr != "" {
 		opts = append(opts, WithAddr(addr))
 	}
 
-	if password := cfg.GetString("cache.redis.password"); password != "" {
+	if password := cfg.GetString(configPrefix + ".redis.password"); password != "" {
 		opts = append(opts, WithPassword(password))
 	}
 
-	if db := cfg.GetInt("cache.redis.db"); db > 0 {
+	if db := cfg.GetInt(configPrefix + ".redis.db"); db > 0 {
 		opts = append(opts, WithDB(db))
 	}
 
@@ -84,8 +93,8 @@ func NewWithConfig(cfg config.Config) (cache.Store, error) {
 }
 
 // MustNewWithConfig 使用配置创建一个新的 Redis 缓存，出错时终止程序。
-func MustNewWithConfig(cfg config.Config) cache.Store {
-	c, err := NewWithConfig(cfg)
+func MustNewWithConfig(cfg config.Config, prefix ...string) cache.Store {
+	c, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
 		log.Fatalf("redis: failed to create cache from config: %v", err)
 	}

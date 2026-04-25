@@ -10,6 +10,45 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type testConfig map[string]any
+
+func (c testConfig) Get(key string) any { return c[key] }
+
+func (c testConfig) GetString(key string) string {
+	v, _ := c[key].(string)
+	return v
+}
+
+func (c testConfig) GetStringSlice(key string) []string {
+	v, _ := c[key].([]string)
+	return v
+}
+
+func (c testConfig) GetStringMap(key string) map[string]any {
+	v, _ := c[key].(map[string]any)
+	return v
+}
+
+func (c testConfig) GetInt(key string) int {
+	v, _ := c[key].(int)
+	return v
+}
+
+func (c testConfig) GetInt64(key string) int64 {
+	v, _ := c[key].(int64)
+	return v
+}
+
+func (c testConfig) GetDuration(key string) time.Duration {
+	v, _ := c[key].(time.Duration)
+	return v
+}
+
+func (c testConfig) GetBool(key string) bool {
+	v, _ := c[key].(bool)
+	return v
+}
+
 // setupTestRedis 创建测试用的 Redis 缓存实例
 func setupTestRedis(t *testing.T) (cache.Store, *miniredis.Miniredis) {
 	t.Helper()
@@ -573,6 +612,81 @@ func TestNew_Validation(t *testing.T) {
 						closer.Close()
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestNewWithConfig_Prefix(t *testing.T) {
+	tests := []struct {
+		name       string
+		prefix     []string
+		cfg        testConfig
+		wantAddr   string
+		wantDB     int
+		wantPasswd string
+	}{
+		{
+			name:   "default prefix",
+			prefix: nil,
+			cfg: testConfig{
+				"cache.redis.addr":     "default-prefix:6379",
+				"cache.redis.password": "default-secret",
+				"cache.redis.db":       2,
+			},
+			wantAddr:   "default-prefix:6379",
+			wantDB:     2,
+			wantPasswd: "default-secret",
+		},
+		{
+			name:   "custom prefix",
+			prefix: []string{"session"},
+			cfg: testConfig{
+				"cache.redis.addr":       "ignored:6379",
+				"cache.redis.db":         1,
+				"session.redis.addr":     "custom-prefix:6379",
+				"session.redis.password": "custom-secret",
+				"session.redis.db":       3,
+			},
+			wantAddr:   "custom-prefix:6379",
+			wantDB:     3,
+			wantPasswd: "custom-secret",
+		},
+		{
+			name:   "empty prefix uses default",
+			prefix: []string{""},
+			cfg: testConfig{
+				"cache.redis.addr": "empty-prefix-default:6379",
+				"cache.redis.db":   4,
+			},
+			wantAddr: "empty-prefix-default:6379",
+			wantDB:   4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store, err := NewWithConfig(tt.cfg, tt.prefix...)
+			if err != nil {
+				t.Fatalf("NewWithConfig() error = %v", err)
+			}
+			defer store.(cache.Closer).Close()
+
+			rc := store.(*redisCache)
+			client, ok := rc.client.(*redis.Client)
+			if !ok {
+				t.Fatalf("client type = %T, want *redis.Client", rc.client)
+			}
+
+			opts := client.Options()
+			if opts.Addr != tt.wantAddr {
+				t.Errorf("addr = %q, want %q", opts.Addr, tt.wantAddr)
+			}
+			if opts.DB != tt.wantDB {
+				t.Errorf("db = %d, want %d", opts.DB, tt.wantDB)
+			}
+			if opts.Password != tt.wantPasswd {
+				t.Errorf("password = %q, want %q", opts.Password, tt.wantPasswd)
 			}
 		})
 	}
