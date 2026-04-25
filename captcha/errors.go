@@ -3,6 +3,12 @@ package captcha
 import "errors"
 
 var (
+	// ErrNotFound 表示验证码不存在或已过期
+	ErrNotFound = errors.New("captcha: not found")
+
+	// ErrInvalidID 表示无效的验证码 ID
+	ErrInvalidID = errors.New("captcha: invalid id")
+
 	// ErrGenerateFailed 表示生成验证码失败
 	ErrGenerateFailed = errors.New("captcha: failed to generate captcha")
 

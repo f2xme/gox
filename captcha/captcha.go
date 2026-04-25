@@ -1,154 +1,113 @@
-// Package captcha 提供验证码生成和验证功能。
-//
-// 支持多种验证码类型：数字、字母、算术、音频。
-// 使用 base64Captcha 库作为底层实现。
 package captcha
 
 import (
-	"time"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"strings"
 
-	"github.com/mojocn/base64Captcha"
+	"github.com/f2xme/gox/captcha/generator"
 )
 
-const (
-	defaultMaxSkew = 0.7 // 数字验证码的最大倾斜度
-)
-
-// Captcha 定义验证码接口
+// Captcha 定义验证码服务接口。
 type Captcha interface {
-	// Generate 生成验证码，返回验证码 ID 和 base64 编码的图片/音频数据
-	// 对于图形验证码，返回 base64 编码的 PNG 图片
-	// 对于音频验证码，返回 base64 编码的 WAV 音频
-	Generate() (id, b64s string, err error)
+	// Generate 生成验证码，返回 ID 和数据。
+	Generate(ctx context.Context) (id string, data string, err error)
 
-	// Verify 验证验证码答案
-	// 验证成功后会自动删除验证码，防止重复使用
-	// 如果验证码不存在、已过期或答案错误，返回 false
-	Verify(id, answer string) bool
+	// Verify 验证验证码答案。
+	// 验证成功返回 true，失败返回 false。
+	// 不会自动删除验证码，需要手动调用 Delete。
+	Verify(ctx context.Context, id string, answer string) (bool, error)
+
+	// Delete 删除验证码。
+	// 通常在验证成功后调用，防止重复使用。
+	Delete(ctx context.Context, id string) error
+
+	// Regenerate 重新生成验证码内容（保持相同 ID）。
+	// 用于"看不清，换一张"的场景。
+	Regenerate(ctx context.Context, id string) (data string, err error)
 }
 
-// captchaImpl 实现 Captcha 接口
-type captchaImpl struct {
-	store  base64Captcha.Store
-	opts   Options
-	driver base64Captcha.Driver
+type captcha struct {
+	store     Store
+	generator generator.Generator
+	opts      Options
 }
 
-// New 创建一个新的验证码实例
-//
-// store 参数指定验证码存储后端，可以使用 NewMemoryStore 创建内存存储，
-// 或实现 base64Captcha.Store 接口自定义存储（如 Redis）。
-//
-// opts 参数用于配置验证码选项，如类型、长度、尺寸等。
-//
-// 示例：
-//
-//	store := captcha.NewMemoryStore(100, 5*time.Minute)
-//	c := captcha.New(store, captcha.WithType(captcha.TypeDigit), captcha.WithLength(6))
-func New(store base64Captcha.Store, opts ...Option) Captcha {
-	options := defaultOptions()
-	for _, opt := range opts {
-		opt(&options)
+// Generate 生成验证码。
+func (c *captcha) Generate(ctx context.Context) (string, string, error) {
+	// 生成随机 ID
+	id, err := generateID(c.opts.IDLength)
+	if err != nil {
+		return "", "", err
 	}
 
-	return &captchaImpl{
-		store:  store,
-		opts:   options,
-		driver: createDriver(options),
-	}
-}
-
-// NewMemoryStore 创建一个内存存储实例
-//
-// gcLimitNumber 指定 GC 时保留的验证码数量，当存储的验证码数量超过此值时，
-// 会清理最旧的验证码。
-//
-// expiration 指定验证码的过期时间，过期后的验证码无法通过验证。
-//
-// 示例：
-//
-//	// 保留最多 1000 个验证码，5 分钟后过期
-//	store := captcha.NewMemoryStore(1000, 5*time.Minute)
-func NewMemoryStore(gcLimitNumber int, expiration time.Duration) base64Captcha.Store {
-	return base64Captcha.NewMemoryStore(gcLimitNumber, expiration)
-}
-
-// Generate 生成验证码
-//
-// 根据配置的验证码类型生成相应的验证码：
-//   - TypeDigit: 纯数字验证码
-//   - TypeString: 字母数字混合验证码
-//   - TypeMath: 算术表达式验证码
-//   - TypeAudio: 音频验证码
-//
-// 返回值：
-//   - id: 验证码唯一标识符，用于后续验证
-//   - b64s: base64 编码的验证码数据（图片或音频）
-//   - err: 生成失败时返回错误
-func (c *captchaImpl) Generate() (string, string, error) {
-	captcha := base64Captcha.NewCaptcha(c.driver, c.store)
-	id, b64s, _, err := captcha.Generate()
+	// 生成验证码
+	data, answer, err := c.generator.Generate()
 	if err != nil {
 		return "", "", ErrGenerateFailed
 	}
-	return id, b64s, nil
-}
 
-// createDriver 根据配置创建对应的验证码驱动
-func createDriver(opts Options) base64Captcha.Driver {
-	switch opts.CaptchaType {
-	case TypeString:
-		return base64Captcha.NewDriverString(
-			opts.Height,
-			opts.Width,
-			opts.NoiseCount,
-			base64Captcha.OptionShowHollowLine,
-			opts.Length,
-			base64Captcha.TxtNumbers+base64Captcha.TxtAlphabet,
-			nil,
-			nil,
-			nil,
-		)
-	case TypeMath:
-		return base64Captcha.NewDriverMath(
-			opts.Height,
-			opts.Width,
-			opts.NoiseCount,
-			base64Captcha.OptionShowHollowLine,
-			nil,
-			nil,
-			nil,
-		)
-	case TypeAudio:
-		return base64Captcha.NewDriverAudio(
-			opts.Length,
-			opts.Language,
-		)
-	default:
-		return base64Captcha.NewDriverDigit(
-			opts.Height,
-			opts.Width,
-			opts.Length,
-			defaultMaxSkew,
-			opts.NoiseCount,
-		)
+	// 存储答案
+	if err := c.store.Set(ctx, id, answer, c.opts.TTL); err != nil {
+		return "", "", err
 	}
+
+	return id, data, nil
 }
 
-// Verify 验证验证码答案
-//
-// 验证成功后会自动删除验证码，防止重复使用。
-//
-// 参数：
-//   - id: 验证码 ID（由 Generate 返回）
-//   - answer: 用户输入的答案
-//
-// 返回值：
-//   - true: 验证成功
-//   - false: 验证失败（ID 或答案为空、验证码不存在、已过期或答案错误）
-func (c *captchaImpl) Verify(id, answer string) bool {
+// Verify 验证验证码答案。
+func (c *captcha) Verify(ctx context.Context, id string, answer string) (bool, error) {
 	if id == "" || answer == "" {
-		return false
+		return false, nil
 	}
-	return c.store.Verify(id, answer, true)
+
+	// 获取存储的答案
+	stored, err := c.store.Get(ctx, id)
+	if err != nil {
+		if err == ErrNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+
+	// 比较答案（忽略大小写和空格）
+	return compareAnswer(stored, answer), nil
+}
+
+// Delete 删除验证码。
+func (c *captcha) Delete(ctx context.Context, id string) error {
+	return c.store.Delete(ctx, id)
+}
+
+// Regenerate 重新生成验证码内容（保持相同 ID）。
+func (c *captcha) Regenerate(ctx context.Context, id string) (string, error) {
+	// 生成新验证码
+	data, answer, err := c.generator.Generate()
+	if err != nil {
+		return "", ErrGenerateFailed
+	}
+
+	// 更新答案
+	if err := c.store.Set(ctx, id, answer, c.opts.TTL); err != nil {
+		return "", err
+	}
+
+	return data, nil
+}
+
+// generateID 生成随机 ID。
+func generateID(length int) (string, error) {
+	bytes := make([]byte, length/2)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+// compareAnswer 比较答案（忽略大小写和空格）。
+func compareAnswer(stored, input string) bool {
+	stored = strings.TrimSpace(strings.ToLower(stored))
+	input = strings.TrimSpace(strings.ToLower(input))
+	return stored == input
 }

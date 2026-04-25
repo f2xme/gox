@@ -19,8 +19,7 @@ require (
 	github.com/mojocn/base64Captcha v1.3.6
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/redis/go-redis/v9 v9.18.0
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.76
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.3.57
+	golang.org/x/sync v0.10.0
 	golang.org/x/time v0.15.0
 	gorm.io/gorm v1.31.1
 )
@@ -92,9 +91,6 @@ require (
 )
 
 require (
-	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.16
-	github.com/alibabacloud-go/dysmsapi-20170525/v4 v4.1.3
-	github.com/alibabacloud-go/tea v1.4.0
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect

@@ -2,13 +2,17 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // Typed 提供类型安全的缓存操作包装器
 type Typed[T any] struct {
 	cache      Cache
 	serializer Serializer
+	group      singleflight.Group
 }
 
 // TypedOption 是 Typed 的配置选项函数
@@ -83,7 +87,7 @@ func (t *Typed[T]) Exists(ctx context.Context, key string) (bool, error) {
 
 // GetOrSet 实现 cache-aside 模式
 // 首先尝试获取值，如果不存在则调用 fn 计算值并存储
-// 这可以防止缓存击穿
+// 使用 singleflight 防止缓存击穿
 func (t *Typed[T]) GetOrSet(ctx context.Context, key string, ttl time.Duration, fn func() (T, error)) (T, error) {
 	var zero T
 
@@ -99,14 +103,118 @@ func (t *Typed[T]) GetOrSet(ctx context.Context, key string, ttl time.Duration, 
 		return zero, err
 	}
 
-	// 缓存未命中，调用加载函数
-	value, err = fn()
+	// 缓存未命中，使用 singleflight 防止并发重复计算
+	result, err, _ := t.group.Do(key, func() (any, error) {
+		// 再次检查缓存（可能其他 goroutine 已经设置）
+		value, err := t.Get(ctx, key)
+		if err == nil {
+			return value, nil
+		}
+		if err != ErrNotFound {
+			return zero, err
+		}
+
+		// 调用加载函数
+		value, err = fn()
+		if err != nil {
+			return zero, err
+		}
+
+		// 存储到缓存（失败不影响返回值，因为数据已成功加载）
+		_ = t.Set(ctx, key, value, ttl)
+
+		return value, nil
+	})
+
 	if err != nil {
 		return zero, err
 	}
 
-	// 存储到缓存（失败不影响返回值，因为数据已成功加载）
-	_ = t.Set(ctx, key, value, ttl)
+	return result.(T), nil
+}
 
-	return value, nil
+// GetMulti 批量获取多个键的值
+// 如果底层 cache 实现了 MultiCache 接口，则使用批量操作
+// 否则降级为循环调用 Get
+func (t *Typed[T]) GetMulti(ctx context.Context, keys []string) (map[string]T, error) {
+	result := make(map[string]T, len(keys))
+
+	// 尝试使用批量接口
+	if mc, ok := t.cache.(MultiCache); ok {
+		dataMap, err := mc.GetMulti(ctx, keys)
+		if err != nil {
+			return nil, err
+		}
+
+		for key, data := range dataMap {
+			var value T
+			if err := t.serializer.Unmarshal(data, &value); err != nil {
+				return nil, fmt.Errorf("unmarshal key %s: %w", key, err)
+			}
+			result[key] = value
+		}
+		return result, nil
+	}
+
+	// 降级为循环调用
+	for _, key := range keys {
+		value, err := t.Get(ctx, key)
+		if err != nil {
+			if err == ErrNotFound {
+				continue // 跳过不存在的键
+			}
+			return nil, fmt.Errorf("get key %s: %w", key, err)
+		}
+		result[key] = value
+	}
+
+	return result, nil
+}
+
+// SetMulti 批量设置多个键值对
+// 如果底层 cache 实现了 MultiCache 接口，则使用批量操作
+// 否则降级为循环调用 Set
+func (t *Typed[T]) SetMulti(ctx context.Context, items map[string]T, ttl time.Duration) error {
+	// 序列化所有值
+	dataMap := make(map[string][]byte, len(items))
+	for key, value := range items {
+		data, err := t.serializer.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("marshal key %s: %w", key, err)
+		}
+		dataMap[key] = data
+	}
+
+	// 尝试使用批量接口
+	if mc, ok := t.cache.(MultiCache); ok {
+		return mc.SetMulti(ctx, dataMap, ttl)
+	}
+
+	// 降级为循环调用
+	for key, data := range dataMap {
+		if err := t.cache.Set(ctx, key, data, ttl); err != nil {
+			return fmt.Errorf("set key %s: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
+// DeleteMulti 批量删除多个键
+// 如果底层 cache 实现了 MultiCache 接口，则使用批量操作
+// 否则降级为循环调用 Delete
+func (t *Typed[T]) DeleteMulti(ctx context.Context, keys []string) error {
+	// 尝试使用批量接口
+	if mc, ok := t.cache.(MultiCache); ok {
+		return mc.DeleteMulti(ctx, keys)
+	}
+
+	// 降级为循环调用
+	for _, key := range keys {
+		if err := t.cache.Delete(ctx, key); err != nil {
+			return fmt.Errorf("delete key %s: %w", key, err)
+		}
+	}
+
+	return nil
 }

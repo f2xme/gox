@@ -505,7 +505,6 @@ func matchGlob(pattern, str string) (bool, error) {
 	}
 	return pattern == str, nil
 }
-}
 
 func containsWildcard(s string) bool {
 	for i := 0; i < len(s); i++ {
