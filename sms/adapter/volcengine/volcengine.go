@@ -2,6 +2,7 @@ package volcengine
 
 import (
 	"fmt"
+	"log"
 
 	goxconfig "github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/sms"
@@ -54,6 +55,15 @@ func (s *volcengineSMS) Send(phone, templateCode, templateParam string) error {
 	return fmt.Errorf("volcengine sms provider not implemented yet")
 }
 
+// MustNew 创建由火山引擎支持的 sms.SMS，如果失败则 log.Fatal
+func MustNew(opts ...Option) sms.SMS {
+	client, err := New(opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
 // NewWithConfig creates a sms.SMS backed by Volcengine with configuration from config.Config.
 // Configuration keys:
 //   - sms.volcengine.accessKeyID (string): Volcengine access key ID (required)
@@ -67,4 +77,14 @@ func NewWithConfig(cfg goxconfig.Config) (sms.SMS, error) {
 		WithRegion(cfg.GetString("sms.volcengine.region")),
 		WithSignName(cfg.GetString("sms.volcengine.signName")),
 	)
+}
+
+// MustNewWithConfig creates a sms.SMS backed by Volcengine with configuration from config.Config.
+// Calls log.Fatal if creation fails.
+func MustNewWithConfig(cfg goxconfig.Config) sms.SMS {
+	client, err := NewWithConfig(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
 }

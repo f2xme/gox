@@ -2,6 +2,7 @@ package tencent
 
 import (
 	"fmt"
+	"log"
 
 	goxconfig "github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/sms"
@@ -94,6 +95,15 @@ func (s *tencentSMS) Send(phone, templateCode, templateParam string) error {
 	return nil
 }
 
+// MustNew 创建由腾讯云支持的 sms.SMS，如果失败则 log.Fatal
+func MustNew(opts ...Option) sms.SMS {
+	client, err := New(opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
 // NewWithConfig creates a sms.SMS backed by Tencent with configuration from config.Config.
 // Configuration keys:
 //   - sms.tencent.secretID (string): Tencent secret ID (required)
@@ -109,4 +119,14 @@ func NewWithConfig(cfg goxconfig.Config) (sms.SMS, error) {
 		WithAppID(cfg.GetString("sms.tencent.appID")),
 		WithSignName(cfg.GetString("sms.tencent.signName")),
 	)
+}
+
+// MustNewWithConfig creates a sms.SMS backed by Tencent with configuration from config.Config.
+// Calls log.Fatal if creation fails.
+func MustNewWithConfig(cfg goxconfig.Config) sms.SMS {
+	client, err := NewWithConfig(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
 }

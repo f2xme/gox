@@ -2,6 +2,7 @@ package aliyun
 
 import (
 	"fmt"
+	"log"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	dysmsapi "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
@@ -89,6 +90,15 @@ func (s *aliyunSMS) Send(phone, templateCode, templateParam string) error {
 	return nil
 }
 
+// MustNew 创建由阿里云支持的 sms.SMS，如果失败则 log.Fatal
+func MustNew(opts ...Option) sms.SMS {
+	client, err := New(opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
 // NewWithConfig creates a sms.SMS backed by Aliyun with configuration from config.Config.
 // Configuration keys:
 //   - sms.aliyun.accessKeyID (string): Aliyun access key ID (required)
@@ -102,4 +112,14 @@ func NewWithConfig(cfg goxconfig.Config) (sms.SMS, error) {
 		WithEndpoint(cfg.GetString("sms.aliyun.endpoint")),
 		WithSignName(cfg.GetString("sms.aliyun.signName")),
 	)
+}
+
+// MustNewWithConfig creates a sms.SMS backed by Aliyun with configuration from config.Config.
+// Calls log.Fatal if creation fails.
+func MustNewWithConfig(cfg goxconfig.Config) sms.SMS {
+	client, err := NewWithConfig(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
 }
