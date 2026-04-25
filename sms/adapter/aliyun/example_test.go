@@ -13,11 +13,11 @@ func ExampleNew() {
 		aliyun.WithSignName("测试签名"),
 	)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Println("Error:", err)
 		return
 	}
 
-	fmt.Printf("SMS client created: %T\n", sms)
+	fmt.Println("SMS client created:", fmt.Sprintf("%T", sms))
 
 	// Output:
 	// SMS client created: *aliyun.aliyunSMS
@@ -30,16 +30,16 @@ func ExampleNew_send() {
 		aliyun.WithSignName("测试签名"),
 	)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Println("Error:", err)
 		return
 	}
 
 	_ = sms
 
 	fmt.Println("发送短信示例")
-	fmt.Println("sms.Send(\"13800138000\", \"SMS_123456789\", `{\"code\":\"123456\"}`)")
+	fmt.Println(`sms.Send(ctx, sms.Message{Phone: "13800138000", TemplateCode: "SMS_123456789", TemplateParam: map[string]string{"code":"123456"}})`)
 
 	// Output:
 	// 发送短信示例
-	// sms.Send("13800138000", "SMS_123456789", `{"code":"123456"}`)
+	// sms.Send(ctx, sms.Message{Phone: "13800138000", TemplateCode: "SMS_123456789", TemplateParam: map[string]string{"code":"123456"}})
 }

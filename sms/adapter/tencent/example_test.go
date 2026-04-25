@@ -14,11 +14,11 @@ func ExampleNew() {
 		tencent.WithSignName("测试签名"),
 	)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Println("Error:", err)
 		return
 	}
 
-	fmt.Printf("SMS client created: %T\n", sms)
+	fmt.Println("SMS client created:", fmt.Sprintf("%T", sms))
 
 	// Output:
 	// SMS client created: *tencent.tencentSMS
@@ -32,16 +32,16 @@ func ExampleNew_send() {
 		tencent.WithSignName("测试签名"),
 	)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Println("Error:", err)
 		return
 	}
 
 	_ = sms
 
 	fmt.Println("发送短信示例")
-	fmt.Println("sms.Send(\"13800138000\", \"123456\", \"123456\")")
+	fmt.Println(`sms.Send(ctx, sms.Message{Phone: "+8613800138000", TemplateCode: "123456", TemplateParam: []string{"123456"}})`)
 
 	// Output:
 	// 发送短信示例
-	// sms.Send("13800138000", "123456", "123456")
+	// sms.Send(ctx, sms.Message{Phone: "+8613800138000", TemplateCode: "123456", TemplateParam: []string{"123456"}})
 }

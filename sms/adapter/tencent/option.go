@@ -17,7 +17,18 @@ type Options struct {
 // Option 定义配置选项函数
 type Option func(*Options)
 
+// defaultOptions 返回默认配置选项
+func defaultOptions() Options {
+	return Options{
+		Region: "ap-guangzhou",
+	}
+}
+
 // WithSecretID 设置密钥 ID
+//
+// 示例：
+//
+//	New(WithSecretID("your-secret-id"))
 func WithSecretID(id string) Option {
 	return func(o *Options) {
 		o.SecretID = id
@@ -25,6 +36,10 @@ func WithSecretID(id string) Option {
 }
 
 // WithSecretKey 设置密钥 Key
+//
+// 示例：
+//
+//	New(WithSecretKey("your-secret-key"))
 func WithSecretKey(key string) Option {
 	return func(o *Options) {
 		o.SecretKey = key
@@ -34,6 +49,10 @@ func WithSecretKey(key string) Option {
 // WithRegion 设置地域
 //
 // 默认值: ap-guangzhou
+//
+// 示例：
+//
+//	New(WithRegion("ap-guangzhou"))
 func WithRegion(region string) Option {
 	return func(o *Options) {
 		o.Region = region
@@ -41,6 +60,10 @@ func WithRegion(region string) Option {
 }
 
 // WithAppID 设置短信应用 ID
+//
+// 示例：
+//
+//	New(WithAppID("your-app-id"))
 func WithAppID(appID string) Option {
 	return func(o *Options) {
 		o.AppID = appID
@@ -48,6 +71,10 @@ func WithAppID(appID string) Option {
 }
 
 // WithSignName 设置短信签名名称
+//
+// 示例：
+//
+//	New(WithSignName("your-sign-name"))
 func WithSignName(signName string) Option {
 	return func(o *Options) {
 		o.SignName = signName

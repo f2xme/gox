@@ -1,6 +1,7 @@
 package volcengine
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -14,7 +15,7 @@ type volcengineSMS struct {
 
 var _ sms.SMS = (*volcengineSMS)(nil)
 
-// validateOptions validates the options and sets defaults
+// validateOptions 校验配置选项并设置默认值。
 func validateOptions(o *Options) error {
 	if o.Region == "" {
 		o.Region = "cn-north-1"
@@ -43,7 +44,7 @@ func validateOptions(o *Options) error {
 //		volcengine.WithSignName("your-sign-name"),
 //	)
 func New(opts ...Option) (sms.SMS, error) {
-	o := Options{}
+	o := defaultOptions()
 	for _, opt := range opts {
 		opt(&o)
 	}
@@ -58,8 +59,8 @@ func New(opts ...Option) (sms.SMS, error) {
 }
 
 // Send 发送短信消息
-func (s *volcengineSMS) Send(phone, templateCode, templateParam string) error {
-	// TODO: Implement Volcengine SMS sending logic
+func (s *volcengineSMS) Send(ctx context.Context, message sms.Message) error {
+	// TODO: 接入火山引擎短信发送逻辑。
 	return fmt.Errorf("volcengine sms provider not implemented yet")
 }
 
@@ -72,13 +73,13 @@ func MustNew(opts ...Option) sms.SMS {
 	return client
 }
 
-// NewWithConfig creates a sms.SMS backed by Volcengine with configuration from config.Config.
-// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
-// Configuration keys:
-//   - {prefix}.volcengine.accessKeyID (string): Volcengine access key ID (required)
-//   - {prefix}.volcengine.accessKeySecret (string): Volcengine access key secret (required)
-//   - {prefix}.volcengine.region (string): Volcengine region (optional, default: cn-north-1)
-//   - {prefix}.volcengine.signName (string): SMS signature name (required)
+// NewWithConfig 使用 config.Config 创建由火山引擎支持的 sms.SMS。
+// 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
+// 配置键：
+//   - {prefix}.volcengine.accessKeyID：火山引擎访问密钥 ID，必填
+//   - {prefix}.volcengine.accessKeySecret：火山引擎访问密钥 Secret，必填
+//   - {prefix}.volcengine.region：火山引擎地域，选填，默认 cn-north-1
+//   - {prefix}.volcengine.signName：短信签名名称，必填
 func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	p := "sms"
 	if len(prefix) > 0 && prefix[0] != "" {
@@ -92,9 +93,9 @@ func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	)
 }
 
-// MustNewWithConfig creates a sms.SMS backed by Volcengine with configuration from config.Config.
-// Calls log.Fatal if creation fails.
-// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
+// MustNewWithConfig 使用 config.Config 创建由火山引擎支持的 sms.SMS。
+// 如果创建失败则调用 log.Fatal。
+// 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
@@ -103,7 +104,7 @@ func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	return client
 }
 
-// NewWithOptions creates a sms.SMS backed by Volcengine using an Options struct.
+// NewWithOptions 使用 Options 创建由火山引擎支持的 sms.SMS。
 func NewWithOptions(opts *Options) (sms.SMS, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("volcengine sms: options cannot be nil")
@@ -119,8 +120,8 @@ func NewWithOptions(opts *Options) (sms.SMS, error) {
 	}, nil
 }
 
-// MustNewWithOptions creates a sms.SMS backed by Volcengine using an Options struct.
-// Calls log.Fatal if creation fails.
+// MustNewWithOptions 使用 Options 创建由火山引擎支持的 sms.SMS。
+// 如果创建失败则调用 log.Fatal。
 func MustNewWithOptions(opts *Options) sms.SMS {
 	client, err := NewWithOptions(opts)
 	if err != nil {

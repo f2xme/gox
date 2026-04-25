@@ -15,7 +15,18 @@ type Options struct {
 // Option 定义配置选项函数
 type Option func(*Options)
 
+// defaultOptions 返回默认配置选项
+func defaultOptions() Options {
+	return Options{
+		Endpoint: "dysmsapi.aliyuncs.com",
+	}
+}
+
 // WithAccessKeyID 设置访问密钥 ID
+//
+// 示例：
+//
+//	New(WithAccessKeyID("your-key-id"))
 func WithAccessKeyID(id string) Option {
 	return func(o *Options) {
 		o.AccessKeyID = id
@@ -23,6 +34,10 @@ func WithAccessKeyID(id string) Option {
 }
 
 // WithAccessKeySecret 设置访问密钥 Secret
+//
+// 示例：
+//
+//	New(WithAccessKeySecret("your-key-secret"))
 func WithAccessKeySecret(secret string) Option {
 	return func(o *Options) {
 		o.AccessKeySecret = secret
@@ -32,6 +47,10 @@ func WithAccessKeySecret(secret string) Option {
 // WithEndpoint 设置短信服务端点
 //
 // 默认值: dysmsapi.aliyuncs.com
+//
+// 示例：
+//
+//	New(WithEndpoint("dysmsapi.aliyuncs.com"))
 func WithEndpoint(endpoint string) Option {
 	return func(o *Options) {
 		o.Endpoint = endpoint
@@ -39,6 +58,10 @@ func WithEndpoint(endpoint string) Option {
 }
 
 // WithSignName 设置短信签名名称
+//
+// 示例：
+//
+//	New(WithSignName("your-sign-name"))
 func WithSignName(signName string) Option {
 	return func(o *Options) {
 		o.SignName = signName

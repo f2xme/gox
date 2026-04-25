@@ -14,8 +14,10 @@
 //	package main
 //
 //	import (
+//		"context"
 //		"log"
 //
+//		"github.com/f2xme/gox/sms"
 //		"github.com/f2xme/gox/sms/adapter/tencent"
 //	)
 //
@@ -32,11 +34,11 @@
 //		}
 //
 //		// 发送短信
-//		err = client.Send(
-//			"13800138000",
-//			"123456",
-//			"1234",
-//		)
+//		err = client.Send(context.Background(), sms.Message{
+//			Phone:         "+8613800138000",
+//			TemplateCode:  "123456",
+//			TemplateParam: []string{"1234"},
+//		})
 //		if err != nil {
 //			log.Fatal(err)
 //		}

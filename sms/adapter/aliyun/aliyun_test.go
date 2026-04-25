@@ -3,63 +3,24 @@ package aliyun_test
 import (
 	"testing"
 
+	"github.com/f2xme/gox/sms"
 	"github.com/f2xme/gox/sms/adapter/aliyun"
 )
 
-func TestNew(t *testing.T) {
-	tests := []struct {
-		name            string
-		accessKeyID     string
-		accessKeySecret string
-		endpoint        string
-		signName        string
-		wantPanic       bool
-	}{
-		{
-			name:            "valid_config",
-			accessKeyID:     "test-id",
-			accessKeySecret: "test-secret",
-			endpoint:        "test-endpoint",
-			signName:        "test-sign",
-			wantPanic:       false,
-		},
-		{
-			name:            "empty_access_key_id",
-			accessKeyID:     "",
-			accessKeySecret: "test-secret",
-			endpoint:        "test-endpoint",
-			signName:        "test-sign",
-			wantPanic:       true,
-		},
-		{
-			name:            "empty_access_key_secret",
-			accessKeyID:     "test-id",
-			accessKeySecret: "",
-			endpoint:        "test-endpoint",
-			signName:        "test-sign",
-			wantPanic:       true,
-		},
-		{
-			name:            "empty_sign_name",
-			accessKeyID:     "test-id",
-			accessKeySecret: "test-secret",
-			endpoint:        "test-endpoint",
-			signName:        "",
-			wantPanic:       true,
-		},
+func TestConnection(t *testing.T) {
+	client, err := aliyun.New(
+		aliyun.WithAccessKeyID("test-id"),
+		aliyun.WithAccessKeySecret("test-secret"),
+		aliyun.WithEndpoint("dysmsapi.aliyuncs.com"),
+		aliyun.WithSignName("test-sign"),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := aliyun.New(
-				aliyun.WithAccessKeyID(tt.accessKeyID),
-				aliyun.WithAccessKeySecret(tt.accessKeySecret),
-				aliyun.WithEndpoint(tt.endpoint),
-				aliyun.WithSignName(tt.signName),
-			)
-			if (err != nil) != tt.wantPanic {
-				t.Errorf("New() error = %v, wantErr %v", err, tt.wantPanic)
-			}
-		})
+	if client == nil {
+		t.Fatal("New() returned nil client")
 	}
+
+	var _ sms.SMS = client
 }

@@ -14,8 +14,10 @@
 //	package main
 //
 //	import (
+//		"context"
 //		"log"
 //
+//		"github.com/f2xme/gox/sms"
 //		"github.com/f2xme/gox/sms/adapter/volcengine"
 //	)
 //
@@ -31,11 +33,11 @@
 //		}
 //
 //		// 发送短信
-//		err = client.Send(
-//			"13800138000",
-//			"SMS_123456789",
-//			`{"code":"1234"}`,
-//		)
+//		err = client.Send(context.Background(), sms.Message{
+//			Phone:         "13800138000",
+//			TemplateCode:  "SMS_123456789",
+//			TemplateParam: map[string]string{"code": "1234"},
+//		})
 //		if err != nil {
 //			log.Fatal(err)
 //		}

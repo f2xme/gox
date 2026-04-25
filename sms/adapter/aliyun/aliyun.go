@@ -1,8 +1,11 @@
 package aliyun
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	dysmsapi "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
@@ -14,12 +17,16 @@ import (
 
 type aliyunSMS struct {
 	options Options
-	client  *dysmsapi.Client
+	client  aliyunSender
 }
 
 var _ sms.SMS = (*aliyunSMS)(nil)
 
-// validateOptions validates the options and sets defaults
+type aliyunSender interface {
+	SendSms(request *dysmsapi.SendSmsRequest) (*dysmsapi.SendSmsResponse, error)
+}
+
+// validateOptions 校验配置选项并设置默认值。
 func validateOptions(o *Options) error {
 	if o.Endpoint == "" {
 		o.Endpoint = "dysmsapi.aliyuncs.com"
@@ -38,7 +45,7 @@ func validateOptions(o *Options) error {
 	return nil
 }
 
-// createClient creates a new Aliyun SMS client from validated options
+// createClient 根据已校验的配置创建阿里云短信客户端。
 func createClient(o *Options) (*dysmsapi.Client, error) {
 	aliConfig := &openapi.Config{
 		AccessKeyId:     tea.String(o.AccessKeyID),
@@ -64,7 +71,7 @@ func createClient(o *Options) (*dysmsapi.Client, error) {
 //		aliyun.WithSignName("your-sign-name"),
 //	)
 func New(opts ...Option) (sms.SMS, error) {
-	o := Options{}
+	o := defaultOptions()
 	for _, opt := range opts {
 		opt(&o)
 	}
@@ -85,28 +92,96 @@ func New(opts ...Option) (sms.SMS, error) {
 }
 
 // Send 发送短信消息
-func (s *aliyunSMS) Send(phone, templateCode, templateParam string) error {
+func (s *aliyunSMS) Send(ctx context.Context, message sms.Message) error {
+	if ctx == nil {
+		return fmt.Errorf("aliyun sms: context cannot be nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("aliyun sms: context error: %w", err)
+	}
+	if err := validateMessage(message); err != nil {
+		return err
+	}
+
+	templateParam, err := encodeTemplateParam(message.TemplateParam)
+	if err != nil {
+		return err
+	}
+
 	request := &dysmsapi.SendSmsRequest{
-		PhoneNumbers:  tea.String(phone),
+		PhoneNumbers:  tea.String(message.Phone),
 		SignName:      tea.String(s.options.SignName),
-		TemplateCode:  tea.String(templateCode),
+		TemplateCode:  tea.String(message.TemplateCode),
 		TemplateParam: tea.String(templateParam),
 	}
 
 	resp, err := s.client.SendSms(request)
 	if err != nil {
-		return fmt.Errorf("send sms: %w", err)
+		return fmt.Errorf("aliyun sms: send sms: %w", err)
 	}
 
-	if resp.Body == nil || resp.Body.Code == nil || *resp.Body.Code != "OK" {
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("aliyun sms: send sms failed: empty response")
+	}
+
+	if resp.Body.Code == nil || *resp.Body.Code != "OK" {
+		code := "unknown"
+		if resp.Body.Code != nil {
+			code = *resp.Body.Code
+		}
 		msg := "unknown error"
-		if resp.Body != nil && resp.Body.Message != nil {
+		if resp.Body.Message != nil {
 			msg = *resp.Body.Message
 		}
-		return fmt.Errorf("send sms failed: %s", msg)
+		requestID := ""
+		if resp.Body.RequestId != nil {
+			requestID = *resp.Body.RequestId
+		}
+		return fmt.Errorf("aliyun sms: send sms failed: code=%s message=%s requestID=%s", code, msg, requestID)
 	}
 
 	return nil
+}
+
+func validateMessage(message sms.Message) error {
+	if strings.TrimSpace(message.Phone) == "" {
+		return fmt.Errorf("aliyun sms: phone is required")
+	}
+	if strings.TrimSpace(message.TemplateCode) == "" {
+		return fmt.Errorf("aliyun sms: template code is required")
+	}
+	return nil
+}
+
+func encodeTemplateParam(param any) (string, error) {
+	if param == nil {
+		return "", nil
+	}
+
+	switch v := param.(type) {
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return "", nil
+		}
+		if !json.Valid([]byte(v)) {
+			return "", fmt.Errorf("aliyun sms: template param must be valid json")
+		}
+		return v, nil
+	case []byte:
+		if len(v) == 0 {
+			return "", nil
+		}
+		if !json.Valid(v) {
+			return "", fmt.Errorf("aliyun sms: template param must be valid json")
+		}
+		return string(v), nil
+	default:
+		b, err := json.Marshal(param)
+		if err != nil {
+			return "", fmt.Errorf("aliyun sms: marshal template param: %w", err)
+		}
+		return string(b), nil
+	}
 }
 
 // MustNew 创建由阿里云支持的 sms.SMS，如果失败则 log.Fatal
@@ -118,13 +193,13 @@ func MustNew(opts ...Option) sms.SMS {
 	return client
 }
 
-// NewWithConfig creates a sms.SMS backed by Aliyun with configuration from config.Config.
-// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
-// Configuration keys:
-//   - {prefix}.aliyun.accessKeyID (string): Aliyun access key ID (required)
-//   - {prefix}.aliyun.accessKeySecret (string): Aliyun access key secret (required)
-//   - {prefix}.aliyun.endpoint (string): Aliyun SMS endpoint (optional, default: dysmsapi.aliyuncs.com)
-//   - {prefix}.aliyun.signName (string): SMS signature name (required)
+// NewWithConfig 使用 config.Config 创建由阿里云支持的 sms.SMS。
+// 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
+// 配置键：
+//   - {prefix}.aliyun.accessKeyID：阿里云访问密钥 ID，必填
+//   - {prefix}.aliyun.accessKeySecret：阿里云访问密钥 Secret，必填
+//   - {prefix}.aliyun.endpoint：阿里云短信服务端点，选填，默认 dysmsapi.aliyuncs.com
+//   - {prefix}.aliyun.signName：短信签名名称，必填
 func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	p := "sms"
 	if len(prefix) > 0 && prefix[0] != "" {
@@ -138,9 +213,9 @@ func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	)
 }
 
-// MustNewWithConfig creates a sms.SMS backed by Aliyun with configuration from config.Config.
-// Calls log.Fatal if creation fails.
-// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
+// MustNewWithConfig 使用 config.Config 创建由阿里云支持的 sms.SMS。
+// 如果创建失败则调用 log.Fatal。
+// 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
@@ -149,7 +224,7 @@ func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	return client
 }
 
-// NewWithOptions creates a sms.SMS backed by Aliyun using an Options struct.
+// NewWithOptions 使用 Options 创建由阿里云支持的 sms.SMS。
 func NewWithOptions(opts *Options) (sms.SMS, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("aliyun sms: options cannot be nil")
@@ -171,8 +246,8 @@ func NewWithOptions(opts *Options) (sms.SMS, error) {
 	}, nil
 }
 
-// MustNewWithOptions creates a sms.SMS backed by Aliyun using an Options struct.
-// Calls log.Fatal if creation fails.
+// MustNewWithOptions 使用 Options 创建由阿里云支持的 sms.SMS。
+// 如果创建失败则调用 log.Fatal。
 func MustNewWithOptions(opts *Options) sms.SMS {
 	client, err := NewWithOptions(opts)
 	if err != nil {
