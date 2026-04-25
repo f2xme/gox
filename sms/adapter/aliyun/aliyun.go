@@ -275,10 +275,10 @@ func MustNew(opts ...Option) sms.SMS {
 // NewWithConfig 使用 config.Config 创建由阿里云支持的 sms.SMS。
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 // 配置键：
-//   - {prefix}.aliyun.accessKeyID：阿里云访问密钥 ID，选填
-//   - {prefix}.aliyun.accessKeySecret：阿里云访问密钥 Secret，选填
-//   - {prefix}.aliyun.endpoint：阿里云短信服务端点，选填，默认 dysmsapi.aliyuncs.com
-//   - {prefix}.aliyun.signName：短信签名名称，必填
+//   - {prefix}.accessKeyID：阿里云访问密钥 ID，选填
+//   - {prefix}.accessKeySecret：阿里云访问密钥 Secret，选填
+//   - {prefix}.endpoint：阿里云短信服务端点，选填，默认 dysmsapi.aliyuncs.com
+//   - {prefix}.signName：短信签名名称，必填
 //
 // 未配置访问密钥时，将使用阿里云默认凭据链。
 func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
@@ -287,10 +287,10 @@ func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 		p = prefix[0]
 	}
 	return New(
-		WithAccessKeyID(cfg.GetString(p+".aliyun.accessKeyID")),
-		WithAccessKeySecret(cfg.GetString(p+".aliyun.accessKeySecret")),
-		WithEndpoint(cfg.GetString(p+".aliyun.endpoint")),
-		WithSignName(cfg.GetString(p+".aliyun.signName")),
+		WithAccessKeyID(cfg.GetString(p+".accessKeyID")),
+		WithAccessKeySecret(cfg.GetString(p+".accessKeySecret")),
+		WithEndpoint(cfg.GetString(p+".endpoint")),
+		WithSignName(cfg.GetString(p+".signName")),
 	)
 }
 

@@ -63,12 +63,11 @@
 // 配置文件示例（YAML）：
 //
 //	sms:
-//	  aliyun:
-//	    # accessKeyID 和 accessKeySecret 可选；未配置时使用阿里云默认凭据链
-//	    accessKeyID: "your-access-key-id"
-//	    accessKeySecret: "your-access-key-secret"
-//	    endpoint: "dysmsapi.aliyuncs.com"
-//	    signName: "your-sign-name"
+//	  # accessKeyID 和 accessKeySecret 可选；未配置时使用阿里云默认凭据链
+//	  accessKeyID: "your-access-key-id"
+//	  accessKeySecret: "your-access-key-secret"
+//	  endpoint: "dysmsapi.aliyuncs.com"
+//	  signName: "your-sign-name"
 //
 // # 注意事项
 //
