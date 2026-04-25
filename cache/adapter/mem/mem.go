@@ -300,3 +300,239 @@ func (c *memCache) IncrementFloat(ctx context.Context, key string, delta float64
 	return newValue, nil
 }
 
+// TTL 实现 cache.Advanced 接口。
+func (c *memCache) TTL(ctx context.Context, key string) (time.Duration, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	itm, exists := c.items[key]
+	if !exists || itm.isExpired() {
+		return 0, cache.ErrNotFound
+	}
+
+	if itm.expiration == 0 {
+		return 0, nil // 无过期时间
+	}
+
+	remaining := time.Duration(itm.expiration - time.Now().UnixNano())
+	if remaining < 0 {
+		return 0, cache.ErrNotFound
+	}
+	return remaining, nil
+}
+
+// SetNX 实现 cache.Advanced 接口。
+func (c *memCache) SetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	itm, exists := c.items[key]
+	if exists && !itm.isExpired() {
+		return false, nil // 键已存在
+	}
+
+	var expiration int64
+	if ttl > 0 {
+		expiration = time.Now().Add(ttl).UnixNano()
+	}
+
+	valueCopy := make([]byte, len(value))
+	copy(valueCopy, value)
+
+	c.items[key] = &item{
+		value:      valueCopy,
+		expiration: expiration,
+	}
+
+	if c.eviction != nil {
+		c.eviction.onSet(key)
+	}
+
+	return true, nil
+}
+
+// SetXX 实现 cache.Advanced 接口。
+func (c *memCache) SetXX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	itm, exists := c.items[key]
+	if !exists || itm.isExpired() {
+		return false, nil // 键不存在
+	}
+
+	var expiration int64
+	if ttl > 0 {
+		expiration = time.Now().Add(ttl).UnixNano()
+	} else if ttl == 0 {
+		expiration = itm.expiration // 保持原有 TTL
+	}
+	// ttl < 0 表示无过期时间
+
+	valueCopy := make([]byte, len(value))
+	copy(valueCopy, value)
+
+	c.items[key] = &item{
+		value:      valueCopy,
+		expiration: expiration,
+	}
+
+	if c.eviction != nil {
+		c.eviction.onAccess(key)
+	}
+
+	return true, nil
+}
+
+// GetSet 实现 cache.Advanced 接口。
+func (c *memCache) GetSet(ctx context.Context, key string, value []byte, ttl time.Duration) ([]byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	itm, exists := c.items[key]
+	if !exists || itm.isExpired() {
+		return nil, cache.ErrNotFound
+	}
+
+	oldValue := make([]byte, len(itm.value))
+	copy(oldValue, itm.value)
+
+	var expiration int64
+	if ttl > 0 {
+		expiration = time.Now().Add(ttl).UnixNano()
+	} else if ttl == 0 {
+		expiration = itm.expiration // 保持原有 TTL
+	}
+	// ttl < 0 表示无过期时间
+
+	valueCopy := make([]byte, len(value))
+	copy(valueCopy, value)
+
+	c.items[key] = &item{
+		value:      valueCopy,
+		expiration: expiration,
+	}
+
+	if c.eviction != nil {
+		c.eviction.onAccess(key)
+	}
+
+	return oldValue, nil
+}
+
+// Expire 实现 cache.Advanced 接口。
+func (c *memCache) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	itm, exists := c.items[key]
+	if !exists || itm.isExpired() {
+		return cache.ErrNotFound
+	}
+
+	if ttl > 0 {
+		itm.expiration = time.Now().Add(ttl).UnixNano()
+	} else {
+		itm.expiration = 0 // 移除过期时间
+	}
+
+	return nil
+}
+
+// ExistsMulti 实现 cache.MultiCacheV2 接口。
+func (c *memCache) ExistsMulti(ctx context.Context, keys []string) (map[string]bool, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	result := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		itm, exists := c.items[key]
+		result[key] = exists && !itm.isExpired()
+	}
+	return result, nil
+}
+
+// Scan 实现 cache.Scanner 接口。
+func (c *memCache) Scan(ctx context.Context, pattern string, cursor uint64, count int64) ([]string, uint64, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// 内存实现简化：一次返回所有匹配的键
+	// cursor 只用于标识是否已完成（0=开始/结束）
+	if cursor != 0 {
+		return nil, 0, nil // 已经完成迭代
+	}
+
+	var matches []string
+	for key := range c.items {
+		itm := c.items[key]
+		if itm.isExpired() {
+			continue
+		}
+		matched, err := matchGlob(pattern, key)
+		if err != nil {
+			return nil, 0, err
+		}
+		if matched {
+			matches = append(matches, key)
+		}
+		if count > 0 && int64(len(matches)) >= count {
+			break
+		}
+	}
+	return matches, 0, nil // cursor=0 表示迭代完成
+}
+
+// matchGlob 简单的 glob 模式匹配实现。
+func matchGlob(pattern, str string) (bool, error) {
+	if pattern == "*" {
+		return true, nil
+	}
+	// 简化实现：支持 * 通配符
+	// 生产环境建议使用更完善的 glob 库
+	if !containsWildcard(pattern) {
+		return pattern == str, nil
+	}
+	// 基本的前缀/后缀匹配
+	if pattern[0] == '*' && pattern[len(pattern)-1] == '*' {
+		return containsSubstring(str, pattern[1:len(pattern)-1]), nil
+	}
+	if pattern[0] == '*' {
+		return hasSuffix(str, pattern[1:]), nil
+	}
+	if pattern[len(pattern)-1] == '*' {
+		return hasPrefix(str, pattern[:len(pattern)-1]), nil
+	}
+	return pattern == str, nil
+}
+}
+
+func containsWildcard(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '*' || s[i] == '?' {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSubstring(s, substr string) bool {
+	return len(substr) == 0 || indexOfSubstring(s, substr) >= 0
+}
+
+func indexOfSubstring(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
+
+func hasPrefix(s, prefix string) bool {
+	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+func hasSuffix(s, suffix string) bool {
+	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+}
