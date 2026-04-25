@@ -78,11 +78,6 @@
   - 功能: 演示短信发送接口（验证码、订单通知）
   - 特点: Mock 实现，展示短信服务的抽象层
 
-- **oss** - 对象存储示例
-  - 路径: `examples/oss/main.go`
-  - 功能: 说明对象存储的典型用法和可用适配器
-  - 特点: 简化示例，需要配置真实的存储服务
-
 - **pager** - 分页工具示例
   - 路径: `examples/pager/main.go`
   - 功能: 演示 Offset、Page、Cursor 三种分页策略
@@ -160,9 +155,6 @@ go run examples/metrics/main.go
 # 运行 sms 示例
 go run examples/sms/main.go
 
-# 运行 oss 示例
-go run examples/oss/main.go
-
 # 运行 pager 示例
 go run examples/pager/main.go
 
@@ -203,7 +195,6 @@ go build ./examples/encrypt
 go build ./examples/graceful
 go build ./examples/metrics
 go build ./examples/sms
-go build ./examples/oss
 go build ./examples/pager
 go build ./examples/payment
 go build ./examples/queue

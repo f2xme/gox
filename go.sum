@@ -94,8 +94,6 @@ github.com/f2xme/gox/httpx/adapter/gin v0.1.0 h1:kSRpr6KmIA00ohpUOQGUoCevnFt3VBj
 github.com/f2xme/gox/httpx/adapter/gin v0.1.0/go.mod h1:57yEkiEHIKLLmOL8Lxq/Fnbczoq4DYn3j4D2m6TWtSQ=
 github.com/f2xme/gox/logx/adapter/zap v0.2.0 h1:XmdShDmmcrfCKH5UkC/pDRaT1w/cCsCF2ePlXYeS3LA=
 github.com/f2xme/gox/logx/adapter/zap v0.2.0/go.mod h1:fA6C/+0H91cf5qyHDRGKPzIrhaIUGLVhJju0rmMKZR8=
-github.com/f2xme/gox/oss/adapter/aliyun v0.2.0 h1:7THk84LzDUnN4oUGBMubsROdATjA6KvN3lg5PibAQHM=
-github.com/f2xme/gox/oss/adapter/aliyun v0.2.0/go.mod h1:/epC6+e1pzYOnzidF5ToBGyJVWZ0R/1ezV3So1XTs+E=
 github.com/f2xme/gox/queue v0.1.0 h1:HGFXtFb/qyAS7sN0o42pT7/MYD2UYmuR5cCw961WdMo=
 github.com/f2xme/gox/queue v0.1.0/go.mod h1:En01TN6QRbOjsTF/jRJJidaIopIxduYR8XnxcFvbKjI=
 github.com/f2xme/gox/queue/adapter/mem v0.1.0 h1:T1+3LuYOPrql+vFkL/G9HigMli4g9/hpQxJcI81KDzg=
