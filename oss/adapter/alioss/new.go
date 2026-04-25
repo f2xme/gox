@@ -79,7 +79,7 @@ func MustNewWithOptions(opts *Options) *Storage {
 
 // NewWithConfig 使用 config.Config 创建一个新的阿里云 OSS 存储实例
 //
-// 可选 prefix 参数用于自定义配置键前缀，默认值为 "oss.alioss"。
+// 可选 prefix 参数用于自定义配置键前缀，默认值为 "oss"。
 //
 // 配置键：
 //   - {prefix}.endpoint: OSS 端点地址（必需）
@@ -94,7 +94,7 @@ func NewWithConfig(cfg config.Config, prefix ...string) (*Storage, error) {
 		return nil, oss.NewError(oss.ErrCodeInvalidArgument, "config is required")
 	}
 
-	p := "oss.alioss"
+	p := "oss"
 	if len(prefix) > 0 && prefix[0] != "" {
 		p = prefix[0]
 	}

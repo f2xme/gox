@@ -64,7 +64,7 @@
 //		alioss.WithTimeout(60),
 //	)
 //
-// 也可以从 config.Config 读取配置，默认配置前缀为 oss.alioss：
+// 也可以从 config.Config 读取配置，默认配置前缀为 oss：
 //
 //	storage, err := alioss.NewWithConfig(cfg)
 //
