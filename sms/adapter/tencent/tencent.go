@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log"
 
-	goxconfig "github.com/f2xme/gox/config"
-	"github.com/f2xme/gox/sms"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
 	txsms "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
+
+	"github.com/f2xme/gox/config"
+	"github.com/f2xme/gox/sms"
 )
 
 type tencentSMS struct {
@@ -130,7 +131,7 @@ func MustNew(opts ...Option) sms.SMS {
 //   - {prefix}.tencent.region (string): Tencent region (optional, default: ap-guangzhou)
 //   - {prefix}.tencent.appID (string): SMS application ID (required)
 //   - {prefix}.tencent.signName (string): SMS signature name (required)
-func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
+func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	p := "sms"
 	if len(prefix) > 0 && prefix[0] != "" {
 		p = prefix[0]
@@ -147,7 +148,7 @@ func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
 // MustNewWithConfig creates a sms.SMS backed by Tencent with configuration from config.Config.
 // Calls log.Fatal if creation fails.
 // The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
-func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
+func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
 		log.Fatal(err)

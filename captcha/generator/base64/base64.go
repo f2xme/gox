@@ -1,8 +1,9 @@
 package base64
 
 import (
-	"github.com/f2xme/gox/captcha/generator"
 	"github.com/mojocn/base64Captcha"
+
+	"github.com/f2xme/gox/captcha/generator"
 )
 
 // base64Generator 实现 Generator 接口，基于 base64Captcha 库。
@@ -26,9 +27,16 @@ func New(opts ...Option) generator.Generator {
 
 // Generate 生成验证码内容和答案。
 func (g *base64Generator) Generate() (string, string, error) {
-	id, b64s, answer := g.driver.GenerateIdQuestionAnswer()
-	_ = id // 忽略 ID，我们在 Captcha 层生成自己的 ID
-	return b64s, answer, nil
+	// 先生成答案
+	_, _, answer := g.driver.GenerateIdQuestionAnswer()
+
+	// 使用答案生成图片
+	item, err := g.driver.DrawCaptcha(answer)
+	if err != nil {
+		return "", "", err
+	}
+
+	return item.EncodeB64string(), answer, nil
 }
 
 // Type 返回生成器类型标识。

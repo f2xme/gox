@@ -7,7 +7,8 @@ import (
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	dysmsapi "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
-	goxconfig "github.com/f2xme/gox/config"
+
+	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/sms"
 )
 
@@ -124,7 +125,7 @@ func MustNew(opts ...Option) sms.SMS {
 //   - {prefix}.aliyun.accessKeySecret (string): Aliyun access key secret (required)
 //   - {prefix}.aliyun.endpoint (string): Aliyun SMS endpoint (optional, default: dysmsapi.aliyuncs.com)
 //   - {prefix}.aliyun.signName (string): SMS signature name (required)
-func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
+func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	p := "sms"
 	if len(prefix) > 0 && prefix[0] != "" {
 		p = prefix[0]
@@ -140,7 +141,7 @@ func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
 // MustNewWithConfig creates a sms.SMS backed by Aliyun with configuration from config.Config.
 // Calls log.Fatal if creation fails.
 // The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
-func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
+func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
 		log.Fatal(err)

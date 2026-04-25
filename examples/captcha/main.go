@@ -147,7 +147,11 @@ func main() {
 		memory.WithMaxSize(1000),
 		memory.WithTTL(5*time.Minute),
 	)
-	largeStoreCaptcha := captcha.New(store)
+	gen := base64.New(
+		base64.WithType(base64.TypeDigit),
+		base64.WithLength(4),
+	)
+	largeStoreCaptcha := captcha.New(store, captcha.WithGenerator(gen))
 	fmt.Printf("验证码实例创建成功: %T\n", largeStoreCaptcha)
 
 	// 示例 8: 批量生成验证码

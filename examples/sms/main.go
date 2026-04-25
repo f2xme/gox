@@ -38,7 +38,8 @@ func main() {
 	}
 
 	fmt.Println("\n=== 示例结束 ===")
-	fmt.Println("\n实际使用时，请使用真实的适配器：")
-	fmt.Println("- aliyun.New() - 阿里云短信")
-	fmt.Println("- tencent.New() - 腾讯云短信")
+	fmt.Println("\n实际使用时，请导入并使用真实的适配器：")
+	fmt.Println("- github.com/f2xme/gox/sms/adapter/aliyun")
+	fmt.Println("- github.com/f2xme/gox/sms/adapter/tencent")
+	fmt.Println("- github.com/f2xme/gox/sms/adapter/volcengine")
 }

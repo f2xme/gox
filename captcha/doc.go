@@ -31,10 +31,10 @@
 //		// 生成验证码
 //		id, b64s, err := c.Generate()
 //		if err != nil {
-//			panic(err)
+//			log.Fatalf("生成验证码失败: %v", err)
 //		}
-//		fmt.Printf("验证码 ID: %s\n", id)
-//		fmt.Printf("验证码图片: data:image/png;base64,%s\n", b64s)
+//		fmt.Printf("验证码 ID: %s", id)
+//		fmt.Printf("验证码图片: data:image/png;base64,%s", b64s)
 //
 //		// 验证用户输入
 //		if c.Verify(id, "1234") {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	goxconfig "github.com/f2xme/gox/config"
+	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/sms"
 )
 
@@ -79,7 +79,7 @@ func MustNew(opts ...Option) sms.SMS {
 //   - {prefix}.volcengine.accessKeySecret (string): Volcengine access key secret (required)
 //   - {prefix}.volcengine.region (string): Volcengine region (optional, default: cn-north-1)
 //   - {prefix}.volcengine.signName (string): SMS signature name (required)
-func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
+func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	p := "sms"
 	if len(prefix) > 0 && prefix[0] != "" {
 		p = prefix[0]
@@ -95,7 +95,7 @@ func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
 // MustNewWithConfig creates a sms.SMS backed by Volcengine with configuration from config.Config.
 // Calls log.Fatal if creation fails.
 // The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
-func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
+func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
 		log.Fatal(err)
