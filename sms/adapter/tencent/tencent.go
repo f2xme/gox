@@ -18,6 +18,40 @@ type tencentSMS struct {
 
 var _ sms.SMS = (*tencentSMS)(nil)
 
+// validateOptions validates the options and sets defaults
+func validateOptions(o *Options) error {
+	if o.Region == "" {
+		o.Region = "ap-guangzhou"
+	}
+
+	if o.SecretID == "" {
+		return fmt.Errorf("tencent sms: secret id is required")
+	}
+	if o.SecretKey == "" {
+		return fmt.Errorf("tencent sms: secret key is required")
+	}
+	if o.AppID == "" {
+		return fmt.Errorf("tencent sms: app id is required")
+	}
+	if o.SignName == "" {
+		return fmt.Errorf("tencent sms: sign name is required")
+	}
+
+	return nil
+}
+
+// createClient creates a new Tencent SMS client from validated options
+func createClient(o *Options) (*txsms.Client, error) {
+	credential := common.NewCredential(o.SecretID, o.SecretKey)
+	cpf := profile.NewClientProfile()
+	client, err := txsms.NewClient(credential, o.Region, cpf)
+	if err != nil {
+		return nil, fmt.Errorf("tencent sms: create client: %w", err)
+	}
+
+	return client, nil
+}
+
 // New 创建由腾讯云支持的 sms.SMS
 //
 // 使用选项模式配置客户端：
@@ -29,34 +63,18 @@ var _ sms.SMS = (*tencentSMS)(nil)
 //		tencent.WithSignName("your-sign-name"),
 //	)
 func New(opts ...Option) (sms.SMS, error) {
-	o := Options{
-		Region: "ap-guangzhou",
-	}
+	o := Options{}
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	if o.SecretID == "" {
-		return nil, fmt.Errorf("tencent sms: secret id is required")
-	}
-	if o.SecretKey == "" {
-		return nil, fmt.Errorf("tencent sms: secret key is required")
-	}
-	if o.Region == "" {
-		return nil, fmt.Errorf("tencent sms: region is required")
-	}
-	if o.AppID == "" {
-		return nil, fmt.Errorf("tencent sms: app id is required")
-	}
-	if o.SignName == "" {
-		return nil, fmt.Errorf("tencent sms: sign name is required")
+	if err := validateOptions(&o); err != nil {
+		return nil, err
 	}
 
-	credential := common.NewCredential(o.SecretID, o.SecretKey)
-	cpf := profile.NewClientProfile()
-	client, err := txsms.NewClient(credential, o.Region, cpf)
+	client, err := createClient(&o)
 	if err != nil {
-		return nil, fmt.Errorf("tencent sms: create client: %w", err)
+		return nil, err
 	}
 
 	return &tencentSMS{
@@ -131,6 +149,38 @@ func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
 // The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
 func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
+// NewWithOptions creates a sms.SMS backed by Tencent using an Options struct.
+func NewWithOptions(opts *Options) (sms.SMS, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("tencent sms: options cannot be nil")
+	}
+
+	o := *opts
+	if err := validateOptions(&o); err != nil {
+		return nil, err
+	}
+
+	client, err := createClient(&o)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tencentSMS{
+		options: o,
+		client:  client,
+	}, nil
+}
+
+// MustNewWithOptions creates a sms.SMS backed by Tencent using an Options struct.
+// Calls log.Fatal if creation fails.
+func MustNewWithOptions(opts *Options) sms.SMS {
+	client, err := NewWithOptions(opts)
 	if err != nil {
 		log.Fatal(err)
 	}

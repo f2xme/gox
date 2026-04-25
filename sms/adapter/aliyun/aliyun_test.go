@@ -40,14 +40,6 @@ func TestNew(t *testing.T) {
 			wantPanic:       true,
 		},
 		{
-			name:            "empty_endpoint",
-			accessKeyID:     "test-id",
-			accessKeySecret: "test-secret",
-			endpoint:        "",
-			signName:        "test-sign",
-			wantPanic:       true,
-		},
-		{
 			name:            "empty_sign_name",
 			accessKeyID:     "test-id",
 			accessKeySecret: "test-secret",

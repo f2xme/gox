@@ -14,6 +14,25 @@ type volcengineSMS struct {
 
 var _ sms.SMS = (*volcengineSMS)(nil)
 
+// validateOptions validates the options and sets defaults
+func validateOptions(o *Options) error {
+	if o.Region == "" {
+		o.Region = "cn-north-1"
+	}
+
+	if o.AccessKeyID == "" {
+		return fmt.Errorf("volcengine sms: access key id is required")
+	}
+	if o.AccessKeySecret == "" {
+		return fmt.Errorf("volcengine sms: access key secret is required")
+	}
+	if o.SignName == "" {
+		return fmt.Errorf("volcengine sms: sign name is required")
+	}
+
+	return nil
+}
+
 // New 创建由火山引擎支持的 sms.SMS
 //
 // 使用选项模式配置客户端：
@@ -24,24 +43,13 @@ var _ sms.SMS = (*volcengineSMS)(nil)
 //		volcengine.WithSignName("your-sign-name"),
 //	)
 func New(opts ...Option) (sms.SMS, error) {
-	o := Options{
-		Region: "cn-north-1",
-	}
+	o := Options{}
 	for _, opt := range opts {
 		opt(&o)
 	}
 
-	if o.AccessKeyID == "" {
-		return nil, fmt.Errorf("volcengine sms: access key id is required")
-	}
-	if o.AccessKeySecret == "" {
-		return nil, fmt.Errorf("volcengine sms: access key secret is required")
-	}
-	if o.Region == "" {
-		return nil, fmt.Errorf("volcengine sms: region is required")
-	}
-	if o.SignName == "" {
-		return nil, fmt.Errorf("volcengine sms: sign name is required")
+	if err := validateOptions(&o); err != nil {
+		return nil, err
 	}
 
 	return &volcengineSMS{
@@ -89,6 +97,32 @@ func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
 // The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
 func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
+// NewWithOptions creates a sms.SMS backed by Volcengine using an Options struct.
+func NewWithOptions(opts *Options) (sms.SMS, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("volcengine sms: options cannot be nil")
+	}
+
+	o := *opts
+	if err := validateOptions(&o); err != nil {
+		return nil, err
+	}
+
+	return &volcengineSMS{
+		options: o,
+	}, nil
+}
+
+// MustNewWithOptions creates a sms.SMS backed by Volcengine using an Options struct.
+// Calls log.Fatal if creation fails.
+func MustNewWithOptions(opts *Options) sms.SMS {
+	client, err := NewWithOptions(opts)
 	if err != nil {
 		log.Fatal(err)
 	}

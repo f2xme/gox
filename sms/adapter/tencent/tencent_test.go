@@ -44,15 +44,6 @@ func TestNew(t *testing.T) {
 			wantPanic: true,
 		},
 		{
-			name:      "empty_region",
-			secretID:  "test-id",
-			secretKey: "test-key",
-			region:    "",
-			appID:     "test-appid",
-			signName:  "test-sign",
-			wantPanic: true,
-		},
-		{
 			name:      "empty_app_id",
 			secretID:  "test-id",
 			secretKey: "test-key",
