@@ -5,12 +5,16 @@ import (
 	"testing"
 	"time"
 
-	cachemem "github.com/f2xme/gox/cache/adapter/mem"
+	cachememory "github.com/f2xme/gox/cache/adapter/memory"
 	"github.com/f2xme/gox/captcha"
 )
 
+type existsStore interface {
+	Exists(ctx context.Context, id string) (bool, error)
+}
+
 func TestCacheStore_SetGet(t *testing.T) {
-	c, _ := cachemem.New()
+	c, _ := cachememory.New()
 	store := New(c)
 	ctx := context.Background()
 
@@ -31,7 +35,7 @@ func TestCacheStore_SetGet(t *testing.T) {
 }
 
 func TestCacheStore_GetNotFound(t *testing.T) {
-	c, _ := cachemem.New()
+	c, _ := cachememory.New()
 	store := New(c)
 	ctx := context.Background()
 
@@ -42,7 +46,7 @@ func TestCacheStore_GetNotFound(t *testing.T) {
 }
 
 func TestCacheStore_Delete(t *testing.T) {
-	c, _ := cachemem.New()
+	c, _ := cachememory.New()
 	store := New(c)
 	ctx := context.Background()
 
@@ -62,12 +66,12 @@ func TestCacheStore_Delete(t *testing.T) {
 }
 
 func TestCacheStore_Exists(t *testing.T) {
-	c, _ := cachemem.New()
+	c, _ := cachememory.New()
 	store := New(c)
 	ctx := context.Background()
 
 	// 不存在
-	exists, err := store.Exists(ctx, "test-id")
+	exists, err := store.(existsStore).Exists(ctx, "test-id")
 	if err != nil {
 		t.Fatalf("Exists() error = %v", err)
 	}
@@ -77,7 +81,7 @@ func TestCacheStore_Exists(t *testing.T) {
 
 	// 设置后存在
 	store.Set(ctx, "test-id", "answer", 5*time.Minute)
-	exists, err = store.Exists(ctx, "test-id")
+	exists, err = store.(existsStore).Exists(ctx, "test-id")
 	if err != nil {
 		t.Fatalf("Exists() error = %v", err)
 	}
@@ -87,7 +91,7 @@ func TestCacheStore_Exists(t *testing.T) {
 }
 
 func TestCacheStore_Prefix(t *testing.T) {
-	c, _ := cachemem.New()
+	c, _ := cachememory.New()
 	store := New(c, WithPrefix("test:"))
 	ctx := context.Background()
 
@@ -104,7 +108,7 @@ func TestCacheStore_Prefix(t *testing.T) {
 }
 
 func TestCacheStore_Expiration(t *testing.T) {
-	c, _ := cachemem.New()
+	c, _ := cachememory.New()
 	store := New(c, WithTTL(100*time.Millisecond))
 	ctx := context.Background()
 

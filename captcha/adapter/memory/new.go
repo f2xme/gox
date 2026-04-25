@@ -11,10 +11,13 @@ func New(opts ...Option) captcha.Store {
 
 	s := &memoryStore{
 		items:  make(map[string]*item),
+		order:  make([]string, 0),
 		opts:   cfg,
 		stopCh: make(chan struct{}),
 	}
 
-	go s.cleanupLoop()
+	if cfg.CleanupInterval > 0 {
+		go s.cleanupLoop()
+	}
 	return s
 }

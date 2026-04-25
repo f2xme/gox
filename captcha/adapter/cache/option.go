@@ -22,6 +22,10 @@ func defaultOptions() Options {
 }
 
 // WithTTL 设置默认过期时间。
+//
+// 示例：
+//
+//	cacheadapter.New(c, cacheadapter.WithTTL(10*time.Minute))
 func WithTTL(ttl time.Duration) Option {
 	return func(o *Options) {
 		o.TTL = ttl
@@ -29,6 +33,10 @@ func WithTTL(ttl time.Duration) Option {
 }
 
 // WithPrefix 设置 key 前缀。
+//
+// 示例：
+//
+//	cacheadapter.New(c, cacheadapter.WithPrefix("captcha:login:"))
 func WithPrefix(prefix string) Option {
 	return func(o *Options) {
 		o.Prefix = prefix

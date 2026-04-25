@@ -8,6 +8,10 @@ import (
 	"github.com/f2xme/gox/captcha"
 )
 
+type existsStore interface {
+	Exists(ctx context.Context, id string) (bool, error)
+}
+
 func TestMemoryStore_SetGet(t *testing.T) {
 	store := New()
 	ctx := context.Background()
@@ -57,12 +61,34 @@ func TestMemoryStore_Delete(t *testing.T) {
 	}
 }
 
+func TestMemoryStore_Take(t *testing.T) {
+	store := New()
+	ctx := context.Background()
+
+	if err := store.Set(ctx, "test-id", "answer", 5*time.Minute); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	answer, err := store.(captcha.Taker).Take(ctx, "test-id")
+	if err != nil {
+		t.Fatalf("Take() error = %v", err)
+	}
+	if answer != "answer" {
+		t.Errorf("Take() = %v, want answer", answer)
+	}
+
+	_, err = store.Get(ctx, "test-id")
+	if err != captcha.ErrNotFound {
+		t.Errorf("Get() after Take() error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestMemoryStore_Exists(t *testing.T) {
 	store := New()
 	ctx := context.Background()
 
 	// 不存在
-	exists, err := store.Exists(ctx, "test-id")
+	exists, err := store.(existsStore).Exists(ctx, "test-id")
 	if err != nil {
 		t.Fatalf("Exists() error = %v", err)
 	}
@@ -72,12 +98,36 @@ func TestMemoryStore_Exists(t *testing.T) {
 
 	// 设置后存在
 	store.Set(ctx, "test-id", "answer", 5*time.Minute)
-	exists, err = store.Exists(ctx, "test-id")
+	exists, err = store.(existsStore).Exists(ctx, "test-id")
 	if err != nil {
 		t.Fatalf("Exists() error = %v", err)
 	}
 	if !exists {
 		t.Error("Exists() = false, want true")
+	}
+}
+
+func TestMemoryStore_MaxSize(t *testing.T) {
+	store := New(WithMaxSize(2))
+	ctx := context.Background()
+
+	for _, id := range []string{"a", "b", "c"} {
+		if err := store.Set(ctx, id, "answer", 5*time.Minute); err != nil {
+			t.Fatalf("Set(%q) error = %v", id, err)
+		}
+	}
+
+	if exists, err := store.(existsStore).Exists(ctx, "a"); err != nil {
+		t.Fatalf("Exists() error = %v", err)
+	} else if exists {
+		t.Error("oldest item should be evicted")
+	}
+	for _, id := range []string{"b", "c"} {
+		if exists, err := store.(existsStore).Exists(ctx, id); err != nil {
+			t.Fatalf("Exists(%q) error = %v", id, err)
+		} else if !exists {
+			t.Errorf("Exists(%q) = false, want true", id)
+		}
 	}
 }
 
@@ -139,5 +189,8 @@ func TestMemoryStore_Close(t *testing.T) {
 	err := s.Close()
 	if err != nil {
 		t.Fatalf("Close() error = %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("second Close() error = %v", err)
 	}
 }

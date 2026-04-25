@@ -1,6 +1,7 @@
 package base64
 
 import (
+	"context"
 	"testing"
 )
 
@@ -17,18 +18,21 @@ func TestGenerate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gen := New(WithType(tt.typ))
+			gen, err := New(WithType(tt.typ))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
 
-			data, answer, err := gen.Generate()
+			data, err := gen.Generate(context.Background())
 			if err != nil {
 				t.Fatalf("Generate() error = %v", err)
 			}
 
-			if data == "" {
+			if data.Data == "" {
 				t.Error("Generate() returned empty data")
 			}
 
-			if answer == "" {
+			if data.Answer == "" {
 				t.Error("Generate() returned empty answer")
 			}
 
@@ -40,13 +44,16 @@ func TestGenerate(t *testing.T) {
 }
 
 func TestOptions(t *testing.T) {
-	gen := New(
+	gen, err := New(
 		WithType(TypeDigit),
 		WithSize(300, 100),
 		WithLength(6),
 		WithNoiseCount(5),
 		WithLanguage("zh"),
 	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
 
 	g := gen.(*base64Generator)
 

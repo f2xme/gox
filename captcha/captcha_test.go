@@ -2,13 +2,12 @@ package captcha
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
-
-	"github.com/f2xme/gox/captcha/generator/base64"
 )
 
-// mockStore 是用于测试的简单内存存储
+// mockStore 是用于测试的简单内存存储。
 type mockStore struct {
 	data map[string]string
 }
@@ -19,16 +18,26 @@ func newMockStore() *mockStore {
 	}
 }
 
-func (s *mockStore) Set(ctx context.Context, id, answer string, ttl time.Duration) error {
+func (s *mockStore) Set(ctx context.Context, id string, answer string, ttl time.Duration) error {
 	s.data[id] = answer
 	return nil
 }
 
 func (s *mockStore) Get(ctx context.Context, id string) (string, error) {
-	if answer, ok := s.data[id]; ok {
-		return answer, nil
+	answer, ok := s.data[id]
+	if !ok {
+		return "", ErrNotFound
 	}
-	return "", ErrNotFound
+	return answer, nil
+}
+
+func (s *mockStore) Take(ctx context.Context, id string) (string, error) {
+	answer, err := s.Get(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	delete(s.data, id)
+	return answer, nil
 }
 
 func (s *mockStore) Delete(ctx context.Context, id string) error {
@@ -36,107 +45,103 @@ func (s *mockStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *mockStore) Exists(ctx context.Context, id string) (bool, error) {
+func (s *mockStore) Exists(id string) bool {
 	_, ok := s.data[id]
-	return ok, nil
+	return ok
 }
 
-func TestCaptcha_Generate(t *testing.T) {
+type mockGenerator struct {
+	data   string
+	answer string
+	count  int
+}
+
+func (g *mockGenerator) Generate(ctx context.Context) (ChallengeData, error) {
+	g.count++
+	if err := ctx.Err(); err != nil {
+		return ChallengeData{}, err
+	}
+	if g.data == "" {
+		return ChallengeData{Data: "captcha-data", Answer: "answer"}, nil
+	}
+	return ChallengeData{Data: g.data, Answer: g.answer}, nil
+}
+
+func (g *mockGenerator) Type() string {
+	return "mock"
+}
+
+func newTestService(t *testing.T, store Store, opts ...Option) Service {
+	t.Helper()
+
+	opts = append([]Option{WithGenerator(&mockGenerator{})}, opts...)
+	svc, err := New(store, opts...)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	return svc
+}
+
+func TestService_Generate(t *testing.T) {
 	ctx := context.Background()
 	store := newMockStore()
-	gen := base64.New()
-	c := New(store, WithGenerator(gen))
+	svc := newTestService(t, store)
 
-	id, data, err := c.Generate(ctx)
+	challenge, err := svc.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	if id == "" {
+	if challenge.ID == "" {
 		t.Error("Generate() returned empty id")
 	}
-	if data == "" {
+	if challenge.Data == "" {
 		t.Error("Generate() returned empty data")
 	}
-
-	// 验证答案已存储
-	exists, err := store.Exists(ctx, id)
-	if err != nil {
-		t.Fatalf("Exists() error = %v", err)
+	if challenge.Type != "mock" {
+		t.Errorf("Type = %v, want mock", challenge.Type)
 	}
-	if !exists {
-		t.Error("Answer should be stored")
+	if !store.Exists(challenge.ID) {
+		t.Error("answer should be stored")
 	}
 }
 
-func TestCaptcha_Verify(t *testing.T) {
+func TestService_Verify(t *testing.T) {
 	ctx := context.Background()
 	store := newMockStore()
-	gen := base64.New()
-	c := New(store, WithGenerator(gen))
+	svc := newTestService(t, store)
 
-	// 生成验证码
-	id, _, err := c.Generate(ctx)
+	challenge, err := svc.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
-
-	// 获取存储的答案
-	answer, err := store.Get(ctx, id)
+	answer, err := store.Get(ctx, challenge.ID)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
 
 	tests := []struct {
-		name    string
-		id      string
-		answer  string
-		want    bool
-		wantErr bool
+		name   string
+		id     string
+		answer string
+		want   bool
 	}{
-		{
-			name:    "correct answer",
-			id:      id,
-			answer:  answer,
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name:    "wrong answer",
-			id:      id,
-			answer:  "wrong",
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name:    "empty id",
-			id:      "",
-			answer:  answer,
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name:    "empty answer",
-			id:      id,
-			answer:  "",
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name:    "non-existent id",
-			id:      "non-existent",
-			answer:  answer,
-			want:    false,
-			wantErr: false,
-		},
+		{name: "correct answer", id: challenge.ID, answer: answer, want: true},
+		{name: "wrong answer", id: challenge.ID, answer: "wrong", want: false},
+		{name: "empty id", id: "", answer: answer, want: false},
+		{name: "empty answer", id: challenge.ID, answer: "", want: false},
+		{name: "missing id", id: "missing", answer: answer, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := c.Verify(ctx, tt.id, tt.answer)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Verify() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.name != "correct answer" {
+				store.data[challenge.ID] = answer
+			}
+
+			got, err := svc.Verify(ctx, tt.id, tt.answer)
+			if err != nil {
+				t.Fatalf("Verify() error = %v", err)
 			}
 			if got != tt.want {
 				t.Errorf("Verify() = %v, want %v", got, tt.want)
@@ -145,121 +150,202 @@ func TestCaptcha_Verify(t *testing.T) {
 	}
 }
 
-func TestCaptcha_Delete(t *testing.T) {
+func TestService_ConsumeOnSuccess(t *testing.T) {
 	ctx := context.Background()
 	store := newMockStore()
-	gen := base64.New()
-	c := New(store, WithGenerator(gen))
+	svc := newTestService(t, store)
 
-	// 生成验证码
-	id, _, err := c.Generate(ctx)
+	challenge, err := svc.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	// 验证存在
-	exists, err := store.Exists(ctx, id)
+	ok, err := svc.Verify(ctx, challenge.ID, "answer")
 	if err != nil {
-		t.Fatalf("Exists() error = %v", err)
+		t.Fatalf("Verify() error = %v", err)
 	}
-	if !exists {
-		t.Error("Captcha should exist before deletion")
+	if !ok {
+		t.Fatal("Verify() = false, want true")
 	}
-
-	// 删除
-	if err := c.Delete(ctx, id); err != nil {
-		t.Errorf("Delete() error = %v", err)
-	}
-
-	// 验证已删除
-	exists, err = store.Exists(ctx, id)
-	if err != nil {
-		t.Fatalf("Exists() error = %v", err)
-	}
-	if exists {
-		t.Error("Captcha should not exist after deletion")
+	if store.Exists(challenge.ID) {
+		t.Fatal("captcha should be deleted after successful verification")
 	}
 }
 
-func TestCaptcha_Regenerate(t *testing.T) {
+func TestService_ConsumeOnSuccessKeepsFailure(t *testing.T) {
 	ctx := context.Background()
 	store := newMockStore()
-	gen := base64.New()
-	c := New(store, WithGenerator(gen))
+	svc := newTestService(t, store)
 
-	// 生成验证码
-	id, data1, err := c.Generate(ctx)
+	challenge, err := svc.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	// 重新生成
-	data2, err := c.Regenerate(ctx, id)
+	ok, err := svc.Verify(ctx, challenge.ID, "wrong")
+	if err != nil {
+		t.Fatalf("Verify() error = %v", err)
+	}
+	if ok {
+		t.Fatal("Verify() = true, want false")
+	}
+	if !store.Exists(challenge.ID) {
+		t.Fatal("captcha should remain after failed verification")
+	}
+}
+
+func TestService_ConsumeAlways(t *testing.T) {
+	ctx := context.Background()
+	store := newMockStore()
+	svc := newTestService(t, store, WithConsumeMode(ConsumeAlways))
+
+	challenge, err := svc.Generate(ctx)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	ok, err := svc.Verify(ctx, challenge.ID, "wrong")
+	if err != nil {
+		t.Fatalf("Verify() error = %v", err)
+	}
+	if ok {
+		t.Fatal("Verify() = true, want false")
+	}
+	if store.Exists(challenge.ID) {
+		t.Fatal("captcha should be deleted when ConsumeAlways is used")
+	}
+}
+
+func TestService_ConsumeNever(t *testing.T) {
+	ctx := context.Background()
+	store := newMockStore()
+	svc := newTestService(t, store, WithConsumeMode(ConsumeNever))
+
+	challenge, err := svc.Generate(ctx)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	ok, err := svc.Verify(ctx, challenge.ID, "answer")
+	if err != nil {
+		t.Fatalf("Verify() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("Verify() = false, want true")
+	}
+	if !store.Exists(challenge.ID) {
+		t.Fatal("captcha should remain when ConsumeNever is used")
+	}
+}
+
+func TestService_Delete(t *testing.T) {
+	ctx := context.Background()
+	store := newMockStore()
+	svc := newTestService(t, store)
+
+	challenge, err := svc.Generate(ctx)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	if err := svc.Delete(ctx, challenge.ID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if store.Exists(challenge.ID) {
+		t.Fatal("captcha should not exist after deletion")
+	}
+}
+
+func TestService_Regenerate(t *testing.T) {
+	ctx := context.Background()
+	store := newMockStore()
+	gen := &mockGenerator{data: "first-data", answer: "first-answer"}
+	svc, err := New(store, WithGenerator(gen))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	challenge, err := svc.Generate(ctx)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	gen.data = "second-data"
+	gen.answer = "second-answer"
+	regenerated, err := svc.Regenerate(ctx, challenge.ID)
 	if err != nil {
 		t.Fatalf("Regenerate() error = %v", err)
 	}
 
-	if data2 == "" {
-		t.Error("Regenerate() returned empty data")
+	if regenerated.ID != challenge.ID {
+		t.Errorf("Regenerate() ID = %v, want %v", regenerated.ID, challenge.ID)
 	}
-
-	// 数据应该不同（概率上）
-	if data1 == data2 {
-		t.Log("Warning: regenerated data is the same (may happen by chance)")
+	if regenerated.Data != "second-data" {
+		t.Errorf("Regenerate() Data = %v, want second-data", regenerated.Data)
+	}
+	answer, err := store.Get(ctx, challenge.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if answer != "second-answer" {
+		t.Errorf("stored answer = %v, want second-answer", answer)
 	}
 }
 
-func TestCaptcha_WithTTL(t *testing.T) {
+func TestService_RegenerateInvalidID(t *testing.T) {
 	ctx := context.Background()
 	store := newMockStore()
-	gen := base64.New()
+	svc := newTestService(t, store)
 
+	if _, err := svc.Regenerate(ctx, ""); !errors.Is(err, ErrInvalidID) {
+		t.Fatalf("Regenerate() error = %v, want ErrInvalidID", err)
+	}
+	if _, err := svc.Regenerate(ctx, "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Regenerate() error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestService_WithTTL(t *testing.T) {
+	store := newMockStore()
 	customTTL := 10 * time.Minute
-	c := New(store, WithGenerator(gen), WithTTL(customTTL))
+	svc := newTestService(t, store, WithTTL(customTTL))
 
-	impl := c.(*captcha)
+	impl := svc.(*service)
 	if impl.opts.TTL != customTTL {
 		t.Errorf("TTL = %v, want %v", impl.opts.TTL, customTTL)
 	}
+}
 
-	// 生成验证码并验证 TTL 被使用
-	_, _, err := c.Generate(ctx)
+func TestService_WithIDLength(t *testing.T) {
+	ctx := context.Background()
+	store := newMockStore()
+	customLength := 21
+	svc := newTestService(t, store, WithIDLength(customLength))
+
+	challenge, err := svc.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
+	}
+	if len(challenge.ID) != customLength {
+		t.Errorf("ID length = %v, want %v", len(challenge.ID), customLength)
 	}
 }
 
-func TestCaptcha_WithIDLength(t *testing.T) {
+func TestService_WithGenerator(t *testing.T) {
 	ctx := context.Background()
 	store := newMockStore()
-	gen := base64.New()
+	gen := &mockGenerator{data: "custom-data", answer: "custom-answer"}
 
-	customLength := 32
-	c := New(store, WithGenerator(gen), WithIDLength(customLength))
+	svc, err := New(store, WithGenerator(gen))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
 
-	id, _, err := c.Generate(ctx)
+	challenge, err := svc.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
-
-	if len(id) != customLength {
-		t.Errorf("ID length = %v, want %v", len(id), customLength)
-	}
-}
-
-func TestCaptcha_WithGenerator(t *testing.T) {
-	ctx := context.Background()
-	store := newMockStore()
-	gen := base64.New(base64.WithType(base64.TypeMath))
-
-	c := New(store, WithGenerator(gen))
-
-	id, data, err := c.Generate(ctx)
-	if err != nil {
-		t.Fatalf("Generate() error = %v", err)
-	}
-
-	if id == "" || data == "" {
-		t.Error("ID or data is empty")
+	if challenge.Data != "custom-data" {
+		t.Errorf("Data = %v, want custom-data", challenge.Data)
 	}
 }

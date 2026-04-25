@@ -25,6 +25,10 @@ func defaultOptions() Options {
 }
 
 // WithTTL 设置默认过期时间。
+//
+// 示例：
+//
+//	memory.New(memory.WithTTL(10*time.Minute))
 func WithTTL(ttl time.Duration) Option {
 	return func(o *Options) {
 		o.TTL = ttl
@@ -32,6 +36,10 @@ func WithTTL(ttl time.Duration) Option {
 }
 
 // WithCleanupInterval 设置清理间隔。
+//
+// 示例：
+//
+//	memory.New(memory.WithCleanupInterval(time.Minute))
 func WithCleanupInterval(interval time.Duration) Option {
 	return func(o *Options) {
 		o.CleanupInterval = interval
@@ -39,6 +47,10 @@ func WithCleanupInterval(interval time.Duration) Option {
 }
 
 // WithMaxSize 设置最大条目数。
+//
+// 示例：
+//
+//	memory.New(memory.WithMaxSize(1000))
 func WithMaxSize(size int) Option {
 	return func(o *Options) {
 		o.MaxSize = size

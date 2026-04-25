@@ -24,10 +24,12 @@ func (i *item) isExpired() bool {
 
 // memoryStore 是内存存储实现。
 type memoryStore struct {
-	mu     sync.RWMutex
-	items  map[string]*item
-	opts   Options
-	stopCh chan struct{}
+	mu        sync.RWMutex
+	items     map[string]*item
+	order     []string
+	opts      Options
+	stopCh    chan struct{}
+	closeOnce sync.Once
 }
 
 // Set 存储验证码答案。
@@ -45,10 +47,15 @@ func (s *memoryStore) Set(ctx context.Context, id string, answer string, ttl tim
 		expiration = time.Now().Add(ttl).UnixNano()
 	}
 
+	if _, exists := s.items[id]; !exists {
+		s.order = append(s.order, id)
+	}
+
 	s.items[id] = &item{
 		answer:     answer,
 		expiration: expiration,
 	}
+	s.enforceMaxSize()
 	return nil
 }
 
@@ -78,11 +85,30 @@ func (s *memoryStore) Get(ctx context.Context, id string) (string, error) {
 	return answer, nil
 }
 
+// Take 获取并删除验证码答案。
+func (s *memoryStore) Take(ctx context.Context, id string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, exists := s.items[id]
+	if !exists {
+		return "", captcha.ErrNotFound
+	}
+	if item.isExpired() {
+		s.deleteLocked(id)
+		return "", captcha.ErrNotFound
+	}
+
+	answer := item.answer
+	s.deleteLocked(id)
+	return answer, nil
+}
+
 // Delete 删除验证码。
 func (s *memoryStore) Delete(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.items, id)
+	s.deleteLocked(id)
 	return nil
 }
 
@@ -113,7 +139,9 @@ func (s *memoryStore) Exists(ctx context.Context, id string) (bool, error) {
 
 // Close 停止清理 goroutine 并释放资源。
 func (s *memoryStore) Close() error {
-	close(s.stopCh)
+	s.closeOnce.Do(func() {
+		close(s.stopCh)
+	})
 	return nil
 }
 
@@ -139,7 +167,30 @@ func (s *memoryStore) cleanup() {
 
 	for key, item := range s.items {
 		if item.isExpired() {
-			delete(s.items, key)
+			s.deleteLocked(key)
 		}
+	}
+}
+
+// deleteLocked 删除条目，调用方必须持有写锁。
+func (s *memoryStore) deleteLocked(id string) {
+	delete(s.items, id)
+	for i, key := range s.order {
+		if key == id {
+			s.order = append(s.order[:i], s.order[i+1:]...)
+			return
+		}
+	}
+}
+
+// enforceMaxSize 按写入顺序淘汰超出容量限制的条目，调用方必须持有写锁。
+func (s *memoryStore) enforceMaxSize() {
+	if s.opts.MaxSize <= 0 {
+		return
+	}
+	for len(s.items) > s.opts.MaxSize && len(s.order) > 0 {
+		oldest := s.order[0]
+		s.order = s.order[1:]
+		delete(s.items, oldest)
 	}
 }

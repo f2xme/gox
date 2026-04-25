@@ -1,5 +1,24 @@
 package base64
 
+import "errors"
+
+var (
+	// ErrInvalidWidth 表示宽度无效。
+	ErrInvalidWidth = errors.New("captcha/base64: width must be positive")
+
+	// ErrInvalidHeight 表示高度无效。
+	ErrInvalidHeight = errors.New("captcha/base64: height must be positive")
+
+	// ErrInvalidLength 表示长度无效。
+	ErrInvalidLength = errors.New("captcha/base64: length must be positive")
+
+	// ErrInvalidNoiseCount 表示噪点数量无效。
+	ErrInvalidNoiseCount = errors.New("captcha/base64: noiseCount cannot be negative")
+
+	// ErrInvalidType 表示验证码类型无效。
+	ErrInvalidType = errors.New("captcha/base64: invalid captcha type")
+)
+
 // CaptchaType 定义验证码类型。
 type CaptchaType int
 
@@ -61,7 +80,31 @@ func defaultOptions() Options {
 	}
 }
 
+// validate 校验生成器配置。
+func (o Options) validate() error {
+	if o.Type < TypeDigit || o.Type > TypeAudio {
+		return ErrInvalidType
+	}
+	if o.Width <= 0 {
+		return ErrInvalidWidth
+	}
+	if o.Height <= 0 {
+		return ErrInvalidHeight
+	}
+	if o.Length <= 0 {
+		return ErrInvalidLength
+	}
+	if o.NoiseCount < 0 {
+		return ErrInvalidNoiseCount
+	}
+	return nil
+}
+
 // WithType 设置验证码类型。
+//
+// 示例：
+//
+//	base64.New(base64.WithType(base64.TypeMath))
 func WithType(t CaptchaType) Option {
 	return func(o *Options) {
 		o.Type = t
@@ -69,6 +112,10 @@ func WithType(t CaptchaType) Option {
 }
 
 // WithSize 设置验证码尺寸。
+//
+// 示例：
+//
+//	base64.New(base64.WithSize(300, 100))
 func WithSize(width, height int) Option {
 	return func(o *Options) {
 		o.Width = width
@@ -77,6 +124,10 @@ func WithSize(width, height int) Option {
 }
 
 // WithLength 设置验证码长度。
+//
+// 示例：
+//
+//	base64.New(base64.WithLength(6))
 func WithLength(length int) Option {
 	return func(o *Options) {
 		o.Length = length
@@ -84,6 +135,10 @@ func WithLength(length int) Option {
 }
 
 // WithNoiseCount 设置噪点数量。
+//
+// 示例：
+//
+//	base64.New(base64.WithNoiseCount(5))
 func WithNoiseCount(count int) Option {
 	return func(o *Options) {
 		o.NoiseCount = count
@@ -91,6 +146,10 @@ func WithNoiseCount(count int) Option {
 }
 
 // WithLanguage 设置音频验证码语言。
+//
+// 示例：
+//
+//	base64.New(base64.WithLanguage("en"))
 func WithLanguage(lang string) Option {
 	return func(o *Options) {
 		o.Language = lang

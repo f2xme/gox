@@ -19,7 +19,12 @@ type Store interface {
 	// Delete 删除验证码。
 	// 如果验证码不存在不返回错误（幂等操作）。
 	Delete(ctx context.Context, id string) error
+}
 
-	// Exists 检查验证码是否存在且未过期。
-	Exists(ctx context.Context, id string) (bool, error)
+// Taker 定义获取并删除验证码答案的可选能力。
+// 存储适配器实现此接口后，ConsumeAlways 策略会优先使用原子消费。
+type Taker interface {
+	// Take 获取并删除验证码答案。
+	// 如果验证码不存在或已过期，返回 ErrNotFound。
+	Take(ctx context.Context, id string) (string, error)
 }

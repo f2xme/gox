@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/f2xme/gox/cache/adapter/mem"
+	cachememory "github.com/f2xme/gox/cache/adapter/memory"
 	cacheadapter "github.com/f2xme/gox/captcha/adapter/cache"
 	"github.com/f2xme/gox/captcha/adapter/memory"
 	"github.com/f2xme/gox/captcha/generator/base64"
@@ -15,23 +15,26 @@ func TestIntegration_MemoryAdapter(t *testing.T) {
 	ctx := context.Background()
 
 	// 使用便捷构造函数
-	c := memory.NewCaptcha(
+	c, err := memory.NewCaptcha(
 		memory.WithCaptchaType(base64.TypeDigit),
 		memory.WithLength(6),
 	)
+	if err != nil {
+		t.Fatalf("NewCaptcha() error = %v", err)
+	}
 
 	// 生成验证码
-	id, data, err := c.Generate(ctx)
+	challenge, err := c.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	if id == "" || data == "" {
+	if challenge.ID == "" || challenge.Data == "" {
 		t.Fatal("Generated captcha has empty id or data")
 	}
 
 	// 验证错误答案
-	ok, err := c.Verify(ctx, id, "wrong")
+	ok, err := c.Verify(ctx, challenge.ID, "wrong")
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
@@ -40,21 +43,21 @@ func TestIntegration_MemoryAdapter(t *testing.T) {
 	}
 
 	// 重新生成
-	newData, err := c.Regenerate(ctx, id)
+	newChallenge, err := c.Regenerate(ctx, challenge.ID)
 	if err != nil {
 		t.Fatalf("Regenerate() error = %v", err)
 	}
-	if newData == "" {
+	if newChallenge.Data == "" {
 		t.Error("Regenerated data is empty")
 	}
 
 	// 删除
-	if err := c.Delete(ctx, id); err != nil {
+	if err := c.Delete(ctx, challenge.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
 	// 验证已删除
-	ok, err = c.Verify(ctx, id, "anything")
+	ok, err = c.Verify(ctx, challenge.ID, "anything")
 	if err != nil {
 		t.Fatalf("Verify() after delete error = %v", err)
 	}
@@ -68,26 +71,29 @@ func TestIntegration_CacheAdapter(t *testing.T) {
 	ctx := context.Background()
 
 	// 创建 cache 实例
-	c, _ := mem.New()
+	c, _ := cachememory.New()
 
 	// 使用便捷构造函数
-	captcha := cacheadapter.NewCaptcha(c,
+	captcha, err := cacheadapter.NewCaptcha(c,
 		cacheadapter.WithCaptchaType(base64.TypeString),
 		cacheadapter.WithLength(4),
 	)
+	if err != nil {
+		t.Fatalf("NewCaptcha() error = %v", err)
+	}
 
 	// 生成验证码
-	id, data, err := captcha.Generate(ctx)
+	challenge, err := captcha.Generate(ctx)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
 
-	if id == "" || data == "" {
+	if challenge.ID == "" || challenge.Data == "" {
 		t.Fatal("Generated captcha has empty id or data")
 	}
 
 	// 验证错误答案
-	ok, err := captcha.Verify(ctx, id, "WRONG")
+	ok, err := captcha.Verify(ctx, challenge.ID, "WRONG")
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
@@ -96,21 +102,21 @@ func TestIntegration_CacheAdapter(t *testing.T) {
 	}
 
 	// 重新生成
-	newData, err := captcha.Regenerate(ctx, id)
+	newChallenge, err := captcha.Regenerate(ctx, challenge.ID)
 	if err != nil {
 		t.Fatalf("Regenerate() error = %v", err)
 	}
-	if newData == "" {
+	if newChallenge.Data == "" {
 		t.Error("Regenerated data is empty")
 	}
 
 	// 删除
-	if err := captcha.Delete(ctx, id); err != nil {
+	if err := captcha.Delete(ctx, challenge.ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 
 	// 验证已删除
-	ok, err = captcha.Verify(ctx, id, "anything")
+	ok, err = captcha.Verify(ctx, challenge.ID, "anything")
 	if err != nil {
 		t.Fatalf("Verify() after delete error = %v", err)
 	}
@@ -135,19 +141,22 @@ func TestIntegration_MultipleTypes(t *testing.T) {
 
 	for _, tt := range types {
 		t.Run(tt.name, func(t *testing.T) {
-			c := memory.NewCaptcha(memory.WithCaptchaType(tt.typ))
+			c, err := memory.NewCaptcha(memory.WithCaptchaType(tt.typ))
+			if err != nil {
+				t.Fatalf("NewCaptcha() error = %v", err)
+			}
 
-			id, data, err := c.Generate(ctx)
+			challenge, err := c.Generate(ctx)
 			if err != nil {
 				t.Fatalf("Generate() error = %v", err)
 			}
 
-			if id == "" || data == "" {
+			if challenge.ID == "" || challenge.Data == "" {
 				t.Error("Generated captcha has empty id or data")
 			}
 
 			// 清理
-			_ = c.Delete(ctx, id)
+			_ = c.Delete(ctx, challenge.ID)
 		})
 	}
 }
