@@ -65,24 +65,30 @@ func MustNew(opts ...Option) sms.SMS {
 }
 
 // NewWithConfig creates a sms.SMS backed by Volcengine with configuration from config.Config.
+// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
 // Configuration keys:
-//   - sms.volcengine.accessKeyID (string): Volcengine access key ID (required)
-//   - sms.volcengine.accessKeySecret (string): Volcengine access key secret (required)
-//   - sms.volcengine.region (string): Volcengine region (optional, default: cn-north-1)
-//   - sms.volcengine.signName (string): SMS signature name (required)
-func NewWithConfig(cfg goxconfig.Config) (sms.SMS, error) {
+//   - {prefix}.volcengine.accessKeyID (string): Volcengine access key ID (required)
+//   - {prefix}.volcengine.accessKeySecret (string): Volcengine access key secret (required)
+//   - {prefix}.volcengine.region (string): Volcengine region (optional, default: cn-north-1)
+//   - {prefix}.volcengine.signName (string): SMS signature name (required)
+func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
+	p := "sms"
+	if len(prefix) > 0 && prefix[0] != "" {
+		p = prefix[0]
+	}
 	return New(
-		WithAccessKeyID(cfg.GetString("sms.volcengine.accessKeyID")),
-		WithAccessKeySecret(cfg.GetString("sms.volcengine.accessKeySecret")),
-		WithRegion(cfg.GetString("sms.volcengine.region")),
-		WithSignName(cfg.GetString("sms.volcengine.signName")),
+		WithAccessKeyID(cfg.GetString(p+".volcengine.accessKeyID")),
+		WithAccessKeySecret(cfg.GetString(p+".volcengine.accessKeySecret")),
+		WithRegion(cfg.GetString(p+".volcengine.region")),
+		WithSignName(cfg.GetString(p+".volcengine.signName")),
 	)
 }
 
 // MustNewWithConfig creates a sms.SMS backed by Volcengine with configuration from config.Config.
 // Calls log.Fatal if creation fails.
-func MustNewWithConfig(cfg goxconfig.Config) sms.SMS {
-	client, err := NewWithConfig(cfg)
+// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
+func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
+	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
 		log.Fatal(err)
 	}

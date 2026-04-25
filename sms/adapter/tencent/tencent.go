@@ -105,26 +105,32 @@ func MustNew(opts ...Option) sms.SMS {
 }
 
 // NewWithConfig creates a sms.SMS backed by Tencent with configuration from config.Config.
+// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
 // Configuration keys:
-//   - sms.tencent.secretID (string): Tencent secret ID (required)
-//   - sms.tencent.secretKey (string): Tencent secret key (required)
-//   - sms.tencent.region (string): Tencent region (optional, default: ap-guangzhou)
-//   - sms.tencent.appID (string): SMS application ID (required)
-//   - sms.tencent.signName (string): SMS signature name (required)
-func NewWithConfig(cfg goxconfig.Config) (sms.SMS, error) {
+//   - {prefix}.tencent.secretID (string): Tencent secret ID (required)
+//   - {prefix}.tencent.secretKey (string): Tencent secret key (required)
+//   - {prefix}.tencent.region (string): Tencent region (optional, default: ap-guangzhou)
+//   - {prefix}.tencent.appID (string): SMS application ID (required)
+//   - {prefix}.tencent.signName (string): SMS signature name (required)
+func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
+	p := "sms"
+	if len(prefix) > 0 && prefix[0] != "" {
+		p = prefix[0]
+	}
 	return New(
-		WithSecretID(cfg.GetString("sms.tencent.secretID")),
-		WithSecretKey(cfg.GetString("sms.tencent.secretKey")),
-		WithRegion(cfg.GetString("sms.tencent.region")),
-		WithAppID(cfg.GetString("sms.tencent.appID")),
-		WithSignName(cfg.GetString("sms.tencent.signName")),
+		WithSecretID(cfg.GetString(p+".tencent.secretID")),
+		WithSecretKey(cfg.GetString(p+".tencent.secretKey")),
+		WithRegion(cfg.GetString(p+".tencent.region")),
+		WithAppID(cfg.GetString(p+".tencent.appID")),
+		WithSignName(cfg.GetString(p+".tencent.signName")),
 	)
 }
 
 // MustNewWithConfig creates a sms.SMS backed by Tencent with configuration from config.Config.
 // Calls log.Fatal if creation fails.
-func MustNewWithConfig(cfg goxconfig.Config) sms.SMS {
-	client, err := NewWithConfig(cfg)
+// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
+func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
+	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
 		log.Fatal(err)
 	}

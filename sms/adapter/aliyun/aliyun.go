@@ -100,24 +100,30 @@ func MustNew(opts ...Option) sms.SMS {
 }
 
 // NewWithConfig creates a sms.SMS backed by Aliyun with configuration from config.Config.
+// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
 // Configuration keys:
-//   - sms.aliyun.accessKeyID (string): Aliyun access key ID (required)
-//   - sms.aliyun.accessKeySecret (string): Aliyun access key secret (required)
-//   - sms.aliyun.endpoint (string): Aliyun SMS endpoint (optional, default: dysmsapi.aliyuncs.com)
-//   - sms.aliyun.signName (string): SMS signature name (required)
-func NewWithConfig(cfg goxconfig.Config) (sms.SMS, error) {
+//   - {prefix}.aliyun.accessKeyID (string): Aliyun access key ID (required)
+//   - {prefix}.aliyun.accessKeySecret (string): Aliyun access key secret (required)
+//   - {prefix}.aliyun.endpoint (string): Aliyun SMS endpoint (optional, default: dysmsapi.aliyuncs.com)
+//   - {prefix}.aliyun.signName (string): SMS signature name (required)
+func NewWithConfig(cfg goxconfig.Config, prefix ...string) (sms.SMS, error) {
+	p := "sms"
+	if len(prefix) > 0 && prefix[0] != "" {
+		p = prefix[0]
+	}
 	return New(
-		WithAccessKeyID(cfg.GetString("sms.aliyun.accessKeyID")),
-		WithAccessKeySecret(cfg.GetString("sms.aliyun.accessKeySecret")),
-		WithEndpoint(cfg.GetString("sms.aliyun.endpoint")),
-		WithSignName(cfg.GetString("sms.aliyun.signName")),
+		WithAccessKeyID(cfg.GetString(p+".aliyun.accessKeyID")),
+		WithAccessKeySecret(cfg.GetString(p+".aliyun.accessKeySecret")),
+		WithEndpoint(cfg.GetString(p+".aliyun.endpoint")),
+		WithSignName(cfg.GetString(p+".aliyun.signName")),
 	)
 }
 
 // MustNewWithConfig creates a sms.SMS backed by Aliyun with configuration from config.Config.
 // Calls log.Fatal if creation fails.
-func MustNewWithConfig(cfg goxconfig.Config) sms.SMS {
-	client, err := NewWithConfig(cfg)
+// The optional prefix parameter allows customizing the configuration key prefix (default: "sms").
+func MustNewWithConfig(cfg goxconfig.Config, prefix ...string) sms.SMS {
+	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
 		log.Fatal(err)
 	}
