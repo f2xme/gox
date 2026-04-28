@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"strings"
 
 	"github.com/f2xme/gox/httpx"
@@ -13,17 +14,17 @@ const (
 	BearerPrefix = "Bearer "
 )
 
-// TokenValidator 验证 bearer token 并返回声明
-type TokenValidator interface {
-	Validate(token string) (Claims, error)
+// Validator 验证 token 并返回声明。
+type Validator interface {
+	Validate(ctx context.Context, token string) (Claims, error)
 }
 
-// TokenValidatorFunc 是实现 TokenValidator 的函数类型，便于以内联函数直接作为验证器使用
-type TokenValidatorFunc func(token string) (Claims, error)
+// ValidatorFunc 是实现 Validator 的函数类型，便于以内联函数直接作为验证器使用。
+type ValidatorFunc func(ctx context.Context, token string) (Claims, error)
 
-// Validate 调用底层函数完成 token 验证
-func (f TokenValidatorFunc) Validate(token string) (Claims, error) {
-	return f(token)
+// Validate 调用底层函数完成 token 验证。
+func (f ValidatorFunc) Validate(ctx context.Context, token string) (Claims, error) {
+	return f(ctx, token)
 }
 
 // Claims 表示已认证的 token 声明
@@ -63,7 +64,7 @@ func New(opts ...Option) httpx.Middleware {
 				return nil
 			}
 
-			claims, err := o.validator.Validate(token)
+			claims, err := o.validator.Validate(ctx.Request().Context(), token)
 			if err != nil {
 				if optional {
 					return next(ctx)

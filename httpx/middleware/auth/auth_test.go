@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -28,7 +29,10 @@ type mockValidator struct {
 	calledWith    []string
 }
 
-func (v *mockValidator) Validate(token string) (Claims, error) {
+func (v *mockValidator) Validate(ctx context.Context, token string) (Claims, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	v.calledWith = append(v.calledWith, token)
 	if claims, ok := v.tokenToClaims[token]; ok {
 		return claims, nil
@@ -106,6 +110,72 @@ func TestAuth_ValidBearerTokenStoresClaimsAndCallsNext(t *testing.T) {
 	}
 	if ctx.RespCode != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, ctx.RespCode)
+	}
+}
+
+func TestAuth_ValidatorReceivesRequestContext(t *testing.T) {
+	key := struct{}{}
+	validator := ValidatorFunc(func(ctx context.Context, token string) (Claims, error) {
+		if got := ctx.Value(key); got != "value" {
+			t.Fatalf("context value = %v, want value", got)
+		}
+		if token != "ctx-token" {
+			t.Fatalf("token = %q, want ctx-token", token)
+		}
+		return &mockClaims{uid: 123, values: map[string]any{}}, nil
+	})
+
+	middleware := New(WithValidator(validator))
+	handler := middleware(func(ctx httpx.Context) error {
+		if GetUID(ctx) != 123 {
+			t.Fatalf("GetUID() = %d, want 123", GetUID(ctx))
+		}
+		return ctx.JSON(http.StatusOK, map[string]any{"ok": true})
+	})
+
+	ctx := newCtx()
+	ctx.Headers["Authorization"] = "Bearer ctx-token"
+	ctx.RequestContext = context.WithValue(context.Background(), key, "value")
+
+	if err := handler(ctx); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if ctx.RespCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, ctx.RespCode)
+	}
+}
+
+func TestAuth_PassesCanceledContextToValidator(t *testing.T) {
+	called := false
+	validator := ValidatorFunc(func(ctx context.Context, token string) (Claims, error) {
+		called = true
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return &mockClaims{uid: 1, values: map[string]any{}}, nil
+	})
+
+	middleware := New(WithValidator(validator))
+	handler := middleware(func(ctx httpx.Context) error {
+		t.Fatal("handler should not be called when request context is canceled")
+		return nil
+	})
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	ctx := newCtx()
+	ctx.RequestContext = reqCtx
+	ctx.Headers["Authorization"] = "Bearer token"
+
+	if err := handler(ctx); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !called {
+		t.Fatal("validator should be called")
+	}
+	if ctx.RespCode != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, ctx.RespCode)
 	}
 }
 
@@ -234,7 +304,9 @@ func TestAuth_BannedUserReturnsForbidden(t *testing.T) {
 	middleware := New(
 		WithValidator(validator),
 		WithUserChecker(statusChecker),
-		WithCheckHandler(func(c httpx.Context, _ error) { _ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("user is banned")) }),
+		WithCheckHandler(func(c httpx.Context, _ error) {
+			_ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("user is banned"))
+		}),
 	)
 
 	handler := middleware(func(ctx httpx.Context) error {
@@ -310,7 +382,9 @@ func TestAuth_CheckerErrorReturnsForbidden(t *testing.T) {
 	middleware := New(
 		WithValidator(validator),
 		WithUserChecker(statusChecker),
-		WithCheckHandler(func(c httpx.Context, _ error) { _ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("check failed")) }),
+		WithCheckHandler(func(c httpx.Context, _ error) {
+			_ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("check failed"))
+		}),
 	)
 
 	handler := middleware(func(ctx httpx.Context) error {

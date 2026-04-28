@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"io"
 	"net/http"
 
@@ -21,6 +22,8 @@ type MockContext struct {
 	Cookies       map[string]*http.Cookie
 	// BodyValue 是可选的请求体。若为 nil，则 Request().Body 为 nil。
 	BodyValue io.ReadCloser
+	// RequestContext 是可选的请求 context。若为 nil，则使用 context.Background()。
+	RequestContext context.Context
 
 	// 响应信息
 	RespCode    int
@@ -79,6 +82,9 @@ func (m *MockContext) Request() *http.Request {
 	}
 	for _, c := range m.Cookies {
 		req.AddCookie(c)
+	}
+	if m.RequestContext != nil {
+		req = req.WithContext(m.RequestContext)
 	}
 	return req
 }
@@ -206,7 +212,6 @@ type mockResponseWriter struct {
 	ctx *MockContext
 }
 
-func (w *mockResponseWriter) Header() http.Header        { return w.ctx.RespHeaders }
+func (w *mockResponseWriter) Header() http.Header         { return w.ctx.RespHeaders }
 func (w *mockResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
 func (w *mockResponseWriter) WriteHeader(code int)        { w.ctx.RespCode = code }
-

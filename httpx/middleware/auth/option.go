@@ -9,15 +9,15 @@ import (
 
 // Options 定义认证中间件配置
 type Options struct {
-	validator       TokenValidator
-	statusChecker   UserChecker
-	checkHandler    func(httpx.Context, error)
-	tokenExtractor  func(httpx.Context) string
-	skipPaths       map[string]bool // 精确匹配
-	skipPatterns    []string        // 通配符模式
-	optionalPaths   map[string]bool // 可选认证：有 token 则验证，无 token 则放行
+	validator        Validator
+	statusChecker    UserChecker
+	checkHandler     func(httpx.Context, error)
+	tokenExtractor   func(httpx.Context) string
+	skipPaths        map[string]bool // 精确匹配
+	skipPatterns     []string        // 通配符模式
+	optionalPaths    map[string]bool // 可选认证：有 token 则验证，无 token 则放行
 	optionalPatterns []string        // 可选认证通配符模式
-	errorHandler    func(httpx.Context)
+	errorHandler     func(httpx.Context)
 }
 
 func defaultOptions() Options {
@@ -47,8 +47,8 @@ func defaultCheckerHandler(ctx httpx.Context, _ error) {
 // Option 配置认证中间件
 type Option func(*Options)
 
-// WithValidator 设置 token 验证器
-func WithValidator(v TokenValidator) Option {
+// WithValidator 设置 token 验证器。
+func WithValidator(v Validator) Option {
 	return func(o *Options) {
 		o.validator = v
 	}
