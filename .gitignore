@@ -45,7 +45,9 @@ vendor/
 worktrees/
 .claude/
 CLAUDE.md
+AGENTS.md
 .planning/
 
 # Documentation (generated)
 docs/
+specs/
