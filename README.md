@@ -42,7 +42,7 @@ github.com/f2xme/gox/<package>
 | 分页 | `pager` | `github.com/f2xme/gox/pager` |
 | 时间格式化、解析、计算 | `timex` | `github.com/f2xme/gox/timex` |
 | 缓存 | `cache`, `cache/adapter/*` | `github.com/f2xme/gox/cache` |
-| 配置加载 | `config`, `config/adapter/viper` | `github.com/f2xme/gox/config` |
+| 配置加载 | `config`, `config/adapter/env`, `config/adapter/viper` | `github.com/f2xme/gox/config` |
 | 数据库连接 | `database/adapter/*` | `github.com/f2xme/gox/database/adapter/pgsqldb` |
 | 加密、哈希、AES、RSA | `encrypt`, `crypto` | `github.com/f2xme/gox/encrypt` |
 | 日志 | `logx`, `logx/adapter/zap` | `github.com/f2xme/gox/logx` |
@@ -58,6 +58,7 @@ github.com/f2xme/gox/<package>
   - `cache/adapter/redis` - Redis 缓存适配器
 - **captcha** - 验证码生成和验证
 - **config** - 配置管理封装
+  - `config/adapter/env` - 环境变量适配器
   - `config/adapter/viper` - Viper 适配器
 - **database** - 数据库操作封装
   - `database/adapter/mysqldb` - MySQL 适配器
@@ -91,6 +92,23 @@ github.com/f2xme/gox/<package>
 - **validator** - 数据验证封装
 
 ## 给 AI 编码助手的规则
+
+### 配置加载示例
+
+纯环境变量配置：
+
+```go
+import "github.com/f2xme/gox/config/adapter/env"
+
+cfg := env.New(
+	env.WithPrefix("APP"),
+	env.WithDefaults(map[string]any{
+		"server.port": 8080,
+	}),
+)
+
+port := cfg.GetInt("server.port") // 读取 APP_SERVER_PORT
+```
 
 - 优先使用 gox 已有封装，不要在有等价封装时直接引入底层第三方库。
 - 核心包从 `github.com/f2xme/gox/<package>` 导入，具体实现从 `adapter` 包导入。

@@ -22,7 +22,7 @@ This guide helps AI coding agents choose and use gox packages correctly.
 | Work with time | `timex` | `github.com/f2xme/gox/timex` |
 | Add cache support | `cache`, `cache/adapter/*` | `github.com/f2xme/gox/cache` |
 | Generate or verify CAPTCHA | `captcha` | `github.com/f2xme/gox/captcha` |
-| Load configuration | `config`, `config/adapter/viper` | `github.com/f2xme/gox/config` |
+| Load configuration | `config`, `config/adapter/env`, `config/adapter/viper` | `github.com/f2xme/gox/config` |
 | Configure databases | `database/adapter/*` | `github.com/f2xme/gox/database/adapter/pgsqldb` |
 | Hash, encrypt, or encode values | `encrypt`, `crypto` | `github.com/f2xme/gox/encrypt` |
 | Create structured errors | `errorx` | `github.com/f2xme/gox/errorx` |

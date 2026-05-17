@@ -41,7 +41,7 @@ SMS providers, queues, and similar integrations.
 | Time formatting, parsing, duration helpers | `timex` |
 | Cache abstraction | `cache`, `cache/adapter/memory`, `cache/adapter/redis` |
 | CAPTCHA | `captcha`, `captcha/generator/*`, `captcha/adapter/*` |
-| Configuration loading | `config`, `config/adapter/viper` |
+| Configuration loading | `config`, `config/adapter/env`, `config/adapter/viper` |
 | Database setup | `database/adapter/mysqldb`, `database/adapter/pgsqldb`, `database/adapter/sqlitedb` |
 | Encryption, hashing, AES, RSA | `encrypt` or `crypto` depending on existing package use |
 | Structured errors | `errorx` |
