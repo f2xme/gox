@@ -1,6 +1,7 @@
 package gin_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -262,6 +263,27 @@ func TestParam(t *testing.T) {
 	w := doRequest(e, "GET", "/users/42")
 	if w.Body.String() != "42" {
 		t.Errorf("expected '42', got %q", w.Body.String())
+	}
+}
+
+func TestReqContext(t *testing.T) {
+	type contextKey string
+
+	e := ginadapter.New()
+	e.GET("/ctx", func(ctx httpx.Context) error {
+		if got := ctx.ReqContext().Value(contextKey("trace_id")); got != "abc123" {
+			return ctx.String(500, fmt.Sprintf("unexpected trace_id: %v", got))
+		}
+		return ctx.String(200, "ok")
+	})
+
+	reqCtx := context.WithValue(context.Background(), contextKey("trace_id"), "abc123")
+	req := httptest.NewRequest(http.MethodGet, "/ctx", nil).WithContext(reqCtx)
+	w := httptest.NewRecorder()
+	e.Raw().(*ginframework.Engine).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

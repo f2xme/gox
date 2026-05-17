@@ -1,6 +1,7 @@
 package gin
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/f2xme/gox/httpx"
@@ -14,7 +15,8 @@ type ginContext struct {
 
 var _ httpx.Context = (*ginContext)(nil)
 
-func (ctx *ginContext) Request() *http.Request       { return ctx.c.Request }
+func (ctx *ginContext) Request() *http.Request        { return ctx.c.Request }
+func (ctx *ginContext) ReqContext() context.Context   { return ctx.c.Request.Context() }
 func (ctx *ginContext) Param(key string) httpx.Value  { return httpx.Value(ctx.c.Param(key)) }
 func (ctx *ginContext) Query(key string) httpx.Value  { return httpx.Value(ctx.c.Query(key)) }
 func (ctx *ginContext) QueryAll(key string) []string  { return ctx.c.QueryArray(key) }
@@ -103,8 +105,8 @@ func (ctx *ginContext) SetCookie(cookie *http.Cookie) {
 
 func (ctx *ginContext) Status(code int) { ctx.c.Status(code) }
 
-func (ctx *ginContext) Set(key string, value any)    { ctx.c.Set(key, value) }
-func (ctx *ginContext) Get(key string) (any, bool)   { return ctx.c.Get(key) }
-func (ctx *ginContext) MustGet(key string) any       { return ctx.c.MustGet(key) }
+func (ctx *ginContext) Set(key string, value any)           { ctx.c.Set(key, value) }
+func (ctx *ginContext) Get(key string) (any, bool)          { return ctx.c.Get(key) }
+func (ctx *ginContext) MustGet(key string) any              { return ctx.c.MustGet(key) }
 func (ctx *ginContext) ResponseWriter() http.ResponseWriter { return ctx.c.Writer }
-func (ctx *ginContext) Raw() any                     { return ctx.c }
+func (ctx *ginContext) Raw() any                            { return ctx.c }

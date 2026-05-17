@@ -89,6 +89,10 @@ func (m *MockContext) Request() *http.Request {
 	return req
 }
 
+func (m *MockContext) ReqContext() context.Context {
+	return m.Request().Context()
+}
+
 func (m *MockContext) Param(key string) httpx.Value { return httpx.Value(m.PathParams[key]) }
 
 func (m *MockContext) Query(key string) httpx.Value {

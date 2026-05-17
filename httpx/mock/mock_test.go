@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -20,6 +21,18 @@ func TestNewMockContext(t *testing.T) {
 	}
 	if ctx.ClientIP() != "127.0.0.1" {
 		t.Errorf("expected 127.0.0.1, got %s", ctx.ClientIP())
+	}
+}
+
+func TestMockContext_ReqContext(t *testing.T) {
+	type contextKey string
+
+	ctx := NewMockContext("GET", "/")
+	reqCtx := context.WithValue(context.Background(), contextKey("trace_id"), "abc123")
+	ctx.RequestContext = reqCtx
+
+	if got := ctx.ReqContext().Value(contextKey("trace_id")); got != "abc123" {
+		t.Errorf("expected trace_id=abc123, got %v", got)
 	}
 }
 

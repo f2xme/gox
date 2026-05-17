@@ -1,6 +1,9 @@
 package httpx
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
 // Validator 定义请求参数校验接口。
 // 如果绑定的结构体实现了此接口,Bind 系列方法会在绑定成功后自动调用 Validate()。
@@ -34,6 +37,8 @@ type Validator interface {
 type Context interface {
 	// Request 返回底层 *http.Request。
 	Request() *http.Request
+	// ReqContext 返回底层请求的 context.Context。
+	ReqContext() context.Context
 
 	// Param 返回 URI 路径参数（如 "/users/:id" 中的 id）。
 	//
