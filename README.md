@@ -2,6 +2,10 @@
 
 对常用 Go 第三方库的二次封装，提供统一的 API 风格和开箱即用的配置。专注于提升开发效率和代码一致性。
 
+## AI 使用入口
+
+- [AI_USAGE.md](AI_USAGE.md) 面向 AI 编码助手，说明“需求 -> 包 -> import -> 示例 -> 禁忌”。
+- [llms.txt](llms.txt) 是更短的 LLM 上下文文件，适合被 AI 工具优先读取。
 
 ## 安装
 
@@ -28,6 +32,24 @@ import "github.com/f2xme/gox/encrypt"
 ```
 github.com/f2xme/gox/<package>
 ```
+
+### 需求选包速查
+
+| 需求 | 优先查看 | 典型 import |
+| --- | --- | --- |
+| HTTP API、路由、绑定请求 | `httpx`, `httpx/adapter/gin` | `github.com/f2xme/gox/httpx` |
+| 请求参数验证 | `validator`, `httpx` 绑定方法 | `github.com/f2xme/gox/validator` |
+| 分页 | `pager` | `github.com/f2xme/gox/pager` |
+| 时间格式化、解析、计算 | `timex` | `github.com/f2xme/gox/timex` |
+| 缓存 | `cache`, `cache/adapter/*` | `github.com/f2xme/gox/cache` |
+| 配置加载 | `config`, `config/adapter/viper` | `github.com/f2xme/gox/config` |
+| 数据库连接 | `database/adapter/*` | `github.com/f2xme/gox/database/adapter/pgsqldb` |
+| 加密、哈希、AES、RSA | `encrypt`, `crypto` | `github.com/f2xme/gox/encrypt` |
+| 日志 | `logx`, `logx/adapter/zap` | `github.com/f2xme/gox/logx` |
+| JWT | `jwt` | `github.com/f2xme/gox/jwt` |
+| 队列 | `queue`, `queue/adapter/*` | `github.com/f2xme/gox/queue` |
+| 短信 | `sms`, `sms/adapter/*` | `github.com/f2xme/gox/sms` |
+| 对象存储 | `oss`, `oss/adapter/aliyun` | `github.com/f2xme/gox/oss` |
 
 ### 可用包
 
@@ -66,3 +88,12 @@ github.com/f2xme/gox/<package>
 - **timex** - 时间工具
 - **trace** - 链路追踪封装
 - **validator** - 数据验证封装
+
+## 给 AI 编码助手的规则
+
+- 优先使用 gox 已有封装，不要在有等价封装时直接引入底层第三方库。
+- 核心包从 `github.com/f2xme/gox/<package>` 导入，具体实现从 `adapter` 包导入。
+- 核心包之间保持独立；跨包集成和框架集成放到 `adapter` 包。
+- 修改或新增 API 前，先查看目标包的 `doc.go`、`example_test.go` 和现有测试。
+- 遵循现有 `New(...Option)`、`WithX(...)` 风格和表驱动测试风格。
+- 占位适配器不能当作生产实现使用，例如 README 中标注未实现真实发送或网关能力的适配器。

@@ -1,0 +1,79 @@
+# gox - Go eXtended utilities
+
+gox is a multi-package Go utility library at `github.com/f2xme/gox`.
+It wraps common third-party libraries behind consistent APIs and adapter
+packages.
+
+Use this file as the short context for AI coding agents. For richer examples,
+read `AI_USAGE.md`, package-level `doc.go` files, and `example_test.go` files.
+
+## Repository Rules
+
+- Each top-level directory is an independent importable package:
+  `github.com/f2xme/gox/<package>`.
+- Core packages should stay independent and should not import other gox core
+  packages.
+- Integrations with external frameworks or other gox packages belong under an
+  `adapter` package.
+- Return errors instead of panicking. Wrap errors with `fmt.Errorf` and `%w`
+  when preserving the cause matters.
+- Exported functions and types need Go doc comments.
+- Prefer table-driven tests.
+
+## Import Pattern
+
+```go
+import "github.com/f2xme/gox/<package>"
+import "github.com/f2xme/gox/<package>/adapter/<adapter>"
+```
+
+Use core packages for domain interfaces and shared types. Use adapter packages
+for concrete implementations backed by Gin, Redis, Zap, GORM, OSS providers,
+SMS providers, queues, and similar integrations.
+
+## Task to Package Map
+
+| Task | Prefer |
+| --- | --- |
+| HTTP APIs and request binding | `httpx`, `httpx/adapter/gin` |
+| Request validation | `validator`, or `httpx` bind methods with `validate` tags |
+| Pagination | `pager` |
+| Time formatting, parsing, duration helpers | `timex` |
+| Cache abstraction | `cache`, `cache/adapter/memory`, `cache/adapter/redis` |
+| CAPTCHA | `captcha`, `captcha/generator/*`, `captcha/adapter/*` |
+| Configuration loading | `config`, `config/adapter/viper` |
+| Database setup | `database/adapter/mysqldb`, `database/adapter/pgsqldb`, `database/adapter/sqlitedb` |
+| Encryption, hashing, AES, RSA | `encrypt` or `crypto` depending on existing package use |
+| Structured errors | `errorx` |
+| Graceful shutdown | `graceful` |
+| ID generation | `idgen` |
+| JWT tokens | `jwt` |
+| Logging | `logx`, `logx/adapter/zap` |
+| Metrics | `metrics`, `metrics/adapter/*` |
+| Email | `email` |
+| Object storage | `oss`, `oss/adapter/aliyun` |
+| Queue abstraction | `queue`, `queue/adapter/mem`, `queue/adapter/rocketmq` |
+| Rate limiting | `ratelimit` |
+| SMS | `sms`, `sms/adapter/aliyun`, `sms/adapter/tencent`, `sms/adapter/volcengine` |
+| Tracing | `trace` |
+
+## Common Usage Rules
+
+- Prefer gox packages over raw third-party packages when this repository
+  already provides the needed abstraction.
+- Do not add cross-package integration to a core package. Create or update an
+  adapter package instead.
+- Follow existing option-style constructors such as `New(...Option)` and
+  `WithX(...)` when adding configuration.
+- Look for `example_test.go` before inventing new usage patterns.
+- Placeholder adapters may exist. If an adapter explicitly says sending,
+  charging, or gateway access is not implemented, do not treat it as production
+  integration.
+
+## Verification
+
+```bash
+go build ./...
+go test ./...
+gofmt -w .
+```
