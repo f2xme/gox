@@ -1,0 +1,29 @@
+go 1.25.7
+
+use (
+	.
+	./authx
+	./authx/adapter/douyin
+	./authx/adapter/qq
+	./authx/adapter/wechat
+	./cache/adapter/redis
+	./config/adapter/viper
+	./crypto
+	./database/adapter/mysqldb
+	./database/adapter/pgsqldb
+	./database/adapter/sqlitedb
+	./encrypt
+	./httpx/adapter/gin
+	./logx/adapter/zap
+	./oss/adapter/aliyun
+	./queue
+	./queue/adapter/mem
+	./queue/adapter/rocketmq
+	./random
+	./session/adapter/redis
+	./sms/adapter/aliyun
+	./sms/adapter/tencent
+	./sms/adapter/uni
+	./sms/adapter/volcengine
+	./validator
+)
