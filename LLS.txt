@@ -68,7 +68,7 @@ Repository: github.com/f2xme/gox
 ### sms - SMS Services
 - aliyun - Alibaba Cloud SMS adapter
 - tencent - Tencent Cloud SMS adapter
-- volcengine - Volcengine SMS adapter
+- volcengine - Volcengine SMS adapter placeholder; sending is not implemented
 
 ### oss - Object Storage
 - adapter/aliyun - Alibaba Cloud OSS adapter
@@ -81,6 +81,7 @@ Repository: github.com/f2xme/gox
 ### payment - Payment Services
 - Payment gateway integrations
 - Unified payment interface
+- Alipay and WeChat adapter packages are placeholders and return not implemented errors
 
 ### queue - Queue Wrapper
 - adapter/memadapter - In-memory queue adapter

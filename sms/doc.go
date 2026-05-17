@@ -8,7 +8,7 @@
 //   - 统一接口：通过 SMS 接口屏蔽不同服务商 SDK 差异
 //   - 结构化消息：使用 Message 描述手机号、模板和模板参数
 //   - 上下文控制：Send 方法接收 context.Context，支持取消和超时
-//   - 独立适配器：阿里云、腾讯云、火山引擎适配器可按需引入
+//   - 独立适配器：阿里云、腾讯云适配器可按需引入
 //
 // # 快速开始
 //
@@ -49,4 +49,5 @@
 //   - 阿里云短信：github.com/f2xme/gox/sms/adapter/aliyun
 //   - 腾讯云短信：github.com/f2xme/gox/sms/adapter/tencent
 //   - 火山引擎短信：github.com/f2xme/gox/sms/adapter/volcengine
+//     当前为占位模块，构造函数会返回 ErrNotImplemented。
 package sms

@@ -1,6 +1,7 @@
 package alipay
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/f2xme/gox/payment"
@@ -17,6 +18,7 @@ func TestAlipay_Pay(t *testing.T) {
 		name    string
 		order   *payment.Order
 		wantErr bool
+		want    error
 	}{
 		{
 			name: "valid order",
@@ -28,7 +30,13 @@ func TestAlipay_Pay(t *testing.T) {
 				NotifyURL:   "https://example.com/notify",
 				ReturnURL:   "https://example.com/return",
 			},
-			wantErr: false,
+			wantErr: true,
+			want:    payment.ErrNotImplemented,
+		},
+		{
+			name:    "nil order",
+			order:   nil,
+			wantErr: true,
 		},
 	}
 
@@ -41,20 +49,11 @@ func TestAlipay_Pay(t *testing.T) {
 				t.Errorf("Pay() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr {
-				if result == nil {
-					t.Error("Pay() result is nil")
-					return
-				}
-				if result.OrderID != tt.order.OrderID {
-					t.Errorf("Pay() OrderID = %v, want %v", result.OrderID, tt.order.OrderID)
-				}
-				if result.TransactionID == "" {
-					t.Error("Pay() TransactionID is empty")
-				}
-				if result.PayURL == "" {
-					t.Error("Pay() PayURL is empty")
-				}
+			if result != nil {
+				t.Errorf("Pay() result = %v, want nil", result)
+			}
+			if tt.want != nil && !errors.Is(err, tt.want) {
+				t.Errorf("Pay() error = %v, want %v", err, tt.want)
 			}
 		})
 	}
@@ -66,11 +65,18 @@ func TestAlipay_Query(t *testing.T) {
 		name    string
 		orderID string
 		wantErr bool
+		want    error
 	}{
 		{
 			name:    "valid order ID",
 			orderID: "TEST001",
-			wantErr: false,
+			wantErr: true,
+			want:    payment.ErrNotImplemented,
+		},
+		{
+			name:    "empty order ID",
+			orderID: "",
+			wantErr: true,
 		},
 	}
 
@@ -83,17 +89,11 @@ func TestAlipay_Query(t *testing.T) {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr {
-				if result == nil {
-					t.Error("Query() result is nil")
-					return
-				}
-				if result.OrderID != tt.orderID {
-					t.Errorf("Query() OrderID = %v, want %v", result.OrderID, tt.orderID)
-				}
-				if result.Status == "" {
-					t.Error("Query() Status is empty")
-				}
+			if result != nil {
+				t.Errorf("Query() result = %v, want nil", result)
+			}
+			if tt.want != nil && !errors.Is(err, tt.want) {
+				t.Errorf("Query() error = %v, want %v", err, tt.want)
 			}
 		})
 	}
@@ -105,6 +105,7 @@ func TestAlipay_Refund(t *testing.T) {
 		name    string
 		req     *payment.RefundRequest
 		wantErr bool
+		want    error
 	}{
 		{
 			name: "valid refund request",
@@ -114,7 +115,13 @@ func TestAlipay_Refund(t *testing.T) {
 				Amount:   5000,
 				Reason:   "测试退款",
 			},
-			wantErr: false,
+			wantErr: true,
+			want:    payment.ErrNotImplemented,
+		},
+		{
+			name:    "nil refund request",
+			req:     nil,
+			wantErr: true,
 		},
 	}
 
@@ -127,17 +134,11 @@ func TestAlipay_Refund(t *testing.T) {
 				t.Errorf("Refund() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr {
-				if result == nil {
-					t.Error("Refund() result is nil")
-					return
-				}
-				if result.RefundID != tt.req.RefundID {
-					t.Errorf("Refund() RefundID = %v, want %v", result.RefundID, tt.req.RefundID)
-				}
-				if result.Status == "" {
-					t.Error("Refund() Status is empty")
-				}
+			if result != nil {
+				t.Errorf("Refund() result = %v, want nil", result)
+			}
+			if tt.want != nil && !errors.Is(err, tt.want) {
+				t.Errorf("Refund() error = %v, want %v", err, tt.want)
 			}
 		})
 	}
@@ -149,11 +150,18 @@ func TestAlipay_Close(t *testing.T) {
 		name    string
 		orderID string
 		wantErr bool
+		want    error
 	}{
 		{
 			name:    "valid order ID",
 			orderID: "TEST001",
-			wantErr: false,
+			wantErr: true,
+			want:    payment.ErrNotImplemented,
+		},
+		{
+			name:    "empty order ID",
+			orderID: "",
+			wantErr: true,
 		},
 	}
 
@@ -164,6 +172,9 @@ func TestAlipay_Close(t *testing.T) {
 			err := ap.Close(tt.orderID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Close() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.want != nil && !errors.Is(err, tt.want) {
+				t.Errorf("Close() error = %v, want %v", err, tt.want)
 			}
 		})
 	}

@@ -54,13 +54,14 @@ github.com/f2xme/gox/<package>
 - **oss** - 对象存储封装
 - **pager** - 分页工具
 - **payment** - 支付服务封装
+- **payment/adapter/alipay**、**payment/adapter/wechat** - 支付适配器占位实现，当前不会连接真实支付网关
 - **queue** - 队列封装
   - `adapter/memadapter` - 内存队列适配器
 - **ratelimit** - 限流工具
 - **sms** - 短信服务封装
   - `aliyun` - 阿里云短信适配器
   - `tencent` - 腾讯云短信适配器
-  - `volcengine` - 火山引擎短信适配器
+  - `volcengine` - 火山引擎短信适配器占位模块，当前未实现发送能力
 - **timex** - 时间工具
 - **trace** - 链路追踪封装
 - **validator** - 数据验证封装

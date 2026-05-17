@@ -2,6 +2,7 @@ package volcengine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
@@ -12,6 +13,10 @@ import (
 type volcengineSMS struct {
 	options Options
 }
+
+// ErrNotImplemented indicates that this adapter does not yet connect to
+// Volcengine SMS.
+var ErrNotImplemented = errors.New("volcengine sms provider is not implemented")
 
 var _ sms.SMS = (*volcengineSMS)(nil)
 
@@ -34,9 +39,10 @@ func validateOptions(o *Options) error {
 	return nil
 }
 
-// New 创建由火山引擎支持的 sms.SMS
+// New validates options and returns ErrNotImplemented.
 //
-// 使用选项模式配置客户端：
+// 当前版本不会创建真实的火山引擎短信客户端。保留此构造函数是为了避免
+// 静默返回一个无法发送短信的占位客户端。
 //
 //	client, err := volcengine.New(
 //		volcengine.WithAccessKeyID("your-key-id"),
@@ -53,18 +59,16 @@ func New(opts ...Option) (sms.SMS, error) {
 		return nil, err
 	}
 
-	return &volcengineSMS{
-		options: o,
-	}, nil
+	return nil, ErrNotImplemented
 }
 
-// Send 发送短信消息
+// Send returns ErrNotImplemented.
 func (s *volcengineSMS) Send(ctx context.Context, message sms.Message) error {
-	// TODO: 接入火山引擎短信发送逻辑。
-	return fmt.Errorf("volcengine sms provider not implemented yet")
+	return ErrNotImplemented
 }
 
-// MustNew 创建由火山引擎支持的 sms.SMS，如果失败则 log.Fatal
+// MustNew calls New and exits with log.Fatal on any error, including
+// ErrNotImplemented.
 func MustNew(opts ...Option) sms.SMS {
 	client, err := New(opts...)
 	if err != nil {
@@ -73,7 +77,8 @@ func MustNew(opts ...Option) sms.SMS {
 	return client
 }
 
-// NewWithConfig 使用 config.Config 创建由火山引擎支持的 sms.SMS。
+// NewWithConfig reads options from config.Config and returns ErrNotImplemented
+// after validation succeeds.
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 // 配置键：
 //   - {prefix}.volcengine.accessKeyID：火山引擎访问密钥 ID，必填
@@ -93,8 +98,8 @@ func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	)
 }
 
-// MustNewWithConfig 使用 config.Config 创建由火山引擎支持的 sms.SMS。
-// 如果创建失败则调用 log.Fatal。
+// MustNewWithConfig calls NewWithConfig and exits with log.Fatal on any error,
+// including ErrNotImplemented.
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
@@ -104,7 +109,7 @@ func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	return client
 }
 
-// NewWithOptions 使用 Options 创建由火山引擎支持的 sms.SMS。
+// NewWithOptions validates Options and returns ErrNotImplemented.
 func NewWithOptions(opts *Options) (sms.SMS, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("volcengine sms: options cannot be nil")
@@ -115,13 +120,11 @@ func NewWithOptions(opts *Options) (sms.SMS, error) {
 		return nil, err
 	}
 
-	return &volcengineSMS{
-		options: o,
-	}, nil
+	return nil, ErrNotImplemented
 }
 
-// MustNewWithOptions 使用 Options 创建由火山引擎支持的 sms.SMS。
-// 如果创建失败则调用 log.Fatal。
+// MustNewWithOptions calls NewWithOptions and exits with log.Fatal on any
+// error, including ErrNotImplemented.
 func MustNewWithOptions(opts *Options) sms.SMS {
 	client, err := NewWithOptions(opts)
 	if err != nil {

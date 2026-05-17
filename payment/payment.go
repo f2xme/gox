@@ -12,7 +12,14 @@
 // All implementations should be safe for concurrent use.
 package payment
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+// ErrNotImplemented indicates that an adapter does not yet connect to a real
+// payment provider.
+var ErrNotImplemented = errors.New("payment adapter is not implemented")
 
 // Payment defines the interface for payment operations.
 type Payment interface {
