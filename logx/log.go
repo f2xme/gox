@@ -2,17 +2,29 @@ package logx
 
 type nopLogger struct{}
 
-func (nopLogger) Info(string, ...Meta)  {}
-func (nopLogger) Warn(string, ...Meta)  {}
-func (nopLogger) Error(error, ...Meta)  {}
-func (nopLogger) Fatal(error, ...Meta)  {}
+func (nopLogger) Info(string, ...Meta) {}
+func (nopLogger) Warn(string, ...Meta) {}
+func (nopLogger) Error(error, ...Meta) {}
+func (nopLogger) Fatal(error, ...Meta) {}
 
 var globalLogger Logger = nopLogger{}
 
 // Init 初始化全局日志记录器
 //
 // 设置后，包级别的日志函数（Info、Warn、Error、Fatal）将使用此 logger。
-func Init(l Logger) {
+func Init(l Logger, opts ...Option) {
+	if l == nil {
+		l = nopLogger{}
+	}
+	cfg := defaultInitOptions()
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
+	}
+	if cfg.async {
+		l = newAsyncLogger(l, cfg.asyncBufferSize)
+	}
 	globalLogger = l
 }
 

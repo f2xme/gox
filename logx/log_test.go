@@ -2,7 +2,9 @@ package logx
 
 import (
 	"errors"
+	"sync"
 	"testing"
+	"time"
 )
 
 type recordedMsg struct {
@@ -143,4 +145,139 @@ func TestDefaultLogger_NoOp(t *testing.T) {
 	Info("test")
 	Warn("test")
 	Error(errors.New("test"))
+}
+
+type blockingLogger struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+
+	mu      sync.Mutex
+	records []recordedMsg
+}
+
+func newBlockingLogger() *blockingLogger {
+	return &blockingLogger{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (l *blockingLogger) Info(msg string, metas ...Meta) {
+	l.once.Do(func() { close(l.started) })
+	<-l.release
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.records = append(l.records, recordedMsg{level: "info", msg: msg, metas: metas})
+}
+
+func (l *blockingLogger) Warn(msg string, metas ...Meta) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.records = append(l.records, recordedMsg{level: "warn", msg: msg, metas: metas})
+}
+
+func (l *blockingLogger) Error(err error, metas ...Meta) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.records = append(l.records, recordedMsg{level: "error", err: err, metas: metas})
+}
+
+func (l *blockingLogger) Fatal(err error, metas ...Meta) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.records = append(l.records, recordedMsg{level: "fatal", err: err, metas: metas})
+}
+
+func (l *blockingLogger) snapshot() []recordedMsg {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	records := make([]recordedMsg, len(l.records))
+	copy(records, l.records)
+	return records
+}
+
+func TestInit_WithAsync_InfoDoesNotBlockOnUnderlyingLogger(t *testing.T) {
+	bl := newBlockingLogger()
+	Init(bl, WithAsync(), WithAsyncBufferSize(1))
+	defer Init(nopLogger{})
+
+	done := make(chan struct{})
+	go func() {
+		Info("async")
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected Info to return before underlying logger finishes")
+	}
+
+	select {
+	case <-bl.started:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected async worker to call underlying logger")
+	}
+
+	close(bl.release)
+	if err := Flush(); err != nil {
+		t.Fatalf("Flush returned error: %v", err)
+	}
+	if records := bl.snapshot(); len(records) != 1 || records[0].msg != "async" {
+		t.Fatalf("expected async record, got %#v", records)
+	}
+}
+
+func TestAsyncLogger_FlushWaitsForQueuedRecords(t *testing.T) {
+	ml := &mockLogger{}
+	Init(ml, WithAsync())
+	defer Init(nopLogger{})
+
+	Info("one")
+	Warn("two")
+	Error(errors.New("three"))
+
+	if err := Flush(); err != nil {
+		t.Fatalf("Flush returned error: %v", err)
+	}
+	if len(ml.records) != 3 {
+		t.Fatalf("expected 3 records after Flush, got %d", len(ml.records))
+	}
+}
+
+func TestAsyncLogger_StopWaitsForQueuedRecords(t *testing.T) {
+	ml := &mockFlushStopSync{}
+	Init(ml, WithAsync())
+	defer Init(nopLogger{})
+
+	Info("one")
+	if err := Stop(); err != nil {
+		t.Fatalf("Stop returned error: %v", err)
+	}
+	if len(ml.records) != 1 {
+		t.Fatalf("expected 1 record after Stop, got %d", len(ml.records))
+	}
+	if !ml.stopped {
+		t.Fatal("expected underlying Stop to be called")
+	}
+}
+
+func TestAsyncLogger_CopiesMetaSlice(t *testing.T) {
+	ml := &mockLogger{}
+	Init(ml, WithAsync())
+	defer Init(nopLogger{})
+
+	metas := []Meta{NewKV("key", "before")}
+	Info("copy", metas...)
+	metas[0] = NewKV("key", "after")
+
+	if err := Flush(); err != nil {
+		t.Fatalf("Flush returned error: %v", err)
+	}
+	if got := ml.records[0].metas[0].Value(); got != "before" {
+		t.Fatalf("expected copied meta value before mutation, got %v", got)
+	}
 }

@@ -71,6 +71,7 @@ github.com/f2xme/gox/<package>
 - **idgen** - ID 生成器
 - **jwt** - JWT 令牌处理
 - **logx** - 日志封装
+  - 支持 `logx.Init(logger, logx.WithAsync())` 启用包级异步打印；退出前调用 `logx.Stop()` 或 `logx.Flush()` 排空队列
   - `logx/adapter/zap` - Zap 日志适配器
 - **metrics** - 指标监控封装
 - **email** - 邮件服务封装

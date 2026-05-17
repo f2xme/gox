@@ -65,6 +65,11 @@ SMS providers, queues, and similar integrations.
   adapter package instead.
 - Follow existing option-style constructors such as `New(...Option)` and
   `WithX(...)` when adding configuration.
+- `logx` package-level logging is synchronous by default. Use
+  `logx.Init(logger, logx.WithAsync())` for async enqueueing, and call
+  `logx.Flush()` or `logx.Stop()` before shutdown. Context logging must extract
+  context fields before enqueueing and must not retain request contexts in
+  background workers.
 - Look for `example_test.go` before inventing new usage patterns.
 - Placeholder adapters may exist. If an adapter explicitly says sending,
   charging, or gateway access is not implemented, do not treat it as production

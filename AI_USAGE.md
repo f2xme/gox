@@ -98,6 +98,33 @@ if err != nil {
 result := pager.NewPageResult(page, rows, total)
 ```
 
+### Logging
+
+Use `logx` for logging APIs and `logx/adapter/zap` for the default concrete
+implementation. Package-level logging is synchronous by default:
+
+```go
+logger := zap.New()
+logx.Init(logger)
+logx.Info("server started", logx.NewKV("port", 8080))
+```
+
+Enable package-level asynchronous logging when callers should enqueue log
+records instead of writing them inline:
+
+```go
+logger := zap.New()
+logx.Init(logger, logx.WithAsync(), logx.WithAsyncBufferSize(2048))
+defer logx.Stop()
+
+logx.Info("server started")
+```
+
+In async mode, `Info`, `Warn`, and `Error` copy the meta slice before enqueueing.
+`InfoCtx`, `WarnCtx`, and `ErrorCtx` extract context fields before enqueueing, so
+the background worker does not retain or read the request context. Call
+`logx.Flush()` or `logx.Stop()` before shutdown to drain queued records.
+
 ### Adapters
 
 Use adapter packages for concrete implementations:

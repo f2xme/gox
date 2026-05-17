@@ -10,6 +10,7 @@ logx 包定义了日志记录的标准接口，支持多种日志库（zap、log
   - 结构化日志：通过 Meta 接口支持键值对形式的结构化字段
   - Context 集成：自动从 context 提取字段，支持请求级别的日志追踪
   - 全局日志：提供包级别的日志函数，简化常见场景的使用
+  - 异步打印：可配置包级别日志异步打印，队列未满时调用方快速返回
   - 多种适配器：内置 zap 等主流日志库的适配器
   - 线程安全：所有实现都是并发安全的
 
@@ -38,6 +39,14 @@ logx 包定义了日志记录的标准接口，支持多种日志库（zap、log
 			logx.Error(err, logx.NewKV("operation", "db_query"))
 		}
 	}
+
+启用异步打印：
+
+	logger := zap.New()
+	logx.Init(logger, logx.WithAsync(), logx.WithAsyncBufferSize(2048))
+	defer logx.Stop()
+
+	logx.Info("server started")
 
 使用 Context 记录日志：
 

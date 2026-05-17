@@ -175,3 +175,44 @@ func TestErrorCtx_Shortcut(t *testing.T) {
 		t.Error("expected error 'fail'")
 	}
 }
+
+func TestInfoCtx_WithAsyncCopiesContextExtractedMetas(t *testing.T) {
+	ml := &mockLogger{}
+	Init(ml, WithAsync())
+	defer Init(nopLogger{})
+	defer SetContextExtractor(nil)
+
+	type traceKey struct{}
+	type traceValue struct {
+		id string
+	}
+
+	trace := &traceValue{id: "before"}
+	SetContextExtractor(func(ctx context.Context) []Meta {
+		if v, ok := ctx.Value(traceKey{}).(*traceValue); ok {
+			return []Meta{NewKV("trace_id", v.id)}
+		}
+		return nil
+	})
+
+	ctx := context.WithValue(context.Background(), traceKey{}, trace)
+	InfoCtx(ctx, "request")
+	trace.id = "after"
+
+	if err := Flush(); err != nil {
+		t.Fatalf("Flush returned error: %v", err)
+	}
+
+	found := false
+	for _, meta := range ml.records[0].metas {
+		if meta.Key() == "trace_id" {
+			found = true
+			if meta.Value() != "before" {
+				t.Fatalf("expected copied trace_id before mutation, got %v", meta.Value())
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected trace_id meta")
+	}
+}

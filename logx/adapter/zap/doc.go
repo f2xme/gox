@@ -64,6 +64,14 @@ zap 是一个高性能的结构化日志库，本适配器将其封装为 logx.L
 	// 程序退出前刷新缓冲区
 	defer logx.Flush()
 
+包级异步打印：
+
+	logger := zap.New(zap.WithInfoLevel())
+	logx.Init(logger, logx.WithAsync(), logx.WithAsyncBufferSize(2048))
+	defer logx.Stop()
+
+	logx.Info("server started")
+
 从配置文件创建：
 
 	import "github.com/f2xme/gox/config/viper"
@@ -73,7 +81,8 @@ zap 是一个高性能的结构化日志库，本适配器将其封装为 logx.L
 
 # 注意事项
 
-  - 使用异步缓冲时，务必在程序退出前调用 logx.Flush()
+  - zap.WithAsyncBuffer() 是 zap 输出缓冲；logx.WithAsync() 是 logx 包级异步打印，两者可以独立或组合使用
+  - 使用异步缓冲或包级异步打印时，务必在程序退出前调用 logx.Flush() 或 logx.Stop()
   - 日志轮转默认值：MaxSize 10MB、MaxBackups 10 个、MaxAge 10 天
   - 生产环境建议使用 Info 或 Warn 级别
   - 高并发场景建议启用异步缓冲
