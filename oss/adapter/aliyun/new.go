@@ -1,7 +1,7 @@
 package aliyun
 
 import (
-	"log"
+	"fmt"
 
 	aliyunoss "github.com/aliyun/aliyun-oss-go-sdk/oss"
 
@@ -31,11 +31,11 @@ func New(opts ...Option) (*Storage, error) {
 	return NewWithOptions(&o)
 }
 
-// MustNew 创建一个新的阿里云 OSS 存储实例，失败时终止程序
+// MustNew 创建一个新的阿里云 OSS 存储实例，失败时 panic。
 func MustNew(opts ...Option) *Storage {
 	storage, err := New(opts...)
 	if err != nil {
-		log.Fatalf("aliyun: create storage instance failed: %v", err)
+		panic(fmt.Errorf("aliyun: create storage instance failed: %w", err))
 	}
 	return storage
 }
@@ -68,11 +68,11 @@ func NewWithOptions(opts *Options) (*Storage, error) {
 	}, nil
 }
 
-// MustNewWithOptions 使用 Options 创建一个新的阿里云 OSS 存储实例，失败时终止程序
+// MustNewWithOptions 使用 Options 创建一个新的阿里云 OSS 存储实例，失败时 panic。
 func MustNewWithOptions(opts *Options) *Storage {
 	storage, err := NewWithOptions(opts)
 	if err != nil {
-		log.Fatalf("aliyun: use options to create storage instance failed: %v", err)
+		panic(fmt.Errorf("aliyun: use options to create storage instance failed: %w", err))
 	}
 	return storage
 }
@@ -121,11 +121,11 @@ func NewWithConfig(cfg config.Config, prefix ...string) (*Storage, error) {
 	return New(opts...)
 }
 
-// MustNewWithConfig 使用 config.Config 创建一个新的阿里云 OSS 存储实例，失败时终止程序
+// MustNewWithConfig 使用 config.Config 创建一个新的阿里云 OSS 存储实例，失败时 panic。
 func MustNewWithConfig(cfg config.Config, prefix ...string) *Storage {
 	storage, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
-		log.Fatalf("aliyun: use config to create storage instance failed: %v", err)
+		panic(fmt.Errorf("aliyun: use config to create storage instance failed: %w", err))
 	}
 	return storage
 }

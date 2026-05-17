@@ -1,7 +1,7 @@
 package cache
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/f2xme/gox/captcha"
 	"github.com/f2xme/gox/captcha/generator/base64"
@@ -24,11 +24,11 @@ func NewCaptcha(c Backend, opts ...CaptchaOption) (captcha.Service, error) {
 	return captcha.New(store, cfg.captchaOpts...)
 }
 
-// MustNewCaptcha 创建使用 cache 存储的 Service 实例，创建失败时退出程序。
+// MustNewCaptcha 创建使用 cache 存储的 Service 实例，创建失败时 panic。
 func MustNewCaptcha(c Backend, opts ...CaptchaOption) captcha.Service {
 	svc, err := NewCaptcha(c, opts...)
 	if err != nil {
-		log.Fatalf("captcha/cache: create captcha failed: %v", err)
+		panic(fmt.Errorf("captcha/cache: create captcha failed: %w", err))
 	}
 	return svc
 }

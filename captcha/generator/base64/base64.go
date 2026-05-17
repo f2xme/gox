@@ -2,7 +2,7 @@ package base64
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/mojocn/base64Captcha"
 
@@ -31,11 +31,11 @@ func New(opts ...Option) (captcha.Generator, error) {
 	}, nil
 }
 
-// MustNew 创建一个新的 base64 生成器，创建失败时退出程序。
+// MustNew 创建一个新的 base64 生成器，创建失败时 panic。
 func MustNew(opts ...Option) captcha.Generator {
 	gen, err := New(opts...)
 	if err != nil {
-		log.Fatalf("captcha/base64: create generator failed: %v", err)
+		panic(fmt.Errorf("captcha/base64: create generator failed: %w", err))
 	}
 	return gen
 }

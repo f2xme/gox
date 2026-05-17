@@ -3,7 +3,6 @@ package rocketmq
 import (
 	"context"
 	"fmt"
-	"log"
 
 	rmq "github.com/apache/rocketmq-clients/golang/v5"
 	"github.com/apache/rocketmq-clients/golang/v5/credentials"
@@ -77,11 +76,11 @@ func NewContext(ctx context.Context, opts ...Option) (queue.Queue, error) {
 	}, nil
 }
 
-// MustNew 创建一个新的 RocketMQ 队列，出错时终止程序。
+// MustNew 创建一个新的 RocketMQ 队列，出错时 panic。
 func MustNew(opts ...Option) queue.Queue {
 	q, err := New(opts...)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("rocketmq: create queue failed: %w", err))
 	}
 	return q
 }
@@ -92,6 +91,7 @@ func MustNew(opts ...Option) queue.Queue {
 //   - queue.rocketmq.accessKey (string): 认证访问密钥
 //   - queue.rocketmq.secretKey (string): 认证密钥
 //   - queue.rocketmq.namespace (string): 命名空间
+//   - queue.rocketmq.topics ([]string): Producer 启动时声明的 topic 列表（必填）
 //   - queue.rocketmq.retries (int): 发送失败重试次数（默认：2）
 //   - queue.rocketmq.sendTimeout (duration): 发送消息超时时间（默认：3s）
 //   - queue.rocketmq.consumerModel (string): 消费模式（默认："clustering"）
@@ -116,6 +116,10 @@ func NewWithConfig(cfg config.Config) (queue.Queue, error) {
 		opts = append(opts, WithNamespace(namespace))
 	}
 
+	if topics := cfg.GetStringSlice("queue.rocketmq.topics"); len(topics) > 0 {
+		opts = append(opts, WithTopics(topics...))
+	}
+
 	if retries := cfg.GetInt("queue.rocketmq.retries"); retries >= 0 {
 		opts = append(opts, WithRetries(retries))
 	}
@@ -131,11 +135,11 @@ func NewWithConfig(cfg config.Config) (queue.Queue, error) {
 	return New(opts...)
 }
 
-// MustNewWithConfig 使用配置创建一个新的 RocketMQ 队列，出错时终止程序。
+// MustNewWithConfig 使用配置创建一个新的 RocketMQ 队列，出错时 panic。
 func MustNewWithConfig(cfg config.Config) queue.Queue {
 	q, err := NewWithConfig(cfg)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("rocketmq: create queue from config failed: %w", err))
 	}
 	return q
 }

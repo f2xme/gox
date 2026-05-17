@@ -24,8 +24,8 @@ type Options struct {
 	SendTimeout time.Duration
 	// ConsumerModel 消费模式（集群或广播）
 	ConsumerModel string
-	// Topics 预热的 topic 列表，启动时会预先拉取路由信息。
-	// 注意：至少需要指定一个 topic，否则 SDK 无法完成初始化握手，导致 New/NewContext 永久阻塞。
+	// Topics Producer 启动时声明的 topic 列表。
+	// 注意：至少需要指定一个 topic，否则 SDK 无法完成初始化握手。
 	Topics []string
 }
 
@@ -104,7 +104,7 @@ func WithSendTimeout(timeout time.Duration) Option {
 	}
 }
 
-// WithTopics 设置启动时预热的 topic 列表，可加速首次发送
+// WithTopics 设置 Producer 启动时声明的 topic 列表。
 //
 // 示例：
 //
@@ -114,7 +114,7 @@ func WithTopics(topics ...string) Option {
 		o.Topics = topics
 	}
 }
-//
+
 // 示例：
 //
 //	rocketmq.New(rocketmq.WithConsumerModel("clustering"))

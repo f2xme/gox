@@ -44,8 +44,8 @@ defer sub.Unsubscribe()
 import "github.com/f2xme/gox/queue/adapter/rocketmq"
 
 queue, err := rocketmq.New(
-    rocketmq.WithNameServers([]string{"localhost:9876"}),
-    rocketmq.WithGroupName("my-producer-group"),
+    rocketmq.WithEndpoint("localhost:8081"),
+    rocketmq.WithTopics("orders"),
 )
 if err != nil {
     log.Fatal(err)

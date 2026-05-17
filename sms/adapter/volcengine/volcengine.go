@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/sms"
@@ -67,12 +66,11 @@ func (s *volcengineSMS) Send(ctx context.Context, message sms.Message) error {
 	return ErrNotImplemented
 }
 
-// MustNew calls New and exits with log.Fatal on any error, including
-// ErrNotImplemented.
+// MustNew calls New and panics on any error, including ErrNotImplemented.
 func MustNew(opts ...Option) sms.SMS {
 	client, err := New(opts...)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("volcengine sms: create client failed: %w", err))
 	}
 	return client
 }
@@ -98,13 +96,13 @@ func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	)
 }
 
-// MustNewWithConfig calls NewWithConfig and exits with log.Fatal on any error,
-// including ErrNotImplemented.
+// MustNewWithConfig calls NewWithConfig and panics on any error, including
+// ErrNotImplemented.
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("volcengine sms: create client from config failed: %w", err))
 	}
 	return client
 }
@@ -123,12 +121,12 @@ func NewWithOptions(opts *Options) (sms.SMS, error) {
 	return nil, ErrNotImplemented
 }
 
-// MustNewWithOptions calls NewWithOptions and exits with log.Fatal on any
-// error, including ErrNotImplemented.
+// MustNewWithOptions calls NewWithOptions and panics on any error, including
+// ErrNotImplemented.
 func MustNewWithOptions(opts *Options) sms.SMS {
 	client, err := NewWithOptions(opts)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("volcengine sms: create client from options failed: %w", err))
 	}
 	return client
 }

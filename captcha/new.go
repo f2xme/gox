@@ -1,6 +1,6 @@
 package captcha
 
-import "log"
+import "fmt"
 
 // New 创建 Service 实例（通用构造函数）。
 func New(store Store, opts ...Option) (Service, error) {
@@ -26,11 +26,11 @@ func New(store Store, opts ...Option) (Service, error) {
 	}, nil
 }
 
-// MustNew 创建 Service 实例，创建失败时退出程序。
+// MustNew 创建 Service 实例，创建失败时 panic。
 func MustNew(store Store, opts ...Option) Service {
 	c, err := New(store, opts...)
 	if err != nil {
-		log.Fatalf("captcha: create captcha failed: %v", err)
+		panic(fmt.Errorf("captcha: create captcha failed: %w", err))
 	}
 	return c
 }

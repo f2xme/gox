@@ -68,7 +68,7 @@
 //
 //	storage, err := aliyun.NewWithConfig(cfg)
 //
-// 初始化阶段可以使用 MustNew、MustNewWithOptions 或 MustNewWithConfig，在创建失败时直接终止程序。
+// 初始化阶段可以使用 MustNew、MustNewWithOptions 或 MustNewWithConfig，在创建失败时 panic。
 //
 // # 对象列表
 //

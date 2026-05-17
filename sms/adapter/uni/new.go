@@ -2,7 +2,6 @@ package uni
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/sms"
@@ -35,11 +34,11 @@ func New(opts ...Option) (sms.SMS, error) {
 	}, nil
 }
 
-// MustNew 创建由 UniSMS 支持的 sms.SMS，如果失败则 log.Fatal。
+// MustNew 创建由 UniSMS 支持的 sms.SMS，失败时 panic。
 func MustNew(opts ...Option) sms.SMS {
 	client, err := New(opts...)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("uni sms: create client failed: %w", err))
 	}
 	return client
 }
@@ -63,12 +62,12 @@ func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 }
 
 // MustNewWithConfig 使用 config.Config 创建由 UniSMS 支持的 sms.SMS。
-// 如果创建失败则调用 log.Fatal。
+// 如果创建失败则 panic。
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("uni sms: create client from config failed: %w", err))
 	}
 	return client
 }
@@ -91,11 +90,11 @@ func NewWithOptions(opts *Options) (sms.SMS, error) {
 }
 
 // MustNewWithOptions 使用 Options 创建由 UniSMS 支持的 sms.SMS。
-// 如果创建失败则调用 log.Fatal。
+// 如果创建失败则 panic。
 func MustNewWithOptions(opts *Options) sms.SMS {
 	client, err := NewWithOptions(opts)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("uni sms: create client from options failed: %w", err))
 	}
 	return client
 }

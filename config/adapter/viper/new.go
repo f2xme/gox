@@ -1,7 +1,7 @@
 package viper
 
 import (
-	"log"
+	"fmt"
 	"strings"
 
 	"github.com/f2xme/gox/config"
@@ -66,10 +66,10 @@ func New(file string, opts ...Option) (config.Config, error) {
 	return vc, nil
 }
 
-// MustNew 创建一个由 viper 支持的 config.Config 实例，失败时终止程序
+// MustNew 创建一个由 viper 支持的 config.Config 实例，失败时 panic。
 //
 // 该方法是 New 的便捷包装，适用于配置文件必须存在的场景。
-// 如果读取配置失败，程序会通过 log.Fatalf 终止。
+// 如果读取配置失败，程序会 panic。
 //
 // 参数：
 //   - file: 配置文件路径（必须包含文件扩展名）
@@ -84,7 +84,7 @@ func New(file string, opts ...Option) (config.Config, error) {
 func MustNew(file string, opts ...Option) config.Config {
 	cfg, err := New(file, opts...)
 	if err != nil {
-		log.Fatalf("config: failed to read %s: %v", file, err)
+		panic(fmt.Errorf("config: failed to read %s: %w", file, err))
 	}
 	return cfg
 }

@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/f2xme/gox/session"
 	goredis "github.com/redis/go-redis/v9"
@@ -37,11 +37,11 @@ func New(opts ...Option) (session.Store, error) {
 	}, nil
 }
 
-// MustNew 创建 Redis 会话存储，失败时退出程序。
+// MustNew 创建 Redis 会话存储，失败时 panic。
 func MustNew(opts ...Option) session.Store {
 	store, err := New(opts...)
 	if err != nil {
-		log.Fatalf("redis: failed to create session store: %v", err)
+		panic(fmt.Errorf("redis: failed to create session store: %w", err))
 	}
 	return store
 }

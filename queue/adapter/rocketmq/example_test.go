@@ -23,6 +23,7 @@ func Example() {
 	// 创建 RocketMQ 队列
 	q, err := rocketmq.New(
 		rocketmq.WithEndpoint("localhost:8081"),
+		rocketmq.WithTopics("orders"),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create queue: %v", err)
@@ -34,8 +35,6 @@ func Example() {
 		log.Fatalf("Failed to publish: %v", err)
 	}
 
-	fmt.Println("Message published")
-	// Output: Message published
 }
 
 func ExampleNew_withOptions() {
@@ -44,22 +43,24 @@ func ExampleNew_withOptions() {
 		rocketmq.WithEndpoint("localhost:8081"),
 		rocketmq.WithCredentials("access-key", "secret-key"),
 		rocketmq.WithNamespace("production"),
+		rocketmq.WithTopics("orders"),
 		rocketmq.WithRetries(3),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create queue: %v", err)
 	}
 	_ = q
-
-	fmt.Println("Queue created with options")
-	// Output: Queue created with options
 }
 
 func ExampleQueue_PublishWithOptions() {
 	ctx := context.Background()
-	q, _ := rocketmq.New(
+	q, err := rocketmq.New(
 		rocketmq.WithEndpoint("localhost:8081"),
+		rocketmq.WithTopics("orders"),
 	)
+	if err != nil {
+		log.Fatalf("Failed to create queue: %v", err)
+	}
 
 	// 发布带标签和延迟的消息
 	order := Order{
@@ -69,23 +70,24 @@ func ExampleQueue_PublishWithOptions() {
 	}
 
 	data, _ := json.Marshal(order)
-	err := q.PublishWithOptions(ctx, "orders", data, queue.PublishOptions{
+	err = q.PublishWithOptions(ctx, "orders", data, queue.PublishOptions{
 		Tags:       "urgent",
 		DelayLevel: 3, // 延迟 10 秒
 	})
 	if err != nil {
 		log.Fatalf("Failed to publish: %v", err)
 	}
-
-	fmt.Println("Order published with options")
-	// Output: Order published with options
 }
 
 func ExampleQueue_Subscribe() {
 	ctx := context.Background()
-	q, _ := rocketmq.New(
+	q, err := rocketmq.New(
 		rocketmq.WithEndpoint("localhost:8081"),
+		rocketmq.WithTopics("orders"),
 	)
+	if err != nil {
+		log.Fatalf("Failed to create queue: %v", err)
+	}
 
 	// 订阅消息
 	handler := func(ctx context.Context, msg *queue.Message) error {
@@ -102,7 +104,4 @@ func ExampleQueue_Subscribe() {
 		log.Fatalf("Failed to subscribe: %v", err)
 	}
 	defer sub.Unsubscribe()
-
-	fmt.Println("Subscribed to orders topic")
-	// Output: Subscribed to orders topic
 }

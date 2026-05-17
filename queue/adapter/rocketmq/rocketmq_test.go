@@ -2,75 +2,25 @@ package rocketmq
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/f2xme/gox/queue"
 )
 
-// TestNew tests creating a new RocketMQ queue.
+// TestNew requires topics before touching the RocketMQ SDK.
 func TestNew(t *testing.T) {
-	tests := []struct {
-		name string
-		opts []Option
-	}{
-		{
-			name: "default options",
-			opts: []Option{},
-		},
-		{
-			name: "with custom endpoint",
-			opts: []Option{
-				WithEndpoint("localhost:8081"),
-			},
-		},
-		{
-			name: "with credentials",
-			opts: []Option{
-				WithCredentials("accessKey", "secretKey"),
-			},
-		},
-		{
-			name: "with namespace",
-			opts: []Option{
-				WithNamespace("test"),
-			},
-		},
-		{
-			name: "with retries",
-			opts: []Option{
-				WithRetries(3),
-			},
-		},
-		{
-			name: "with send timeout",
-			opts: []Option{
-				WithSendTimeout(5 * time.Second),
-			},
-		},
-		{
-			name: "with consumer model",
-			opts: []Option{
-				WithConsumerModel("clustering"),
-			},
-		},
+	q, err := New(WithEndpoint("localhost:8081"))
+	if err == nil {
+		if closer, ok := q.(queue.Closer); ok {
+			_ = closer.Close()
+		}
+		t.Fatal("expected error when topics are not configured")
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			q, err := New(tt.opts...)
-			// Note: New() may succeed even without a RocketMQ server
-			// because the producer is created but not yet connected.
-			// Actual connection happens on first Publish/Subscribe.
-			if err != nil {
-				t.Logf("New() returned error (expected without RocketMQ server): %v", err)
-			}
-			if q != nil {
-				if closer, ok := q.(queue.Closer); ok {
-					_ = closer.Close()
-				}
-			}
-		})
+	if !strings.Contains(err.Error(), "WithTopics") {
+		t.Fatalf("expected WithTopics error, got %v", err)
 	}
 }
 
@@ -139,6 +89,14 @@ func TestOptions(t *testing.T) {
 			t.Errorf("consumer model not set correctly")
 		}
 	})
+
+	t.Run("WithTopics", func(t *testing.T) {
+		opts := defaultOptions()
+		WithTopics("orders", "payments")(&opts)
+		if len(opts.Topics) != 2 || opts.Topics[0] != "orders" || opts.Topics[1] != "payments" {
+			t.Errorf("topics not set correctly: %v", opts.Topics)
+		}
+	})
 }
 
 // TestDefaultOptions tests default options.
@@ -160,19 +118,31 @@ func TestDefaultOptions(t *testing.T) {
 	if opts.ConsumerModel != "clustering" {
 		t.Errorf("unexpected default consumer model: %s", opts.ConsumerModel)
 	}
+
+	if len(opts.Topics) != 0 {
+		t.Errorf("unexpected default topics: %v", opts.Topics)
+	}
 }
 
-// 注意：集成测试需要运行中的 RocketMQ 服务，以下测试在 CI 中会被跳过。
-
-func TestIntegration_PublishSubscribe(t *testing.T) {
+func skipRocketMQIntegration(t *testing.T) {
+	t.Helper()
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
+	if os.Getenv("GOX_ROCKETMQ_INTEGRATION") != "1" {
+		t.Skip("set GOX_ROCKETMQ_INTEGRATION=1 to run RocketMQ integration tests")
+	}
+}
 
-	ctx := context.Background()
+func TestIntegration_PublishSubscribe(t *testing.T) {
+	skipRocketMQIntegration(t)
 
-	q, err := New(
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	q, err := NewContext(ctx,
 		WithEndpoint("localhost:8081"),
+		WithTopics("test-topic"),
 	)
 	if err != nil {
 		t.Skipf("skipping test, RocketMQ not available: %v", err)
@@ -221,14 +191,14 @@ func TestIntegration_PublishSubscribe(t *testing.T) {
 }
 
 func TestIntegration_DelayMessage(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
+	skipRocketMQIntegration(t)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	q, err := New(
+	q, err := NewContext(ctx,
 		WithEndpoint("localhost:8081"),
+		WithTopics("test-delay-topic"),
 	)
 	if err != nil {
 		t.Skipf("skipping test, RocketMQ not available: %v", err)

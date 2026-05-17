@@ -37,11 +37,11 @@ func New(opts ...Option) (database.DB, error) {
 	return wrapMySQL(base)
 }
 
-// MustNew 创建由 MySQL 支持的 database.DB，失败时终止程序
+// MustNew 创建由 MySQL 支持的 database.DB，失败时 panic。
 func MustNew(opts ...Option) database.DB {
 	db, err := New(opts...)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("mysqldb: create database failed: %w", err))
 	}
 	return db
 }
@@ -110,11 +110,11 @@ func NewWithConfig(cfg config.Config, prefixes ...string) (database.DB, error) {
 	return New(opts...)
 }
 
-// MustNewWithConfig 是 NewWithConfig 的 Must 版本，失败时终止程序
+// MustNewWithConfig 是 NewWithConfig 的 Must 版本，失败时 panic。
 func MustNewWithConfig(cfg config.Config, prefixes ...string) database.DB {
 	db, err := NewWithConfig(cfg, prefixes...)
 	if err != nil {
-		log.Fatal(err)
+		panic(fmt.Errorf("mysqldb: create database from config failed: %w", err))
 	}
 	return db
 }

@@ -106,8 +106,8 @@ RocketMQ 队列：
 	import "github.com/f2xme/gox/queue/adapter/rocketmq"
 
 	queue, err := rocketmq.New(
-		rocketmq.WithNameServers([]string{"localhost:9876"}),
-		rocketmq.WithGroupName("my-producer-group"),
+		rocketmq.WithEndpoint("localhost:8081"),
+		rocketmq.WithTopics("orders"),
 	)
 
 特性：分布式消息队列、支持消息标签过滤、支持延迟消息、支持集群和广播消费、高可用和高吞吐量

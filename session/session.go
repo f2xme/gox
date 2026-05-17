@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"log"
+	"fmt"
 	"time"
 )
 
@@ -86,11 +86,11 @@ func New(store Store, opts ...Option) (Manager, error) {
 	return &manager{store: store, opts: options}, nil
 }
 
-// MustNew 创建会话管理器，失败时退出程序。
+// MustNew 创建会话管理器，失败时 panic。
 func MustNew(store Store, opts ...Option) Manager {
 	m, err := New(store, opts...)
 	if err != nil {
-		log.Fatalf("session: create manager failed: %v", err)
+		panic(fmt.Errorf("session: create manager failed: %w", err))
 	}
 	return m
 }

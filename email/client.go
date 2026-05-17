@@ -1,7 +1,7 @@
 package email
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/f2xme/gox/config"
 	"gopkg.in/gomail.v2"
@@ -114,11 +114,11 @@ func NewWithConfig(cfg config.Config) (*Client, error) {
 	)
 }
 
-// MustNewWithConfig 使用配置创建邮件客户端，失败时终止程序
+// MustNewWithConfig 使用配置创建邮件客户端，失败时 panic。
 func MustNewWithConfig(cfg config.Config) *Client {
 	client, err := NewWithConfig(cfg)
 	if err != nil {
-		log.Fatalf("email: failed to create client from config: %v", err)
+		panic(fmt.Errorf("email: failed to create client from config: %w", err))
 	}
 	return client
 }

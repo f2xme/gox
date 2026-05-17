@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/f2xme/gox/cache"
 	"github.com/f2xme/gox/config"
@@ -47,11 +47,11 @@ func New(opts ...Option) (cache.Store, error) {
 	}, nil
 }
 
-// MustNew 创建一个新的 Redis 缓存，出错时终止程序。
+// MustNew 创建一个新的 Redis 缓存，出错时 panic。
 func MustNew(opts ...Option) cache.Store {
 	c, err := New(opts...)
 	if err != nil {
-		log.Fatalf("redis: failed to create cache: %v", err)
+		panic(fmt.Errorf("redis: failed to create cache: %w", err))
 	}
 	return c
 }
@@ -92,11 +92,11 @@ func NewWithConfig(cfg config.Config, prefix ...string) (cache.Store, error) {
 	return New(opts...)
 }
 
-// MustNewWithConfig 使用配置创建一个新的 Redis 缓存，出错时终止程序。
+// MustNewWithConfig 使用配置创建一个新的 Redis 缓存，出错时 panic。
 func MustNewWithConfig(cfg config.Config, prefix ...string) cache.Store {
 	c, err := NewWithConfig(cfg, prefix...)
 	if err != nil {
-		log.Fatalf("redis: failed to create cache from config: %v", err)
+		panic(fmt.Errorf("redis: failed to create cache from config: %w", err))
 	}
 	return c
 }

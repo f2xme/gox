@@ -24,6 +24,7 @@ Package rocketmq 基于 Apache RocketMQ 5.x Go SDK 实现 `queue.Queue`，
 		q, err := rocketmq.New(
 			rocketmq.WithEndpoint("localhost:8081"),
 			rocketmq.WithNamespace("dev"),
+			rocketmq.WithTopics("orders"),
 		)
 		if err != nil {
 			return err
@@ -56,13 +57,15 @@ Package rocketmq 基于 Apache RocketMQ 5.x Go SDK 实现 `queue.Queue`，
 		rocketmq.WithEndpoint("localhost:8081"),
 		rocketmq.WithCredentials("accessKey", "secretKey"),
 		rocketmq.WithNamespace("production"),
+		rocketmq.WithTopics("orders"),
 		rocketmq.WithSendTimeout(5*time.Second),
 	)
 
-使用 `MustNew` 在初始化失败时直接终止程序：
+使用 `MustNew` 在初始化失败时 panic：
 
 	q := rocketmq.MustNew(
 		rocketmq.WithEndpoint("localhost:8081"),
+		rocketmq.WithTopics("orders"),
 	)
 
 使用 `NewWithConfig` 从 `config.Config` 读取配置：
@@ -75,6 +78,7 @@ Package rocketmq 基于 Apache RocketMQ 5.x Go SDK 实现 `queue.Queue`，
   - `queue.rocketmq.accessKey`
   - `queue.rocketmq.secretKey`
   - `queue.rocketmq.namespace`
+  - `queue.rocketmq.topics`
   - `queue.rocketmq.retries`
   - `queue.rocketmq.sendTimeout`
   - `queue.rocketmq.consumerModel`
@@ -141,6 +145,13 @@ Package rocketmq 基于 Apache RocketMQ 5.x Go SDK 实现 `queue.Queue`，
 设置命名空间：
 
 	rocketmq.New(rocketmq.WithNamespace("dev"))
+
+## WithTopics
+
+设置 Producer 启动时声明的 topic 列表。RocketMQ 5.x Go SDK 创建 Producer 时
+至少需要一个 topic：
+
+	rocketmq.New(rocketmq.WithTopics("orders", "payments"))
 
 ## WithRetries
 
