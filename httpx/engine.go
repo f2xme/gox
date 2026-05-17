@@ -11,7 +11,6 @@ type Engine interface {
 
 	SetErrorHandler(h ErrorHandler)
 	SetNotFoundHandler(h Handler)
-	SetRenderer(r Renderer)
 
 	Raw() any
 }
