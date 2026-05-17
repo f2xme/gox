@@ -10,9 +10,9 @@ httpx 定义了 HTTP 服务器的标准接口,支持多种 HTTP 框架(Gin、Ech
   - Value 类型:Param/Query/Header 返回 Value,支持链式类型转换与默认值回退
   - 多值 Query:QueryAll 支持同名参数多值(如 ?tag=a&tag=b)
   - 自动验证:Bind 系列方法自动调用 Validator 接口,无需手动校验
-  - 统一响应:httpx.Data/Done/Fail 输出标准 JSON 格式;ErrBadRequest 等语义化 HTTPError 构造函数通过 ErrorHandler 统一处理
+  - 可选统一响应:httpx.Data/Done/Fail 输出标准 JSON 格式;ErrBadRequest 等语义化 StatusError 构造函数通过 ErrorHandler 统一处理
   - 中间件:洋葱模型,支持全局和路由组级别注册
-  - 错误处理:可自定义 ErrorHandler,默认映射 HTTPError 到状态码
+  - 错误处理:可自定义 ErrorHandler,默认映射 StatusError 到状态码
 
 # 快速开始
 
@@ -128,12 +128,12 @@ label tag 用于自定义验证错误消息中的字段名(支持中文)。
 # 错误处理
 
 	engine.SetErrorHandler(func(c httpx.Context, err error) {
-		var he *httpx.HTTPError
+		var he *httpx.StatusError
 		if errors.As(err, &he) {
-			c.JSON(he.Code, httpx.NewFailResponse(he.Message))
+			c.JSON(he.Status, map[string]string{"message": he.Message})
 			return
 		}
-		c.JSON(500, httpx.NewFailResponse("internal error"))
+		c.JSON(500, map[string]string{"message": "internal error"})
 	})
 
 # 优雅关闭

@@ -1,111 +1,101 @@
 package httpx
 
 import (
-	"encoding/json"
 	"testing"
 )
 
-func TestNewDataResponse(t *testing.T) {
-	resp := NewDataResponse(map[string]string{"name": "alice"})
+func TestData(t *testing.T) {
+	ctx := &errorHandlerContext{}
+
+	if err := Data(ctx, map[string]string{"name": "alice"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if ctx.status != 200 {
+		t.Fatalf("status: want 200, got %d", ctx.status)
+	}
+	resp, ok := ctx.body.(Response)
+	if !ok {
+		t.Fatalf("body type: want Response, got %T", ctx.body)
+	}
 	if !resp.Success {
-		t.Error("expected Success to be true")
+		t.Fatal("expected success=true")
 	}
 	if resp.Message != "ok" {
-		t.Errorf("expected Message 'ok', got %q", resp.Message)
-	}
-
-	data, err := json.Marshal(resp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := `{"success":true,"message":"ok","data":{"name":"alice"}}`
-	if string(data) != expected {
-		t.Errorf("JSON mismatch\nexpected: %s\ngot:      %s", expected, string(data))
-	}
-}
-
-func TestNewDataResponse_CustomMsg(t *testing.T) {
-	resp := NewDataResponse(map[string]string{"id": "1"}, "创建成功")
-	if resp.Message != "创建成功" {
-		t.Errorf("expected Message '创建成功', got %q", resp.Message)
-	}
-
-	data, err := json.Marshal(resp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := `{"success":true,"message":"创建成功","data":{"id":"1"}}`
-	if string(data) != expected {
-		t.Errorf("JSON mismatch\nexpected: %s\ngot:      %s", expected, string(data))
-	}
-}
-
-func TestNewDataResponse_NilData(t *testing.T) {
-	resp := NewDataResponse(nil)
-	data, err := json.Marshal(resp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := `{"success":true,"message":"ok"}`
-	if string(data) != expected {
-		t.Errorf("JSON mismatch\nexpected: %s\ngot:      %s", expected, string(data))
-	}
-}
-
-func TestNewDoneResponse(t *testing.T) {
-	resp := NewDoneResponse("删除成功")
-	if !resp.Success {
-		t.Error("expected Success to be true")
-	}
-	if resp.Message != "删除成功" {
-		t.Errorf("expected Message '删除成功', got %q", resp.Message)
-	}
-	if resp.Data != nil {
-		t.Errorf("expected Data to be nil, got %v", resp.Data)
-	}
-
-	data, err := json.Marshal(resp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := `{"success":true,"message":"删除成功"}`
-	if string(data) != expected {
-		t.Errorf("JSON mismatch\nexpected: %s\ngot:      %s", expected, string(data))
-	}
-}
-
-func TestNewFailResponse(t *testing.T) {
-	resp := NewFailResponse("something went wrong")
-	if resp.Success {
-		t.Error("expected Success to be false")
-	}
-
-	data, err := json.Marshal(resp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := `{"success":false,"message":"something went wrong"}`
-	if string(data) != expected {
-		t.Errorf("JSON mismatch\nexpected: %s\ngot:      %s", expected, string(data))
-	}
-}
-
-func TestNewFailResponse_WithData(t *testing.T) {
-	fieldErrors := map[string]string{"name": "必填"}
-	resp := NewFailResponse("表单校验失败", fieldErrors)
-	if resp.Success {
-		t.Error("expected Success to be false")
+		t.Fatalf("message: want %q, got %q", "ok", resp.Message)
 	}
 	if resp.Data == nil {
-		t.Error("expected Data to be set")
+		t.Fatal("expected data to be set")
 	}
+}
 
-	data, err := json.Marshal(resp)
-	if err != nil {
+func TestDataCustomMessage(t *testing.T) {
+	ctx := &errorHandlerContext{}
+
+	if err := Data(ctx, map[string]string{"id": "1"}, "创建成功"); err != nil {
 		t.Fatal(err)
 	}
-	expected := `{"success":false,"message":"表单校验失败","data":{"name":"必填"}}`
-	if string(data) != expected {
-		t.Errorf("JSON mismatch\nexpected: %s\ngot:      %s", expected, string(data))
+
+	resp := ctx.body.(Response)
+	if resp.Message != "创建成功" {
+		t.Fatalf("message: want %q, got %q", "创建成功", resp.Message)
+	}
+}
+
+func TestDone(t *testing.T) {
+	ctx := &errorHandlerContext{}
+
+	if err := Done(ctx, "删除成功"); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, ok := ctx.body.(Response)
+	if !ok {
+		t.Fatalf("body type: want Response, got %T", ctx.body)
+	}
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	if resp.Message != "删除成功" {
+		t.Fatalf("message: want %q, got %q", "删除成功", resp.Message)
+	}
+	if resp.Data != nil {
+		t.Fatalf("data: want nil, got %v", resp.Data)
+	}
+}
+
+func TestFail(t *testing.T) {
+	ctx := &errorHandlerContext{}
+
+	if err := Fail(ctx, "something went wrong"); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, ok := ctx.body.(Response)
+	if !ok {
+		t.Fatalf("body type: want Response, got %T", ctx.body)
+	}
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+	if resp.Message != "something went wrong" {
+		t.Fatalf("message: want %q, got %q", "something went wrong", resp.Message)
+	}
+}
+
+func TestFailWithData(t *testing.T) {
+	ctx := &errorHandlerContext{}
+	fieldErrors := map[string]string{"name": "必填"}
+
+	if err := Fail(ctx, "表单校验失败", fieldErrors); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := ctx.body.(Response)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+	if resp.Data == nil {
+		t.Fatal("expected data to be set")
 	}
 }

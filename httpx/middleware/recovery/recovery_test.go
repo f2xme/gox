@@ -35,14 +35,14 @@ func TestNew_CatchesPanic(t *testing.T) {
 
 func TestNew_CatchesErrorPanic(t *testing.T) {
 	mw := New()
-	expectedErr := httpx.NewHTTPError(500, "internal")
+	expectedErr := httpx.NewStatusError(500, "internal")
 	handler := mw(func(ctx httpx.Context) error {
 		panic(expectedErr)
 	})
 	ctx := mock.NewMockContext("GET", "/test")
 	err := handler(ctx)
 	if err != expectedErr {
-		t.Errorf("expected HTTPError, got %v", err)
+		t.Errorf("expected StatusError, got %v", err)
 	}
 }
 

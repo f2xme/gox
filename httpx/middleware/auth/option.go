@@ -37,11 +37,11 @@ func defaultTokenExtractor(ctx httpx.Context) string {
 }
 
 func defaultErrorHandler(ctx httpx.Context) {
-	_ = ctx.JSON(http.StatusUnauthorized, httpx.NewFailResponse("Authentication required"))
+	_ = ctx.JSON(http.StatusUnauthorized, map[string]string{"message": "Authentication required"})
 }
 
 func defaultCheckerHandler(ctx httpx.Context, _ error) {
-	_ = ctx.JSON(http.StatusForbidden, httpx.NewFailResponse("Forbidden"))
+	_ = ctx.JSON(http.StatusForbidden, map[string]string{"message": "Forbidden"})
 }
 
 // Option 配置认证中间件

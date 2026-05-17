@@ -113,7 +113,7 @@ func ExampleMockContext_errorResponses() {
 
 	handler := func(ctx httpx.Context) error {
 		// 模拟用户不存在
-		return ctx.JSON(404, httpx.NewFailResponse("用户不存在"))
+		return ctx.JSON(404, map[string]string{"message": "用户不存在"})
 	}
 
 	handler(ctx)
@@ -135,7 +135,7 @@ func ExampleMockContext_unifiedResponse() {
 
 	handler(ctx)
 
-	resp := ctx.RespBody.(*httpx.Response)
+	resp := ctx.RespBody.(httpx.Response)
 	fmt.Println(resp.Success)
 	fmt.Println(resp.Message)
 	// Output:

@@ -305,7 +305,7 @@ func TestAuth_BannedUserReturnsForbidden(t *testing.T) {
 		WithValidator(validator),
 		WithUserChecker(statusChecker),
 		WithCheckHandler(func(c httpx.Context, _ error) {
-			_ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("user is banned"))
+			_ = c.JSON(http.StatusForbidden, httpx.Response{Success: false, Message: "user is banned"})
 		}),
 	)
 
@@ -383,7 +383,7 @@ func TestAuth_CheckerErrorReturnsForbidden(t *testing.T) {
 		WithValidator(validator),
 		WithUserChecker(statusChecker),
 		WithCheckHandler(func(c httpx.Context, _ error) {
-			_ = c.JSON(http.StatusForbidden, httpx.NewFailResponse("check failed"))
+			_ = c.JSON(http.StatusForbidden, httpx.Response{Success: false, Message: "check failed"})
 		}),
 	)
 

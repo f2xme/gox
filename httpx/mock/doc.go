@@ -116,9 +116,9 @@
 //	}
 //
 //	// 验证响应体
-//	resp, ok := ctx.RespBody.(*httpx.Response)
+//	resp, ok := ctx.RespBody.(httpx.Response)
 //	if !ok {
-//	    t.Fatal("expected *httpx.Response")
+//	    t.Fatal("expected httpx.Response")
 //	}
 //	if !resp.Success {
 //	    t.Error("expected success=true")

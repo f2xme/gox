@@ -40,6 +40,15 @@ func decodeResponse(t *testing.T, w *httptest.ResponseRecorder) httpx.Response {
 	return resp
 }
 
+func decodeErrorBody(t *testing.T, w *httptest.ResponseRecorder) map[string]string {
+	t.Helper()
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+	return resp
+}
+
 func TestGET_String(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/hello", func(ctx httpx.Context) error {
@@ -148,22 +157,19 @@ func TestFail(t *testing.T) {
 	}
 }
 
-func TestErrorHandler_HTTPError(t *testing.T) {
+func TestErrorHandler_StatusError(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/err", func(ctx httpx.Context) error {
-		return httpx.NewHTTPError(http.StatusBadRequest, "invalid input")
+		return httpx.NewStatusError(http.StatusBadRequest, "invalid input")
 	})
 
 	w := doRequest(e, "GET", "/err")
 	if w.Code != 400 {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
-	resp := decodeResponse(t, w)
-	if resp.Success {
-		t.Error("expected success=false")
-	}
-	if resp.Message != "invalid input" {
-		t.Errorf("expected message='invalid input', got %q", resp.Message)
+	resp := decodeErrorBody(t, w)
+	if resp["message"] != "invalid input" {
+		t.Errorf("expected message='invalid input', got %q", resp["message"])
 	}
 }
 
@@ -392,7 +398,7 @@ func TestGroupMiddleware(t *testing.T) {
 	authMw := func(next httpx.Handler) httpx.Handler {
 		return func(ctx httpx.Context) error {
 			if ctx.Header("Authorization") == "" {
-				return httpx.NewHTTPError(http.StatusUnauthorized, "unauthorized")
+				return httpx.NewStatusError(http.StatusUnauthorized, "unauthorized")
 			}
 			return next(ctx)
 		}
@@ -422,7 +428,7 @@ func TestGroupMiddleware(t *testing.T) {
 func TestCustomErrorHandler(t *testing.T) {
 	e := ginadapter.New()
 	e.SetErrorHandler(func(ctx httpx.Context, err error) {
-		_ = ctx.JSON(418, httpx.NewFailResponse("custom: "+err.Error()))
+		_ = ctx.JSON(418, httpx.Response{Success: false, Message: "custom: " + err.Error()})
 	})
 	e.GET("/err", func(ctx httpx.Context) error {
 		return fmt.Errorf("oops")

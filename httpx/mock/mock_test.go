@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -112,10 +113,10 @@ func TestMockContext_String(t *testing.T) {
 	}
 }
 
-func TestHTTPErrors_DefaultMessage(t *testing.T) {
+func TestStatusErrors_DefaultMessage(t *testing.T) {
 	tests := []struct {
 		name     string
-		err      *httpx.HTTPError
+		err      *httpx.StatusError
 		wantCode int
 	}{
 		{"BadRequest", httpx.ErrBadRequest(), 400},
@@ -138,7 +139,7 @@ func TestHTTPErrors_DefaultMessage(t *testing.T) {
 	}
 }
 
-func TestHTTPError_CustomMessage(t *testing.T) {
+func TestStatusError_CustomMessage(t *testing.T) {
 	ctx := NewMockContext("GET", "/")
 	httpx.DefaultErrorHandler(ctx, httpx.ErrNotFound("用户不存在"))
 
@@ -146,12 +147,16 @@ func TestHTTPError_CustomMessage(t *testing.T) {
 		t.Errorf("expected 404, got %d", ctx.RespCode)
 	}
 
-	resp, ok := ctx.RespBody.(*httpx.Response)
-	if !ok {
-		t.Fatal("expected *httpx.Response")
+	data, err := json.Marshal(ctx.RespBody)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if resp.Message != "用户不存在" {
-		t.Errorf("expected custom message, got %s", resp.Message)
+	var resp map[string]string
+	if err := json.Unmarshal(data, &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["message"] != "用户不存在" {
+		t.Errorf("expected custom message, got %s", resp["message"])
 	}
 }
 
@@ -241,9 +246,9 @@ func TestSuccessAndFail(t *testing.T) {
 			t.Errorf("expected 200, got %d", ctx.RespCode)
 		}
 
-		resp, ok := ctx.RespBody.(*httpx.Response)
+		resp, ok := ctx.RespBody.(httpx.Response)
 		if !ok {
-			t.Fatal("expected *httpx.Response")
+			t.Fatal("expected httpx.Response")
 		}
 		if !resp.Success {
 			t.Error("expected success=true")
@@ -261,9 +266,9 @@ func TestSuccessAndFail(t *testing.T) {
 			t.Errorf("expected 200, got %d", ctx.RespCode)
 		}
 
-		resp, ok := ctx.RespBody.(*httpx.Response)
+		resp, ok := ctx.RespBody.(httpx.Response)
 		if !ok {
-			t.Fatal("expected *httpx.Response")
+			t.Fatal("expected httpx.Response")
 		}
 		if resp.Success {
 			t.Error("expected success=false")

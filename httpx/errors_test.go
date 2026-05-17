@@ -1,23 +1,24 @@
 package httpx
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"testing"
 )
 
-func TestHTTPError_Error(t *testing.T) {
-	e := NewHTTPError(http.StatusBadRequest, "bad request")
-	expected := "code=400, message=bad request"
+func TestStatusError_Error(t *testing.T) {
+	e := NewStatusError(http.StatusBadRequest, "bad request")
+	expected := "status=400, message=bad request"
 	if e.Error() != expected {
 		t.Errorf("expected %q, got %q", expected, e.Error())
 	}
 }
 
-func TestHTTPError_WithError(t *testing.T) {
+func TestStatusError_WithError(t *testing.T) {
 	inner := fmt.Errorf("inner error")
-	e := NewHTTPError(http.StatusBadRequest, "bad request").WithError(inner)
+	e := NewStatusError(http.StatusBadRequest, "bad request").WithError(inner)
 	if !errors.Is(e, inner) {
 		t.Error("expected errors.Is to find inner error")
 	}
@@ -26,16 +27,44 @@ func TestHTTPError_WithError(t *testing.T) {
 	}
 }
 
-func TestHTTPError_ErrorsAs(t *testing.T) {
-	e := NewHTTPError(http.StatusNotFound, "not found")
+func TestNewStatusErrorCause(t *testing.T) {
+	inner := errors.New("inner error")
+	e := NewStatusErrorCause(http.StatusBadGateway, "upstream failed", inner)
+
+	if e.Status != http.StatusBadGateway {
+		t.Fatalf("status: want %d, got %d", http.StatusBadGateway, e.Status)
+	}
+	if e.Message != "upstream failed" {
+		t.Fatalf("message: want %q, got %q", "upstream failed", e.Message)
+	}
+	if !errors.Is(e, inner) {
+		t.Fatal("expected errors.Is to find inner error")
+	}
+}
+
+func TestStatusError_WithErrorDoesNotMutateOriginal(t *testing.T) {
+	inner := errors.New("inner error")
+	base := NewStatusError(http.StatusBadRequest, "bad request")
+	wrapped := base.WithError(inner)
+
+	if base.Err != nil {
+		t.Fatalf("base Err: want nil, got %v", base.Err)
+	}
+	if !errors.Is(wrapped, inner) {
+		t.Fatal("expected wrapped error to preserve inner error")
+	}
+}
+
+func TestStatusError_ErrorsAs(t *testing.T) {
+	e := NewStatusError(http.StatusNotFound, "not found")
 	wrapped := fmt.Errorf("wrapped: %w", e)
 
-	var he *HTTPError
+	var he *StatusError
 	if !errors.As(wrapped, &he) {
-		t.Error("expected errors.As to find HTTPError")
+		t.Error("expected errors.As to find StatusError")
 	}
-	if he.Code != http.StatusNotFound {
-		t.Errorf("expected code 404, got %d", he.Code)
+	if he.Status != http.StatusNotFound {
+		t.Errorf("expected status 404, got %d", he.Status)
 	}
 }
 
@@ -113,8 +142,8 @@ func TestErrFactories(t *testing.T) {
 
 	t.Run("无参数返回默认消息", func(t *testing.T) {
 		e := ErrBadRequest()
-		if e.Code != http.StatusBadRequest {
-			t.Errorf("code: want 400, got %d", e.Code)
+		if e.Status != http.StatusBadRequest {
+			t.Errorf("status: want 400, got %d", e.Status)
 		}
 		if e.Message != "Bad Request" {
 			t.Errorf("message: want 'Bad Request', got %q", e.Message)
@@ -156,8 +185,8 @@ func TestErrFactories(t *testing.T) {
 
 	t.Run("ErrNotFound 仅传 error", func(t *testing.T) {
 		e := ErrNotFound(inner)
-		if e.Code != http.StatusNotFound {
-			t.Errorf("code: want 404, got %d", e.Code)
+		if e.Status != http.StatusNotFound {
+			t.Errorf("status: want 404, got %d", e.Status)
 		}
 		if !errors.Is(e, inner) {
 			t.Error("expected errors.Is to find inner error")
@@ -165,37 +194,127 @@ func TestErrFactories(t *testing.T) {
 	})
 }
 
-// TestNewBizError 验证 BizError 工厂的三种调用方式。
-func TestNewBizError(t *testing.T) {
-	inner := errors.New("db error")
+func TestDefaultErrorHandler(t *testing.T) {
+	inner := errors.New("sql: connection refused")
 
-	t.Run("仅传 string", func(t *testing.T) {
-		e := NewBizError("余额不足")
-		if e.Message != "余额不足" {
-			t.Errorf("message: want '余额不足', got %q", e.Message)
-		}
-		if e.Err != nil {
-			t.Errorf("err: want nil, got %v", e.Err)
-		}
-	})
+	tests := []struct {
+		name     string
+		err      error
+		wantCode int
+		wantMsg  string
+	}{
+		{
+			name:     "4xx 返回用户消息",
+			err:      ErrBadRequest("参数错误", inner),
+			wantCode: http.StatusBadRequest,
+			wantMsg:  "参数错误",
+		},
+		{
+			name:     "5xx 不暴露底层错误",
+			err:      ErrInternalError(inner),
+			wantCode: http.StatusInternalServerError,
+			wantMsg:  http.StatusText(http.StatusInternalServerError),
+		},
+		{
+			name:     "普通错误回退为标准 500 消息",
+			err:      inner,
+			wantCode: http.StatusInternalServerError,
+			wantMsg:  http.StatusText(http.StatusInternalServerError),
+		},
+		{
+			name:     "非法状态码兜底为 500",
+			err:      NewStatusError(0, "bad status"),
+			wantCode: http.StatusInternalServerError,
+			wantMsg:  http.StatusText(http.StatusInternalServerError),
+		},
+		{
+			name:     "空 4xx 消息回退为状态文本",
+			err:      NewStatusError(http.StatusNotFound, ""),
+			wantCode: http.StatusNotFound,
+			wantMsg:  http.StatusText(http.StatusNotFound),
+		},
+	}
 
-	t.Run("仅传 error", func(t *testing.T) {
-		e := NewBizError(inner)
-		if e.Message != inner.Error() {
-			t.Errorf("message: want %q, got %q", inner.Error(), e.Message)
-		}
-		if !errors.Is(e, inner) {
-			t.Error("expected errors.Is to find inner error")
-		}
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &errorHandlerContext{}
+			DefaultErrorHandler(ctx, tc.err)
 
-	t.Run("string + error", func(t *testing.T) {
-		e := NewBizError("业务校验失败", inner)
-		if e.Message != "业务校验失败" {
-			t.Errorf("message: want '业务校验失败', got %q", e.Message)
-		}
-		if !errors.Is(e, inner) {
-			t.Error("expected errors.Is to find inner error")
-		}
-	})
+			if ctx.status != tc.wantCode {
+				t.Fatalf("status: want %d, got %d", tc.wantCode, ctx.status)
+			}
+			resp, ok := ctx.body.(errorResponse)
+			if !ok {
+				t.Fatalf("body type: want errorResponse, got %T", ctx.body)
+			}
+			if resp.Message != tc.wantMsg {
+				t.Fatalf("message: want %q, got %q", tc.wantMsg, resp.Message)
+			}
+		})
+	}
 }
+
+type errorHandlerContext struct {
+	status int
+	body   any
+}
+
+func (c *errorHandlerContext) Request() *http.Request {
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	return req
+}
+
+func (c *errorHandlerContext) ReqContext() context.Context { return context.Background() }
+func (c *errorHandlerContext) Param(string) Value          { return "" }
+func (c *errorHandlerContext) Query(string) Value          { return "" }
+func (c *errorHandlerContext) QueryAll(string) []string    { return nil }
+func (c *errorHandlerContext) Header(string) Value         { return "" }
+func (c *errorHandlerContext) Cookie(string) (*http.Cookie, error) {
+	return nil, http.ErrNoCookie
+}
+func (c *errorHandlerContext) ClientIP() string { return "" }
+func (c *errorHandlerContext) Method() string   { return http.MethodGet }
+func (c *errorHandlerContext) Path() string     { return "/" }
+func (c *errorHandlerContext) Bind(any) error   { return nil }
+func (c *errorHandlerContext) BindJSON(any) error {
+	return nil
+}
+func (c *errorHandlerContext) BindQuery(any) error { return nil }
+func (c *errorHandlerContext) BindForm(any) error  { return nil }
+func (c *errorHandlerContext) JSON(status int, v any) error {
+	c.status = status
+	c.body = v
+	return nil
+}
+func (c *errorHandlerContext) String(status int, s string) error {
+	c.status = status
+	c.body = s
+	return nil
+}
+func (c *errorHandlerContext) HTML(status int, html string) error {
+	c.status = status
+	c.body = html
+	return nil
+}
+func (c *errorHandlerContext) Blob(status int, _ string, data []byte) error {
+	c.status = status
+	c.body = data
+	return nil
+}
+func (c *errorHandlerContext) NoContent(status int) error {
+	c.status = status
+	return nil
+}
+func (c *errorHandlerContext) Redirect(status int, url string) error {
+	c.status = status
+	c.body = url
+	return nil
+}
+func (c *errorHandlerContext) SetHeader(string, string)            {}
+func (c *errorHandlerContext) SetCookie(*http.Cookie)              {}
+func (c *errorHandlerContext) Status(status int)                   { c.status = status }
+func (c *errorHandlerContext) Set(string, any)                     {}
+func (c *errorHandlerContext) Get(string) (any, bool)              { return nil, false }
+func (c *errorHandlerContext) MustGet(string) any                  { return nil }
+func (c *errorHandlerContext) ResponseWriter() http.ResponseWriter { return nil }
+func (c *errorHandlerContext) Raw() any                            { return nil }

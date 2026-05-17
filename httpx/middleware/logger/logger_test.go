@@ -55,7 +55,7 @@ func TestNew_LogsRequest(t *testing.T) {
 func TestNew_LogsError(t *testing.T) {
 	l := &mockLogger{}
 	mw := New(WithLogger(l))
-	expectedErr := httpx.NewHTTPError(500, "internal")
+	expectedErr := httpx.NewStatusError(500, "internal")
 	handler := mw(func(ctx httpx.Context) error {
 		return expectedErr
 	})

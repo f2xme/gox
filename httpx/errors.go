@@ -6,38 +6,47 @@ import (
 	"net/http"
 )
 
-// HTTPError 表示带有 HTTP 状态码的错误。
-type HTTPError struct {
-	Code    int
+// StatusError 表示带有 HTTP 状态码的错误。
+type StatusError struct {
+	Status  int
 	Message string
 	Err     error
 }
 
-// NewHTTPError 创建一个新的 HTTPError。
-func NewHTTPError(code int, message string) *HTTPError {
-	return &HTTPError{Code: code, Message: message}
+// NewStatusError 创建一个新的 StatusError。
+func NewStatusError(status int, message string) *StatusError {
+	return &StatusError{Status: status, Message: message}
+}
+
+// NewStatusErrorCause 创建一个带底层原因的 StatusError。
+func NewStatusErrorCause(status int, message string, err error) *StatusError {
+	return &StatusError{Status: status, Message: message, Err: err}
 }
 
 // Error 实现 error 接口。
-func (e *HTTPError) Error() string {
+func (e *StatusError) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("code=%d, message=%s, err=%v", e.Code, e.Message, e.Err)
+		return fmt.Sprintf("status=%d, message=%s, err=%v", e.Status, e.Message, e.Err)
 	}
-	return fmt.Sprintf("code=%d, message=%s", e.Code, e.Message)
+	return fmt.Sprintf("status=%d, message=%s", e.Status, e.Message)
 }
 
 // Unwrap 返回被包装的原始错误。
-func (e *HTTPError) Unwrap() error {
+func (e *StatusError) Unwrap() error {
 	return e.Err
 }
 
 // WithError 包装一个底层错误。
-func (e *HTTPError) WithError(err error) *HTTPError {
-	e.Err = err
-	return e
+func (e *StatusError) WithError(err error) *StatusError {
+	if e == nil {
+		return &StatusError{Err: err}
+	}
+	clone := *e
+	clone.Err = err
+	return &clone
 }
 
-func (e *HTTPError) withErr(err error) *HTTPError {
+func (e *StatusError) withErr(err error) *StatusError {
 	if err != nil {
 		e.Err = err
 	}
@@ -70,91 +79,92 @@ func resolveArgs(def string, args []any) (msg string, err error) {
 	return
 }
 
-// BizError 表示业务层错误，HTTP 状态码固定为 200，通过 success:false 标识失败。
-type BizError struct {
-	Message string
-	Err     error
-}
-
-// NewBizError 创建一个新的 BizError。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func NewBizError(args ...any) *BizError {
-	msg, err := resolveArgs("", args)
-	return &BizError{Message: msg, Err: err}
-}
-
-// Error 实现 error 接口。
-func (e *BizError) Error() string {
-	if e.Err != nil {
-		return fmt.Sprintf("biz_error: message=%s, err=%v", e.Message, e.Err)
-	}
-	return fmt.Sprintf("biz_error: message=%s", e.Message)
-}
-
-// Unwrap 返回被包装的原始错误。
-func (e *BizError) Unwrap() error {
-	return e.Err
-}
-
-// WithError 包装一个底层错误。
-func (e *BizError) WithError(err error) *BizError {
-	e.Err = err
-	return e
-}
-
 // ErrBadRequest 创建 400 参数错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func ErrBadRequest(args ...any) *HTTPError {
+func ErrBadRequest(args ...any) *StatusError {
 	msg, err := resolveArgs("Bad Request", args)
-	return NewHTTPError(http.StatusBadRequest, msg).withErr(err)
+	return NewStatusError(http.StatusBadRequest, msg).withErr(err)
 }
 
 // ErrUnauthorized 创建 401 未登录错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func ErrUnauthorized(args ...any) *HTTPError {
+func ErrUnauthorized(args ...any) *StatusError {
 	msg, err := resolveArgs("Unauthorized", args)
-	return NewHTTPError(http.StatusUnauthorized, msg).withErr(err)
+	return NewStatusError(http.StatusUnauthorized, msg).withErr(err)
 }
 
 // ErrForbidden 创建 403 无权限错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func ErrForbidden(args ...any) *HTTPError {
+func ErrForbidden(args ...any) *StatusError {
 	msg, err := resolveArgs("Forbidden", args)
-	return NewHTTPError(http.StatusForbidden, msg).withErr(err)
+	return NewStatusError(http.StatusForbidden, msg).withErr(err)
 }
 
 // ErrNotFound 创建 404 资源不存在错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func ErrNotFound(args ...any) *HTTPError {
+func ErrNotFound(args ...any) *StatusError {
 	msg, err := resolveArgs("Not Found", args)
-	return NewHTTPError(http.StatusNotFound, msg).withErr(err)
+	return NewStatusError(http.StatusNotFound, msg).withErr(err)
 }
 
 // ErrTooManyRequests 创建 429 请求过频错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func ErrTooManyRequests(args ...any) *HTTPError {
+func ErrTooManyRequests(args ...any) *StatusError {
 	msg, err := resolveArgs("Too Many Requests", args)
-	return NewHTTPError(http.StatusTooManyRequests, msg).withErr(err)
+	return NewStatusError(http.StatusTooManyRequests, msg).withErr(err)
 }
 
 // ErrInternalError 创建 500 服务器内部错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func ErrInternalError(args ...any) *HTTPError {
+func ErrInternalError(args ...any) *StatusError {
 	msg, err := resolveArgs("Internal Server Error", args)
-	return NewHTTPError(http.StatusInternalServerError, msg).withErr(err)
+	return NewStatusError(http.StatusInternalServerError, msg).withErr(err)
 }
 
 // ErrServiceUnavailable 创建 503 服务不可用错误。args 支持 string、error 或两者混合，规则同 resolveArgs。
-func ErrServiceUnavailable(args ...any) *HTTPError {
+func ErrServiceUnavailable(args ...any) *StatusError {
 	msg, err := resolveArgs("Service Unavailable", args)
-	return NewHTTPError(http.StatusServiceUnavailable, msg).withErr(err)
+	return NewStatusError(http.StatusServiceUnavailable, msg).withErr(err)
 }
 
 // DefaultErrorHandler 是默认的错误处理器。
-// BizError 返回 HTTP 200 并携带业务错误码；HTTPError 映射到对应状态码；其他错误回退到 500。
+// StatusError 映射到对应状态码；其他错误回退到 500。
+// 5xx 响应只返回标准 HTTP 状态文本，避免向客户端暴露底层错误细节。
 func DefaultErrorHandler(ctx Context, err error) {
-	var be *BizError
-	if errors.As(err, &be) {
-		_ = ctx.JSON(http.StatusOK, NewFailResponse(be.Message))
+	if err == nil {
 		return
 	}
-	var he *HTTPError
-	if errors.As(err, &he) {
-		_ = ctx.JSON(he.Code, NewFailResponse(he.Message))
+
+	var se *StatusError
+	if errors.As(err, &se) {
+		status := normalizeHTTPStatus(se.Status)
+		writeError(ctx, status, responseMessage(status, se.Message))
 	} else {
-		_ = ctx.JSON(http.StatusInternalServerError, NewFailResponse(err.Error()))
+		writeError(ctx, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 	}
+}
+
+type errorResponse struct {
+	Message string `json:"message"`
+}
+
+func writeError(ctx Context, code int, message string) {
+	_ = ctx.JSON(code, errorResponse{Message: message})
+}
+
+func normalizeHTTPStatus(code int) int {
+	if code < 100 || code > 599 {
+		return http.StatusInternalServerError
+	}
+	return code
+}
+
+func responseMessage(code int, message string) string {
+	if code >= 500 {
+		if text := http.StatusText(code); text != "" {
+			return text
+		}
+		return http.StatusText(http.StatusInternalServerError)
+	}
+	if message != "" {
+		return message
+	}
+	if text := http.StatusText(code); text != "" {
+		return text
+	}
+	return "error"
 }

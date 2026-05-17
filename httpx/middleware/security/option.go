@@ -42,7 +42,7 @@ func defaultOptions() *Options {
 }
 
 func defaultErrorHandler(ctx httpx.Context, code int, message string) {
-	ctx.JSON(code, httpx.NewFailResponse(message))
+	ctx.JSON(code, map[string]string{"message": message})
 }
 
 func normalizeCSRFConfig(cfg *CSRFConfig) {
