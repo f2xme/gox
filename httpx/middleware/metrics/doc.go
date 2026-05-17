@@ -121,7 +121,7 @@ metrics 中间件自动收集 HTTP 请求的关键指标，包括请求计数、
 内置收集器：
 
   - MemoryCollector：内存收集器，适用于开发和测试
-  - 可集成 Prometheus、StatsD 等第三方收集器
+  - 可通过 Collector 接口集成 Prometheus 等第三方收集器
 
 # 使用示例
 
