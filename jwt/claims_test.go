@@ -45,13 +45,13 @@ func TestClaimsToMapClaims(t *testing.T) {
 func TestFromMapClaims(t *testing.T) {
 	now := time.Now()
 	mc := jwt.MapClaims{
-		"sub": "user123",
-		"iss": "test-issuer",
-		"aud": []interface{}{"app1", "app2"},
-		"exp": float64(now.Add(time.Hour).Unix()),
-		"nbf": float64(now.Unix()),
-		"iat": float64(now.Unix()),
-		"jti": "token123",
+		"sub":  "user123",
+		"iss":  "test-issuer",
+		"aud":  []interface{}{"app1", "app2"},
+		"exp":  float64(now.Add(time.Hour).Unix()),
+		"nbf":  float64(now.Unix()),
+		"iat":  float64(now.Unix()),
+		"jti":  "token123",
 		"role": "admin",
 		"org":  "test-org",
 	}
@@ -157,6 +157,43 @@ func TestClaimsIsNotYetValid(t *testing.T) {
 				t.Errorf("IsNotYetValid() = %v, want %v", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestClaimsGetUID(t *testing.T) {
+	t.Parallel()
+	if (&Claims{Subject: " 42 "}).GetUID() != 42 {
+		t.Fatal("expected trimmed subject to parse")
+	}
+	if (&Claims{Subject: "x"}).GetUID() != 0 {
+		t.Fatal("invalid subject should yield 0")
+	}
+	if (&Claims{}).GetUID() != 0 {
+		t.Fatal("empty subject should yield 0")
+	}
+}
+
+func TestClaimsGet(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(1000, 0)
+	claims := &Claims{
+		Subject:   "1",
+		Issuer:    "iss",
+		Audience:  []string{"a"},
+		ExpiresAt: now,
+		NotBefore: now,
+		IssuedAt:  now,
+		ID:        "jid",
+		Custom:    map[string]interface{}{"role": "admin"},
+	}
+	if v, ok := claims.Get("sub"); !ok || v != "1" {
+		t.Fatalf("sub: %v %v", v, ok)
+	}
+	if _, ok := (&Claims{}).Get("iss"); ok {
+		t.Fatal("empty iss should be missing")
+	}
+	if v, ok := claims.Get("role"); !ok || v != "admin" {
+		t.Fatalf("custom: %v %v", v, ok)
 	}
 }
 

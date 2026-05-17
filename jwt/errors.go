@@ -21,6 +21,6 @@ var (
 	// ErrUnexpectedSigningMethod 当令牌使用意外的签名方法时返回
 	ErrUnexpectedSigningMethod = errors.New("jwt: unexpected signing method")
 
-	// ErrNilJWT 当 TokenValidator 未配置 JWT 实例时返回
+	// ErrNilJWT 当 JWT 实例为空时返回
 	ErrNilJWT = errors.New("jwt: JWT instance cannot be nil")
 )

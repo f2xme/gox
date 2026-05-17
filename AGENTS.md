@@ -44,5 +44,7 @@ github.com/f2xme/gox/<package>
 - Exported functions and types must have doc comments.
 - Errors should be returned, not panicked. Use `fmt.Errorf` with `%w` for wrapping.
 - Packages should be small and focused on a single concern.
-- No package should import another package from this library (keep packages independent).
+- Core packages should not import another package from this library (keep packages independent).
+- Adapter packages under `adapter` may import the core package they adapt, the target framework, and other gox packages needed for integration.
+- Cross-package integrations between two gox packages must live in an adapter package, not in either core package.
 - Table-driven tests are preferred.

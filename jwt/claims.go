@@ -128,7 +128,7 @@ func (c *Claims) IsNotYetValid() bool {
 	return time.Now().Before(c.NotBefore)
 }
 
-// GetUID 将 Subject（标准 sub 声明）解析为 int64，供 httpx 认证中间件使用；无法解析时返回 0。
+// GetUID 将 Subject（标准 sub 声明）解析为 int64，无法解析时返回 0。
 func (c *Claims) GetUID() int64 {
 	if c == nil {
 		return 0
@@ -144,7 +144,7 @@ func (c *Claims) GetUID() int64 {
 	return id
 }
 
-// Get 按 key 返回声明值，涵盖标准字段与 Custom，满足 httpx/middleware/auth.Claims。
+// Get 按 key 返回声明值，涵盖标准字段与 Custom。
 func (c *Claims) Get(key string) (any, bool) {
 	if c == nil {
 		return nil, false

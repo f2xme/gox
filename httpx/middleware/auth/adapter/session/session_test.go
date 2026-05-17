@@ -1,4 +1,4 @@
-package auth
+package session
 
 import (
 	"net/http"
@@ -10,7 +10,7 @@ import (
 	"github.com/f2xme/gox/session/adapter/memory"
 )
 
-func TestSessionValidatorValidate(t *testing.T) {
+func TestValidatorValidate(t *testing.T) {
 	store, err := memory.New()
 	if err != nil {
 		t.Fatalf("memory.New() error = %v", err)
@@ -27,12 +27,12 @@ func TestSessionValidatorValidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	sess.Values[DefaultSessionUIDKey] = int64(1001)
+	sess.Values[DefaultUIDKey] = int64(1001)
 	if err := manager.Save(t.Context(), sess); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	claims, err := (SessionValidator{Manager: manager}).Validate(t.Context(), sess.ID)
+	claims, err := (Validator{Manager: manager}).Validate(t.Context(), sess.ID)
 	if err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}
@@ -41,7 +41,7 @@ func TestSessionValidatorValidate(t *testing.T) {
 	}
 }
 
-func TestNewSessionValidator(t *testing.T) {
+func TestNewValidator(t *testing.T) {
 	store, err := memory.New()
 	if err != nil {
 		t.Fatalf("memory.New() error = %v", err)
@@ -63,7 +63,7 @@ func TestNewSessionValidator(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	validator := NewSessionValidator(manager, session.WithValidatorUIDKey("uid"))
+	validator := NewValidator(manager, session.WithValidatorUIDKey("uid"))
 	claims, err := validator.Validate(t.Context(), sess.ID)
 	if err != nil {
 		t.Fatalf("Validate() error = %v", err)
@@ -73,17 +73,17 @@ func TestNewSessionValidator(t *testing.T) {
 	}
 }
 
-func TestNewSessionExtractor(t *testing.T) {
+func TestNewExtractor(t *testing.T) {
 	ctx := mock.NewMockContext(http.MethodGet, "/profile")
-	ctx.SetCookie(&http.Cookie{Name: DefaultSessionCookieName, Value: "sid-1"})
+	ctx.SetCookie(&http.Cookie{Name: DefaultCookieName, Value: "sid-1"})
 
-	token := NewSessionExtractor("")(ctx)
+	token := NewExtractor("")(ctx)
 	if token != "sid-1" {
-		t.Fatalf("NewSessionExtractor() = %q, want sid-1", token)
+		t.Fatalf("NewExtractor() = %q, want sid-1", token)
 	}
 
-	missing := NewSessionExtractor("missing")(ctx)
+	missing := NewExtractor("missing")(ctx)
 	if missing != "" {
-		t.Fatalf("NewSessionExtractor() missing = %q, want empty", missing)
+		t.Fatalf("NewExtractor() missing = %q, want empty", missing)
 	}
 }
