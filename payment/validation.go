@@ -2,7 +2,7 @@ package payment
 
 import "fmt"
 
-// ValidateOrder validates an order for payment operations.
+// ValidateOrder 校验支付订单。
 func ValidateOrder(order *Order) error {
 	if order == nil {
 		return fmt.Errorf("order cannot be nil")
@@ -13,7 +13,7 @@ func ValidateOrder(order *Order) error {
 	return nil
 }
 
-// ValidateOrderID validates an order ID.
+// ValidateOrderID 校验商户订单号。
 func ValidateOrderID(orderID string) error {
 	if orderID == "" {
 		return fmt.Errorf("order ID cannot be empty")
@@ -21,7 +21,7 @@ func ValidateOrderID(orderID string) error {
 	return nil
 }
 
-// ValidateRefundRequest validates a refund request.
+// ValidateRefundRequest 校验退款请求。
 func ValidateRefundRequest(req *RefundRequest) error {
 	if req == nil {
 		return fmt.Errorf("refund request cannot be nil")

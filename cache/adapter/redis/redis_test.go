@@ -357,6 +357,15 @@ func TestRedisCacheTryLock(t *testing.T) {
 			t.Errorf("Second unlock returned error: %v", err)
 		}
 	})
+
+	t.Run("TryLock rejects non-positive ttl", func(t *testing.T) {
+		for _, ttl := range []time.Duration{0, -time.Second} {
+			_, err := locker.TryLock(ctx, key, ttl)
+			if err != cache.ErrInvalidTTL {
+				t.Errorf("TryLock ttl %v returned error %v, want %v", ttl, err, cache.ErrInvalidTTL)
+			}
+		}
+	})
 }
 
 // TestRedisCacheLock 测试 Redis Lock 的阻塞行为

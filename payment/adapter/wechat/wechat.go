@@ -34,7 +34,7 @@ func NewWechatPay(appID, mchID, apiKey, certPath string) *WechatPay {
 	}
 }
 
-// Pay validates the order and returns payment.ErrNotImplemented.
+// Pay 校验订单并返回 payment.ErrNotImplemented。
 func (w *WechatPay) Pay(order *payment.Order) (*payment.PaymentResult, error) {
 	if err := payment.ValidateOrder(order); err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (w *WechatPay) Pay(order *payment.Order) (*payment.PaymentResult, error) {
 	return nil, fmt.Errorf("wechat pay: %w", payment.ErrNotImplemented)
 }
 
-// Query validates the order ID and returns payment.ErrNotImplemented.
+// Query 校验订单号并返回 payment.ErrNotImplemented。
 func (w *WechatPay) Query(orderID string) (*payment.QueryResult, error) {
 	if err := payment.ValidateOrderID(orderID); err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (w *WechatPay) Query(orderID string) (*payment.QueryResult, error) {
 	return nil, fmt.Errorf("wechat query: %w", payment.ErrNotImplemented)
 }
 
-// Refund validates the request and returns payment.ErrNotImplemented.
+// Refund 校验退款请求并返回 payment.ErrNotImplemented。
 func (w *WechatPay) Refund(req *payment.RefundRequest) (*payment.RefundResult, error) {
 	if err := payment.ValidateRefundRequest(req); err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (w *WechatPay) Refund(req *payment.RefundRequest) (*payment.RefundResult, e
 	return nil, fmt.Errorf("wechat refund: %w", payment.ErrNotImplemented)
 }
 
-// Close validates the order ID and returns payment.ErrNotImplemented.
+// Close 校验订单号并返回 payment.ErrNotImplemented。
 func (w *WechatPay) Close(orderID string) error {
 	if err := payment.ValidateOrderID(orderID); err != nil {
 		return err

@@ -13,8 +13,7 @@ type volcengineSMS struct {
 	options Options
 }
 
-// ErrNotImplemented indicates that this adapter does not yet connect to
-// Volcengine SMS.
+// ErrNotImplemented 表示当前适配器尚未接入真实火山引擎短信服务。
 var ErrNotImplemented = errors.New("volcengine sms provider is not implemented")
 
 var _ sms.SMS = (*volcengineSMS)(nil)
@@ -38,7 +37,7 @@ func validateOptions(o *Options) error {
 	return nil
 }
 
-// New validates options and returns ErrNotImplemented.
+// New 校验配置并返回 ErrNotImplemented。
 //
 // 当前版本不会创建真实的火山引擎短信客户端。保留此构造函数是为了避免
 // 静默返回一个无法发送短信的占位客户端。
@@ -61,12 +60,12 @@ func New(opts ...Option) (sms.SMS, error) {
 	return nil, ErrNotImplemented
 }
 
-// Send returns ErrNotImplemented.
+// Send 返回 ErrNotImplemented。
 func (s *volcengineSMS) Send(ctx context.Context, message sms.Message) error {
 	return ErrNotImplemented
 }
 
-// MustNew calls New and panics on any error, including ErrNotImplemented.
+// MustNew 调用 New，遇到包括 ErrNotImplemented 在内的错误时 panic。
 func MustNew(opts ...Option) sms.SMS {
 	client, err := New(opts...)
 	if err != nil {
@@ -75,8 +74,7 @@ func MustNew(opts ...Option) sms.SMS {
 	return client
 }
 
-// NewWithConfig reads options from config.Config and returns ErrNotImplemented
-// after validation succeeds.
+// NewWithConfig 从 config.Config 读取配置，校验通过后返回 ErrNotImplemented。
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 // 配置键：
 //   - {prefix}.volcengine.accessKeyID：火山引擎访问密钥 ID，必填
@@ -96,8 +94,7 @@ func NewWithConfig(cfg config.Config, prefix ...string) (sms.SMS, error) {
 	)
 }
 
-// MustNewWithConfig calls NewWithConfig and panics on any error, including
-// ErrNotImplemented.
+// MustNewWithConfig 调用 NewWithConfig，遇到包括 ErrNotImplemented 在内的错误时 panic。
 // 可选 prefix 参数用于自定义配置键前缀，默认值为 "sms"。
 func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	client, err := NewWithConfig(cfg, prefix...)
@@ -107,7 +104,7 @@ func MustNewWithConfig(cfg config.Config, prefix ...string) sms.SMS {
 	return client
 }
 
-// NewWithOptions validates Options and returns ErrNotImplemented.
+// NewWithOptions 校验 Options 并返回 ErrNotImplemented。
 func NewWithOptions(opts *Options) (sms.SMS, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("volcengine sms: options cannot be nil")
@@ -121,8 +118,7 @@ func NewWithOptions(opts *Options) (sms.SMS, error) {
 	return nil, ErrNotImplemented
 }
 
-// MustNewWithOptions calls NewWithOptions and panics on any error, including
-// ErrNotImplemented.
+// MustNewWithOptions 调用 NewWithOptions，遇到包括 ErrNotImplemented 在内的错误时 panic。
 func MustNewWithOptions(opts *Options) sms.SMS {
 	client, err := NewWithOptions(opts)
 	if err != nil {

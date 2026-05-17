@@ -6,7 +6,17 @@ payment/adapter/alipay 和 payment/adapter/wechat 子包中；当前仓库内的
 支付宝和微信支付适配器仍是占位实现，不会连接真实支付网关，调用支付操作
 会返回 ErrNotImplemented。
 
-# 核心接口
+# 功能特性
+
+  - 定义统一的支付、查询、退款和关单接口
+  - 使用分为单位的 int64 金额，避免浮点精度问题
+  - 通过 Extra 字段保留服务商专有参数
+  - 提供订单和退款请求校验函数
+  - 将真实服务商接入隔离到 adapter 子包
+
+# 快速开始
+
+业务代码依赖 Payment 接口即可隔离具体支付服务商：
 
 	type Payment interface {
 		Pay(order *Order) (*PaymentResult, error)
@@ -14,6 +24,15 @@ payment/adapter/alipay 和 payment/adapter/wechat 子包中；当前仓库内的
 		Refund(req *RefundRequest) (*RefundResult, error)
 		Close(orderID string) error
 	}
+
+	var p Payment
+	result, err := p.Pay(&Order{
+		OrderID: "order-1001",
+		Amount:  9900,
+		Subject: "会员订阅",
+	})
+	_ = result
+	_ = err
 
 # 使用建议
 

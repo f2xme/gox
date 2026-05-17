@@ -6,6 +6,14 @@ Package prometheus 提供 Prometheus 监控系统的 metrics 适配器实现。
 prometheus 实现了 metrics.Metrics 接口，将指标收集请求转换为 Prometheus 格式。
 它使用 prometheus/client_golang 库，支持 Counter、Gauge、Histogram 三种指标类型。
 
+# 功能特性
+
+  - 实现 metrics.Metrics 统一指标工厂接口
+  - 支持 Counter、Gauge 和 Histogram
+  - 自动缓存相同名称和标签键的指标向量
+  - 提供 /metrics HTTP handler 暴露 Prometheus 指标
+  - 支持 namespace、subsystem 和自定义 histogram buckets
+
 # 快速开始
 
 基本用法：

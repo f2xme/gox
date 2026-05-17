@@ -1,15 +1,3 @@
-// Package payment provides a unified interface for payment operations.
-//
-// It abstracts common payment operations across different payment providers
-// (WeChat Pay, Alipay, etc.) with a consistent API.
-//
-// Features:
-//   - Unified payment interface for multiple providers
-//   - Support for payment, query, refund, and close operations
-//   - Flexible Extra fields for provider-specific parameters
-//   - Amount in cents (int64) to avoid floating-point precision issues
-//
-// All implementations should be safe for concurrent use.
 package payment
 
 import (
@@ -17,153 +5,152 @@ import (
 	"time"
 )
 
-// ErrNotImplemented indicates that an adapter does not yet connect to a real
-// payment provider.
+// ErrNotImplemented 表示适配器尚未接入真实支付服务商。
 var ErrNotImplemented = errors.New("payment adapter is not implemented")
 
-// Payment defines the interface for payment operations.
+// Payment 定义统一的支付操作接口。
 type Payment interface {
-	// Pay initiates a payment with the given order.
-	// Returns payment result including transaction ID and payment URL/parameters.
+	// Pay 使用给定订单发起支付。
+	// 返回结果包含交易流水号、支付链接或服务商专有支付参数。
 	Pay(order *Order) (*PaymentResult, error)
 
-	// Query queries the payment status of an order.
+	// Query 查询订单的支付状态。
 	Query(orderID string) (*QueryResult, error)
 
-	// Refund initiates a refund for a paid order.
+	// Refund 为已支付订单发起退款。
 	Refund(req *RefundRequest) (*RefundResult, error)
 
-	// Close closes an unpaid order.
-	// Once closed, the order cannot be paid.
+	// Close 关闭未支付订单。
+	// 订单关闭后不能继续支付。
 	Close(orderID string) error
 }
 
-// Order represents a payment order.
+// Order 表示支付订单。
 type Order struct {
-	// OrderID is the merchant order ID (must be unique).
+	// OrderID 是商户订单号，必须唯一。
 	OrderID string
 
-	// Amount is the payment amount in cents (e.g., 100 = 1.00 CNY).
+	// Amount 是支付金额，单位为分，例如 100 表示 1.00 元。
 	Amount int64
 
-	// Subject is the order title/subject.
+	// Subject 是订单标题。
 	Subject string
 
-	// Description is the order description (optional).
+	// Description 是订单描述，可选。
 	Description string
 
-	// NotifyURL is the URL for asynchronous payment notification.
+	// NotifyURL 是异步支付通知地址。
 	NotifyURL string
 
-	// ReturnURL is the URL for synchronous redirect after payment (optional).
-	// Used for web/H5 payments.
+	// ReturnURL 是支付完成后的同步跳转地址，可选。
+	// 常用于网页或 H5 支付。
 	ReturnURL string
 
-	// Extra contains provider-specific parameters.
-	// For example:
-	//   - WeChat: {"openid": "xxx"} for JSAPI payment
-	//   - Alipay: {"quit_url": "xxx"} for H5 payment
+	// Extra 保存服务商专有参数。
+	// 例如：
+	//   - 微信 JSAPI 支付可传入 {"openid": "xxx"}
+	//   - 支付宝 H5 支付可传入 {"quit_url": "xxx"}
 	Extra map[string]any
 }
 
-// PaymentResult represents the result of a payment initiation.
+// PaymentResult 表示发起支付后的结果。
 type PaymentResult struct {
-	// OrderID is the merchant order ID.
+	// OrderID 是商户订单号。
 	OrderID string
 
-	// TransactionID is the payment provider's transaction ID.
+	// TransactionID 是支付服务商交易流水号。
 	TransactionID string
 
-	// PayURL is the payment URL for H5/PC payments.
-	// Empty for APP/Mini Program payments (use Extra instead).
+	// PayURL 是 H5 或 PC 支付链接。
+	// APP 或小程序支付通常为空，应使用 Extra 中的专有参数。
 	PayURL string
 
-	// Extra contains provider-specific payment parameters.
-	// For example:
-	//   - WeChat APP: {"appid": "xxx", "partnerid": "xxx", "prepayid": "xxx", ...}
-	//   - WeChat Mini Program: {"appId": "xxx", "timeStamp": "xxx", "package": "xxx", ...}
-	//   - Alipay APP: {"orderString": "xxx"}
+	// Extra 保存服务商专有支付参数。
+	// 例如：
+	//   - 微信 APP 支付：{"appid": "xxx", "partnerid": "xxx", "prepayid": "xxx"}
+	//   - 微信小程序支付：{"appId": "xxx", "timeStamp": "xxx", "package": "xxx"}
+	//   - 支付宝 APP 支付：{"orderString": "xxx"}
 	Extra map[string]any
 }
 
-// QueryResult represents the result of a payment query.
+// QueryResult 表示支付查询结果。
 type QueryResult struct {
-	// OrderID is the merchant order ID.
+	// OrderID 是商户订单号。
 	OrderID string
 
-	// TransactionID is the payment provider's transaction ID.
+	// TransactionID 是支付服务商交易流水号。
 	TransactionID string
 
-	// Status is the payment status.
+	// Status 是支付状态。
 	Status PaymentStatus
 
-	// Amount is the payment amount in cents.
+	// Amount 是支付金额，单位为分。
 	Amount int64
 
-	// PaidAt is the time when the payment was completed.
-	// Nil if payment is not completed yet.
+	// PaidAt 是支付完成时间。
+	// 支付尚未完成时为 nil。
 	PaidAt *time.Time
 }
 
-// RefundRequest represents a refund request.
+// RefundRequest 表示退款请求。
 type RefundRequest struct {
-	// OrderID is the original merchant order ID.
+	// OrderID 是原商户订单号。
 	OrderID string
 
-	// RefundID is the merchant refund ID (must be unique).
+	// RefundID 是商户退款单号，必须唯一。
 	RefundID string
 
-	// Amount is the refund amount in cents.
-	// Must be less than or equal to the original payment amount.
+	// Amount 是退款金额，单位为分。
+	// 必须小于或等于原支付金额。
 	Amount int64
 
-	// Reason is the refund reason (optional).
+	// Reason 是退款原因，可选。
 	Reason string
 
-	// NotifyURL is the URL for asynchronous refund notification (optional).
+	// NotifyURL 是异步退款通知地址，可选。
 	NotifyURL string
 }
 
-// RefundResult represents the result of a refund.
+// RefundResult 表示退款结果。
 type RefundResult struct {
-	// RefundID is the merchant refund ID.
+	// RefundID 是商户退款单号。
 	RefundID string
 
-	// Status is the refund status.
+	// Status 是退款状态。
 	Status RefundStatus
 
-	// RefundAt is the time when the refund was completed.
-	// Nil if refund is not completed yet.
+	// RefundAt 是退款完成时间。
+	// 退款尚未完成时为 nil。
 	RefundAt *time.Time
 }
 
-// PaymentStatus represents the status of a payment.
+// PaymentStatus 表示支付状态。
 type PaymentStatus string
 
 const (
-	// PaymentStatusPending indicates the payment is pending.
+	// PaymentStatusPending 表示支付待处理。
 	PaymentStatusPending PaymentStatus = "pending"
 
-	// PaymentStatusSuccess indicates the payment was successful.
+	// PaymentStatusSuccess 表示支付成功。
 	PaymentStatusSuccess PaymentStatus = "success"
 
-	// PaymentStatusFailed indicates the payment failed.
+	// PaymentStatusFailed 表示支付失败。
 	PaymentStatusFailed PaymentStatus = "failed"
 
-	// PaymentStatusClosed indicates the payment was closed.
+	// PaymentStatusClosed 表示支付已关闭。
 	PaymentStatusClosed PaymentStatus = "closed"
 )
 
-// RefundStatus represents the status of a refund.
+// RefundStatus 表示退款状态。
 type RefundStatus string
 
 const (
-	// RefundStatusPending indicates the refund is pending.
+	// RefundStatusPending 表示退款待处理。
 	RefundStatusPending RefundStatus = "pending"
 
-	// RefundStatusSuccess indicates the refund was successful.
+	// RefundStatusSuccess 表示退款成功。
 	RefundStatusSuccess RefundStatus = "success"
 
-	// RefundStatusFailed indicates the refund failed.
+	// RefundStatusFailed 表示退款失败。
 	RefundStatusFailed RefundStatus = "failed"
 )

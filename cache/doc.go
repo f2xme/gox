@@ -1,6 +1,8 @@
 /*
 Package cache 提供统一的缓存能力接口，支持内存缓存、Redis 缓存和类型安全包装器。
 
+# 功能特性
+
 接口按能力拆分，调用方可以按需断言：
 
   - Store：基础 Get、Set、Delete、Exists。

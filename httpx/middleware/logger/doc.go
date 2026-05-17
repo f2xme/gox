@@ -6,6 +6,13 @@ Package logger 提供 HTTP 请求日志中间件。
 logger 中间件记录每个 HTTP 请求的基本信息，包括方法、路径、客户端 IP、响应时间和错误。
 通过 Logger 接口，你可以集成任何日志库（如 slog、zap、logrus）。
 
+# 功能特性
+
+  - 记录请求方法、路径、客户端 IP、耗时和错误
+  - 通过 Logger 接口适配 slog、zap 等日志库
+  - 支持跳过指定路径或 HTTP 方法
+  - 未设置 logger 时保持 no-op，便于按需启用
+
 # 快速开始
 
 基本用法：

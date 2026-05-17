@@ -45,6 +45,13 @@ func validateTTL(ttl time.Duration) error {
 	return nil
 }
 
+func validateLockTTL(ttl time.Duration) error {
+	if ttl <= 0 {
+		return cache.ErrInvalidTTL
+	}
+	return nil
+}
+
 // Get 获取给定键的值。
 // 如果键不存在则返回 cache.ErrNotFound。
 func (r *redisCache) Get(ctx context.Context, key string) ([]byte, error) {
@@ -166,6 +173,10 @@ func (r *redisCache) Close() error {
 //
 // 返回一个必须调用以释放锁的 unlock 函数。
 func (r *redisCache) TryLock(ctx context.Context, key string, ttl time.Duration) (func() error, error) {
+	if err := validateLockTTL(ttl); err != nil {
+		return nil, err
+	}
+
 	// 为此锁生成唯一令牌
 	token, err := generateToken()
 	if err != nil {
@@ -436,7 +447,7 @@ func (r *redisCache) LockWithRenewal(ctx context.Context, key string, ttl, renew
 
 // TryLockWithRenewal 尝试获取带自动续期的锁。
 func (r *redisCache) TryLockWithRenewal(ctx context.Context, key string, ttl, renewInterval time.Duration) (func() error, error) {
-	if err := validateTTL(ttl); err != nil {
+	if err := validateLockTTL(ttl); err != nil {
 		return nil, err
 	}
 
@@ -511,6 +522,10 @@ func (r *redisCache) unlockWithToken(key, token string) func() error {
 
 // LockReentrant 获取可重入锁。
 func (r *redisCache) LockReentrant(ctx context.Context, key string, ownerID string, ttl time.Duration) (func() error, error) {
+	if err := validateLockTTL(ttl); err != nil {
+		return nil, err
+	}
+
 	script := `
 		local current = redis.call("HGET", KEYS[1], "owner")
 		if current == false then
@@ -571,6 +586,10 @@ func (r *redisCache) LockReentrant(ctx context.Context, key string, ownerID stri
 
 // TryLockReentrant 尝试获取可重入锁。
 func (r *redisCache) TryLockReentrant(ctx context.Context, key string, ownerID string, ttl time.Duration) (func() error, error) {
+	if err := validateLockTTL(ttl); err != nil {
+		return nil, err
+	}
+
 	script := `
 		local current = redis.call("HGET", KEYS[1], "owner")
 		if current == false then

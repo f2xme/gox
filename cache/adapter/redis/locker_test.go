@@ -85,6 +85,15 @@ func TestRedisLocker_LockWithRenewal(t *testing.T) {
 		}
 	})
 
+	t.Run("TryLockWithRenewal rejects non-positive ttl", func(t *testing.T) {
+		for _, ttl := range []time.Duration{0, -time.Second} {
+			_, err := locker.TryLockWithRenewal(ctx, "renewal-lock-invalid-ttl", ttl, time.Second)
+			if err != cache.ErrInvalidTTL {
+				t.Errorf("TryLockWithRenewal ttl %v returned error %v, want %v", ttl, err, cache.ErrInvalidTTL)
+			}
+		}
+	})
+
 	t.Run("LockWithRenewal blocks until lock is released", func(t *testing.T) {
 		key := "renewal-lock-blocking"
 		unlock1, err := locker.TryLockWithRenewal(ctx, key, 5*time.Second, time.Second)
@@ -254,6 +263,22 @@ func TestRedisLocker_ReentrantLock(t *testing.T) {
 
 		unlock2()
 		unlock1()
+	})
+
+	t.Run("Reentrant locks reject non-positive ttl", func(t *testing.T) {
+		for _, ttl := range []time.Duration{0, -time.Second} {
+			_, err := locker.TryLockReentrant(ctx, "reentrant-lock-invalid-ttl", ownerID, ttl)
+			if err != cache.ErrInvalidTTL {
+				t.Errorf("TryLockReentrant ttl %v returned error %v, want %v", ttl, err, cache.ErrInvalidTTL)
+			}
+
+			invalidCtx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
+			_, err = locker.LockReentrant(invalidCtx, "reentrant-lock-invalid-ttl", ownerID, ttl)
+			cancel()
+			if err != cache.ErrInvalidTTL {
+				t.Errorf("LockReentrant ttl %v returned error %v, want %v", ttl, err, cache.ErrInvalidTTL)
+			}
+		}
 	})
 }
 
