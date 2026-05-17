@@ -76,13 +76,13 @@ Package auth 提供基于 Bearer Token 的 HTTP 认证中间件。
 # Session 认证
 
 authsession adapter 可以将 session 包作为 auth 中间件的验证器来源。
-登录成功后把用户 ID 写入 session.DefaultUIDKey，并把 session ID 写入 Cookie：
+登录成功后把用户 ID 写入 authsession.DefaultUIDKey，并把 session ID 写入 Cookie：
 
 	store, _ := memory.New()
 	manager, _ := session.New(store, session.WithTTL(24*time.Hour))
 
 	sess, _ := manager.Create(ctx)
-	sess.Values[session.DefaultUIDKey] = int64(userID)
+	sess.Values[authsession.DefaultUIDKey] = int64(userID)
 	_ = manager.Save(ctx, sess)
 
 	ctx.SetCookie(&http.Cookie{
@@ -96,7 +96,7 @@ authsession adapter 可以将 session 包作为 auth 中间件的验证器来源
 	app.Use(auth.New(
 		auth.WithValidator(authsession.NewValidator(
 			manager,
-			session.WithRefreshThreshold(30*time.Minute),
+			authsession.WithRefreshThreshold(30*time.Minute),
 		)),
 		auth.WithTokenExtractor(authsession.NewExtractor(authsession.DefaultCookieName)),
 		auth.WithSkipPaths("/login", "/register"),

@@ -16,6 +16,3 @@ var ErrInvalidTTL = errors.New("session: invalid ttl")
 
 // ErrNilStore 表示存储适配器为空。
 var ErrNilStore = errors.New("session: nil store")
-
-// ErrInvalidSession 表示会话认证信息无效。
-var ErrInvalidSession = errors.New("session: invalid session")
