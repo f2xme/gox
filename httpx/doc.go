@@ -13,6 +13,7 @@ httpx 定义了 HTTP 服务器的标准接口,支持多种 HTTP 框架(Gin、Ech
   - 可选统一响应:httpx.Data/Done/Fail 输出标准 JSON 格式;ErrBadRequest 等语义化 StatusError 构造函数通过 ErrorHandler 统一处理
   - 中间件:洋葱模型,支持全局和路由组级别注册
   - 错误处理:可自定义 ErrorHandler,默认映射 StatusError 到状态码
+  - 集成测试:httpx/testkit 可对 httpx.Engine 发起真实 HTTP 请求,覆盖路由、中间件、绑定、错误处理和响应
 
 # 快速开始
 
@@ -141,5 +142,21 @@ label tag 用于自定义验证错误消息中的字段名(支持中文)。
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	engine.Shutdown(ctx)
+
+# 集成测试
+
+使用 httpx/testkit 测试真实 HTTP 链路:
+
+	import "github.com/f2xme/gox/httpx/testkit"
+
+	client := testkit.New(t, engine)
+	defer client.Close()
+
+	client.POSTJSON("/users", CreateUserRequest{Name: "Alice"}).
+		ExpectStatus(201).
+		ExpectJSONValue("success", true)
+
+	client.Do(http.MethodTrace, "/debug", nil).
+		ExpectStatus(200)
 */
 package httpx

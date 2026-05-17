@@ -36,6 +36,7 @@ SMS providers, queues, and similar integrations.
 | Task | Prefer |
 | --- | --- |
 | HTTP APIs and request binding | `httpx`, `httpx/adapter/gin` |
+| HTTP integration tests | `httpx/testkit`, `httpx/adapter/gin` |
 | Request validation | `validator`, or `httpx` bind methods with `validate` tags |
 | Pagination | `pager` |
 | Time formatting, parsing, duration helpers | `timex` |

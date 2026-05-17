@@ -18,6 +18,7 @@ This guide helps AI coding agents choose and use gox packages correctly.
 | --- | --- | --- |
 | Build an HTTP API | `httpx`, `httpx/adapter/gin` | `github.com/f2xme/gox/httpx` |
 | Bind and validate HTTP requests | `httpx`, `validator` | `github.com/f2xme/gox/httpx` |
+| Write HTTP integration tests | `httpx/testkit`, `httpx/adapter/gin` | `github.com/f2xme/gox/httpx/testkit` |
 | Add pagination | `pager` | `github.com/f2xme/gox/pager` |
 | Work with time | `timex` | `github.com/f2xme/gox/timex` |
 | Add cache support | `cache`, `cache/adapter/*` | `github.com/f2xme/gox/cache` |
@@ -79,6 +80,24 @@ func createUser(c httpx.Context) error {
 
 	return c.JSON(200, req)
 }
+```
+
+Use `httpx/testkit` for black-box HTTP integration tests that should exercise
+real routing, middleware, binding, error handling, headers, cookies, and
+responses through an `httpx.Engine`.
+
+```go
+import "github.com/f2xme/gox/httpx/testkit"
+
+client := testkit.New(t, engine)
+defer client.Close()
+
+client.POSTJSON("/users", CreateUserRequest{Name: "Alice"}).
+	ExpectStatus(201).
+	ExpectJSONValue("success", true)
+
+client.Do(http.MethodTrace, "/debug", nil).
+	ExpectStatus(200)
 ```
 
 ### Pagination

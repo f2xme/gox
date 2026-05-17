@@ -37,7 +37,7 @@ github.com/f2xme/gox/<package>
 
 | 需求 | 优先查看 | 典型 import |
 | --- | --- | --- |
-| HTTP API、路由、绑定请求 | `httpx`, `httpx/adapter/gin` | `github.com/f2xme/gox/httpx` |
+| HTTP API、路由、绑定请求、集成测试 | `httpx`, `httpx/adapter/gin`, `httpx/testkit` | `github.com/f2xme/gox/httpx` |
 | 请求参数验证 | `validator`, `httpx` 绑定方法 | `github.com/f2xme/gox/validator` |
 | 分页 | `pager` | `github.com/f2xme/gox/pager` |
 | 时间格式化、解析、计算 | `timex` | `github.com/f2xme/gox/timex` |
@@ -69,6 +69,7 @@ github.com/f2xme/gox/<package>
 - **graceful** - 优雅关闭封装
 - **httpx** - HTTP 工具封装
   - `httpx/adapter/gin` - Gin 框架适配器
+  - `httpx/testkit` - 面向 `httpx.Engine` 的 HTTP 集成测试工具
 - **idgen** - ID 生成器
 - **jwt** - JWT 令牌处理
 - **logx** - 日志封装
