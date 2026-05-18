@@ -71,12 +71,12 @@ func (r OffsetResult[T]) HasPrev() bool {
 	return r.Offset > 0
 }
 
-// GetOffset 返回 GORM 使用的 offset 值
+// GetOffset 返回 SQL 使用的 offset 值
 func (p OffsetPage) GetOffset() int {
 	return p.Offset
 }
 
-// GetLimit 返回 GORM 使用的 limit 值
+// GetLimit 返回 SQL 使用的 limit 值
 func (p OffsetPage) GetLimit() int {
 	return p.Limit
 }

@@ -107,14 +107,11 @@ limit/offset queries, and `pager.NewCursor` for cursor pagination.
 
 ```go
 page := pager.NewPage(1, 20)
-offset := page.ToOffset()
 
-rows, total, err := listUsers(ctx, offset.Limit, offset.Offset)
+rows, err := listUsers(ctx, page.GetLimit(), page.GetOffset())
 if err != nil {
 	return err
 }
-
-result := pager.NewPageResult(page, rows, total)
 ```
 
 ### Logging

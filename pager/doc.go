@@ -41,14 +41,10 @@
 //	// 创建页码分页参数
 //	page := pager.NewPage(2, 10) // page=2, size=10
 //
-//	// 转换为 offset 用于数据库查询
-//	offset := page.ToOffset()
-//	// SELECT * FROM users LIMIT offset.Limit OFFSET offset.Offset
-//
-//	// 创建分页结果
-//	items := []string{"item1", "item2"}
-//	result := pager.NewPageResult(page, items, 100)
-//	fmt.Printf("当前页: %d/%d\n", result.Page, result.TotalPages)
+//	// 转换为 SQL 查询参数
+//	limit := page.GetLimit()
+//	offset := page.GetOffset()
+//	// SELECT * FROM users LIMIT limit OFFSET offset
 //
 // 游标分页示例：
 //
@@ -78,7 +74,7 @@
 //	func handler(w http.ResponseWriter, r *http.Request) {
 //		// 从查询参数解析：?page=2&size=20
 //		page := pager.NewPageFromRequest(r)
-//		// 使用 page.ToOffset() 转换为数据库查询参数
+//		// 使用 page.GetLimit() 和 page.GetOffset() 转换为 SQL 查询参数
 //	}
 //
 //	func handler(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +84,7 @@
 //		cursor, _ := pager.DecodeCursor(page.Cursor)
 //	}
 //
-// 方式二：嵌入到请求结构体（推荐用于 GORM）：
+// 方式二：嵌入到请求结构体（推荐用于 SQL 查询）：
 //
 //	import "github.com/f2xme/gox/pager"
 //
@@ -104,11 +100,9 @@
 //		Category         string `json:"category" form:"category"`
 //	}
 //
-//	// 在 GORM 中使用
+//	// 在 SQL 查询中使用
 //	func listUsers(req UserListRequest) ([]User, error) {
-//		var users []User
-//		err := db.Offset(req.GetOffset()).Limit(req.GetLimit()).Find(&users).Error
-//		return users, err
+//		return queryUsers("SELECT * FROM users LIMIT ? OFFSET ?", req.GetLimit(), req.GetOffset())
 //	}
 //
 // # 分页策略选择指南

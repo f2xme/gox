@@ -36,21 +36,10 @@ func ExampleNewPage() {
 	// Output: Page: 2, Size: 20
 }
 
-func ExamplePageNumber_ToOffset() {
+func ExamplePageNumber_GetOffset() {
 	page := pager.NewPage(3, 10)
-	offset := page.ToOffset()
-	fmt.Printf("Offset: %d, Limit: %d\n", offset.Offset, offset.Limit)
+	fmt.Printf("Offset: %d, Limit: %d\n", page.GetOffset(), page.GetLimit())
 	// Output: Offset: 20, Limit: 10
-}
-
-func ExampleNewPageResult() {
-	page := pager.NewPage(1, 10)
-	items := []string{"item1", "item2"}
-	result := pager.NewPageResult(page, items, 25)
-
-	fmt.Printf("Page: %d/%d, HasNext: %v\n",
-		result.Page, result.TotalPages, result.HasNext())
-	// Output: Page: 1/3, HasNext: true
 }
 
 func ExampleNewCursor() {
