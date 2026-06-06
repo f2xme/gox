@@ -39,6 +39,18 @@ type adapterValidateRequest struct {
 	Name string `json:"name" validate:"required"`
 }
 
+type adapterTrimRequest struct {
+	Keyword string            `json:"keyword" validate:"required"`
+	Status  string            `json:"status"`
+	Child   *adapterTrimChild `json:"child"`
+	Tags    []string          `json:"tags"`
+	Meta    map[string]any    `json:"meta"`
+}
+
+type adapterTrimChild struct {
+	Name string `json:"name"`
+}
+
 func TestGoxValidatorAdapterValidateStruct(t *testing.T) {
 	adapter := &goxValidatorAdapter{validator: newGoxValidator()}
 	valid := adapterValidateRequest{Name: "Alice"}
@@ -114,6 +126,59 @@ func TestGoxValidatorAdapterValidateStruct(t *testing.T) {
 				t.Errorf("ValidateStruct() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestGoxValidatorAdapterTrimsStringFieldsBeforeValidation(t *testing.T) {
+	adapter := &goxValidatorAdapter{validator: newGoxValidator()}
+	input := &adapterTrimRequest{
+		Keyword: "  gox  ",
+		Status:  " active ",
+		Child:   &adapterTrimChild{Name: " child "},
+		Tags:    []string{" api ", " gin "},
+		Meta: map[string]any{
+			"source": " query ",
+			"child":  adapterTrimChild{Name: " nested "},
+		},
+	}
+
+	if err := adapter.ValidateStruct(input); err != nil {
+		t.Fatalf("ValidateStruct() error = %v", err)
+	}
+
+	if input.Keyword != "gox" {
+		t.Fatalf("Keyword = %q, want %q", input.Keyword, "gox")
+	}
+	if input.Status != "active" {
+		t.Fatalf("Status = %q, want %q", input.Status, "active")
+	}
+	if input.Child.Name != "child" {
+		t.Fatalf("Child.Name = %q, want %q", input.Child.Name, "child")
+	}
+	if input.Tags[0] != "api" || input.Tags[1] != "gin" {
+		t.Fatalf("Tags = %#v, want trimmed values", input.Tags)
+	}
+	if got := input.Meta["source"]; got != "query" {
+		t.Fatalf("Meta[source] = %#v, want %q", got, "query")
+	}
+	child, ok := input.Meta["child"].(adapterTrimChild)
+	if !ok {
+		t.Fatalf("Meta[child] = %T, want adapterTrimChild", input.Meta["child"])
+	}
+	if child.Name != "nested" {
+		t.Fatalf("Meta[child].Name = %q, want %q", child.Name, "nested")
+	}
+}
+
+func TestGoxValidatorAdapterTrimsWhitespaceOnlyRequiredField(t *testing.T) {
+	adapter := &goxValidatorAdapter{validator: newGoxValidator()}
+	input := &adapterTrimRequest{Keyword: "   "}
+
+	if err := adapter.ValidateStruct(input); err == nil {
+		t.Fatal("ValidateStruct() error = nil, want required validation error")
+	}
+	if input.Keyword != "" {
+		t.Fatalf("Keyword = %q, want empty string after trim", input.Keyword)
 	}
 }
 
