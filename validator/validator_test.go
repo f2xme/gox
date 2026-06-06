@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -102,6 +103,67 @@ func TestValidate_Required(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Name") {
 		t.Errorf("error should mention field Name, got: %v", err)
+	}
+}
+
+func TestValidate_ReturnsValidationError(t *testing.T) {
+	type User struct {
+		Name  string `validate:"required" label:"姓名"`
+		Email string `validate:"email" label:"邮箱"`
+	}
+
+	err := New().Validate(User{Email: "invalid"})
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("errors.Is(err, ErrValidation) = false, err = %v", err)
+	}
+	if !IsValidationError(err) {
+		t.Fatalf("IsValidationError(err) = false, err = %v", err)
+	}
+
+	validationErr, ok := AsValidationError(err)
+	if !ok {
+		t.Fatalf("AsValidationError(err) ok = false, err = %T", err)
+	}
+
+	fields := validationErr.Fields()
+	if len(fields) != 2 {
+		t.Fatalf("len(Fields()) = %d, want 2", len(fields))
+	}
+	if fields[0].Field != "姓名" || fields[0].StructField != "Name" || fields[0].Tag != "required" {
+		t.Fatalf("first field = %#v, want name required error", fields[0])
+	}
+	if fields[1].Field != "邮箱" || fields[1].StructField != "Email" || fields[1].Tag != "email" {
+		t.Fatalf("second field = %#v, want email error", fields[1])
+	}
+
+	messages := validationErr.Messages()
+	if len(messages) != 2 {
+		t.Fatalf("len(Messages()) = %d, want 2", len(messages))
+	}
+	if !strings.Contains(validationErr.Error(), "姓名") || !strings.Contains(validationErr.Error(), "邮箱") {
+		t.Fatalf("Error() = %q, want field messages", validationErr.Error())
+	}
+}
+
+func TestValidationErrorFieldsReturnsCopy(t *testing.T) {
+	type User struct {
+		Name string `validate:"required"`
+	}
+
+	err := New().Validate(User{})
+	validationErr, ok := AsValidationError(err)
+	if !ok {
+		t.Fatalf("AsValidationError(err) ok = false, err = %T", err)
+	}
+
+	fields := validationErr.Fields()
+	fields[0].Field = "mutated"
+
+	if got := validationErr.Fields()[0].Field; got == "mutated" {
+		t.Fatal("Fields() returned internal slice")
 	}
 }
 

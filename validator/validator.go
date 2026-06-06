@@ -1,7 +1,6 @@
 package validator
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -121,13 +120,20 @@ func (v *Validator) Validate(i any) error {
 	return v.formatErrors(validationErrs)
 }
 
-// formatErrors 将验证错误格式化为友好的中文消息
+// formatErrors 将验证错误格式化为可识别的验证错误
 func (v *Validator) formatErrors(errs validator.ValidationErrors) error {
-	var messages []string
+	fields := make([]FieldError, 0, len(errs))
 	for _, err := range errs {
-		messages = append(messages, err.Translate(v.trans))
+		fields = append(fields, FieldError{
+			Namespace:   err.Namespace(),
+			Field:       err.Field(),
+			StructField: err.StructField(),
+			Tag:         err.Tag(),
+			Param:       err.Param(),
+			Message:     err.Translate(v.trans),
+		})
 	}
-	return fmt.Errorf("%s", strings.Join(messages, "; "))
+	return &ValidationError{fields: fields}
 }
 
 // RegisterValidation 注册自定义验证规则。
