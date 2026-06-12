@@ -72,6 +72,45 @@ func TestWrapNil(t *testing.T) {
 	}
 }
 
+func TestFromNil(t *testing.T) {
+	err := From(nil)
+	if err != nil {
+		t.Error("from nil should return nil")
+	}
+}
+
+func TestFromError(t *testing.T) {
+	original := errors.New("standard error")
+	err := From(original)
+
+	if err == nil {
+		t.Fatal("expected non-nil error")
+	}
+	if err.Message != "standard error" {
+		t.Errorf("expected 'standard error', got %q", err.Message)
+	}
+	if err.Kind != KindUnknown {
+		t.Errorf("expected KindUnknown, got %v", err.Kind)
+	}
+	if err.Cause != original {
+		t.Error("expected Cause to be original error")
+	}
+	if errors.Unwrap(err) != original {
+		t.Error("Unwrap should return original error")
+	}
+	if len(err.Stack) == 0 {
+		t.Error("expected non-empty stack")
+	}
+}
+
+func TestFromErrorxError(t *testing.T) {
+	original := New("errorx error")
+	err := From(original)
+	if err != original {
+		t.Error("expected From to return original *Error")
+	}
+}
+
 func TestErrorWithKind(t *testing.T) {
 	err := New("test").WithKind(KindNotFound)
 	if err.Kind != KindNotFound {

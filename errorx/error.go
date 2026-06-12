@@ -87,6 +87,24 @@ func NewCode(code, message string) *Error {
 	}
 }
 
+// From 将标准 error 转换为 Error。
+//
+// 如果 err 已经是 *Error，直接返回；如果 err 为 nil，返回 nil。
+func From(err error) *Error {
+	if err == nil {
+		return nil
+	}
+	if e, ok := err.(*Error); ok {
+		return e
+	}
+	return &Error{
+		Message: err.Error(),
+		Kind:    KindUnknown,
+		Cause:   err,
+		Stack:   captureStack(2),
+	}
+}
+
 // Wrap 用额外的上下文包装现有错误
 // 如果 err 为 nil，Wrap 返回 nil
 func Wrap(err error, message string) *Error {
