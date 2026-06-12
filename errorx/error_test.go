@@ -65,8 +65,33 @@ func TestWrap(t *testing.T) {
 	}
 }
 
+func TestWrapWithoutMessage(t *testing.T) {
+	original := errors.New("original error")
+	wrapped := Wrap(original)
+
+	if wrapped == nil {
+		t.Fatal("expected non-nil error")
+	}
+	if wrapped.Message != "original error" {
+		t.Errorf("expected 'original error', got %q", wrapped.Message)
+	}
+	if wrapped.Error() != "original error" {
+		t.Errorf("expected 'original error', got %q", wrapped.Error())
+	}
+	if wrapped.Cause != original {
+		t.Error("expected Cause to be original error")
+	}
+}
+
 func TestWrapNil(t *testing.T) {
 	wrapped := Wrap(nil, "message")
+	if wrapped != nil {
+		t.Error("wrapping nil should return nil")
+	}
+}
+
+func TestWrapNilWithoutMessage(t *testing.T) {
+	wrapped := Wrap(nil)
 	if wrapped != nil {
 		t.Error("wrapping nil should return nil")
 	}
@@ -88,6 +113,9 @@ func TestFromError(t *testing.T) {
 	}
 	if err.Message != "standard error" {
 		t.Errorf("expected 'standard error', got %q", err.Message)
+	}
+	if err.Error() != "standard error" {
+		t.Errorf("expected 'standard error', got %q", err.Error())
 	}
 	if err.Kind != KindUnknown {
 		t.Errorf("expected KindUnknown, got %v", err.Kind)

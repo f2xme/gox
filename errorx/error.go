@@ -24,11 +24,17 @@ type Error struct {
 func (e *Error) Error() string {
 	if e.Code != "" {
 		if e.Cause != nil {
+			if e.Message == "" || e.Message == e.Cause.Error() {
+				return fmt.Sprintf("[%s] %v", e.Code, e.Cause)
+			}
 			return fmt.Sprintf("[%s] %s: %v", e.Code, e.Message, e.Cause)
 		}
 		return fmt.Sprintf("[%s] %s", e.Code, e.Message)
 	}
 	if e.Cause != nil {
+		if e.Message == "" || e.Message == e.Cause.Error() {
+			return e.Cause.Error()
+		}
 		return fmt.Sprintf("%s: %v", e.Message, e.Cause)
 	}
 	return e.Message
@@ -105,14 +111,19 @@ func From(err error) *Error {
 	}
 }
 
-// Wrap 用额外的上下文包装现有错误
-// 如果 err 为 nil，Wrap 返回 nil
-func Wrap(err error, message string) *Error {
+// Wrap 用可选的额外上下文包装现有错误。
+//
+// 如果 err 为 nil，Wrap 返回 nil；如果未提供 message，则使用 err.Error()。
+func Wrap(err error, message ...string) *Error {
 	if err == nil {
 		return nil
 	}
+	msg := err.Error()
+	if len(message) > 0 {
+		msg = message[0]
+	}
 	return &Error{
-		Message: message,
+		Message: msg,
 		Kind:    KindUnknown,
 		Cause:   err,
 		Stack:   captureStack(2),
