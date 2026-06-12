@@ -1,6 +1,7 @@
 package errorx
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -98,4 +99,14 @@ func Wrap(err error, message string) *Error {
 		Cause:   err,
 		Stack:   captureStack(2),
 	}
+}
+
+// Is 判断给定的错误是否是 errorx.Error 类型
+// 它会检查错误本身以及错误链中的所有错误
+func Is(err error) bool {
+	if err == nil {
+		return false
+	}
+	var e *Error
+	return errors.As(err, &e)
 }

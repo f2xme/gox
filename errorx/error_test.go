@@ -138,3 +138,61 @@ func TestErrorFormatWithCause(t *testing.T) {
 		t.Errorf("expected 'wrapped: original', got %q", s)
 	}
 }
+
+func TestIs(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil error",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "errorx.Error",
+			err:  New("test error"),
+			want: true,
+		},
+		{
+			name: "errorx.Error with code",
+			err:  NewCode("ERR001", "test error"),
+			want: true,
+		},
+		{
+			name: "wrapped errorx.Error",
+			err:  Wrap(New("inner"), "outer"),
+			want: true,
+		},
+		{
+			name: "standard error",
+			err:  errors.New("standard error"),
+			want: false,
+		},
+		{
+			name: "fmt.Errorf",
+			err:  fmt.Errorf("formatted error"),
+			want: false,
+		},
+		{
+			name: "wrapped standard error",
+			err:  fmt.Errorf("wrap: %w", errors.New("original")),
+			want: false,
+		},
+		{
+			name: "errorx.Error wrapped in standard error",
+			err:  fmt.Errorf("wrap: %w", New("errorx error")),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Is(tt.err)
+			if got != tt.want {
+				t.Errorf("Is() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
