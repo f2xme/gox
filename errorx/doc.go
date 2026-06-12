@@ -1,4 +1,4 @@
-// Package errorx 提供增强的错误处理功能，支持错误码、堆栈跟踪和错误分类。
+// Package errorx 提供增强的错误处理功能，支持错误码、堆栈跟踪、错误分类和轻量级业务错误。
 //
 // # 功能特性
 //
@@ -6,6 +6,7 @@
 //   - 错误分类（Kind）：使用预定义的错误类型进行分类（验证、未找到、未授权等）
 //   - 堆栈跟踪：自动捕获错误发生时的调用栈信息
 //   - 错误码注册表：支持国际化的错误消息管理
+//   - 业务错误：提供不捕获堆栈的轻量级 BizError，用于用户可预期错误
 //   - 链式调用：流畅的 API 设计，支持链式设置错误属性
 //   - 线程安全：所有函数和类型都可以在多个 goroutine 中并发使用
 //
@@ -36,6 +37,19 @@
 //
 //	code := errorx.GetCode(err)
 //
+// 创建业务错误：
+//
+//	bizErr := errorx.NewBiz("USER_NOT_FOUND")
+//
+//	if errorx.IsBiz(bizErr) {
+//		message := errorx.LocalizeBiz(bizErr, "zh")
+//		_ = message
+//	}
+//
+// 创建仅包含消息的业务错误：
+//
+//	bizErr := errorx.NewBizMessage("手机号已注册")
+//
 // 格式化错误（包含堆栈）：
 //
 //	fmt.Println(errorx.FormatWithStack(err))
@@ -64,6 +78,10 @@
 // 使用注册的错误码创建错误：
 //
 //	err := errorx.NewCodeWithLang("USER_NOT_FOUND", "zh")
+//
+// 创建轻量级业务错误：
+//
+//	err := errorx.NewBizLang("USER_NOT_FOUND", "zh")
 //
 // # 最佳实践
 //

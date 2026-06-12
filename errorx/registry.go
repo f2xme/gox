@@ -35,6 +35,13 @@ func SetDefaultLang(lang string) {
 
 const defaultEnglish = "en"
 
+// getDefaultLang 获取当前默认语言。
+func getDefaultLang() string {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+	return defaultLang
+}
+
 // getMessage 获取指定错误码和语言的消息
 func getMessage(code, lang string) (string, bool) {
 	registryMu.RLock()
