@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-func TestMaskString(t *testing.T) {
+func TestString(t *testing.T) {
 	tests := []struct {
 		name   string
 		value  string
@@ -21,14 +21,14 @@ func TestMaskString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MaskString(tt.value, tt.prefix, tt.suffix, tt.mask); got != tt.want {
-				t.Fatalf("MaskString(%q, %d, %d, %q) = %q, want %q", tt.value, tt.prefix, tt.suffix, tt.mask, got, tt.want)
+			if got := String(tt.value, tt.prefix, tt.suffix, tt.mask); got != tt.want {
+				t.Fatalf("String(%q, %d, %d, %q) = %q, want %q", tt.value, tt.prefix, tt.suffix, tt.mask, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestMaskPhone(t *testing.T) {
+func TestPhone(t *testing.T) {
 	tests := []struct {
 		name  string
 		phone string
@@ -42,14 +42,14 @@ func TestMaskPhone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MaskPhone(tt.phone); got != tt.want {
-				t.Fatalf("MaskPhone(%q) = %q, want %q", tt.phone, got, tt.want)
+			if got := Phone(tt.phone); got != tt.want {
+				t.Fatalf("Phone(%q) = %q, want %q", tt.phone, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestMaskIDCard(t *testing.T) {
+func TestIDCard(t *testing.T) {
 	tests := []struct {
 		name string
 		id   string
@@ -63,14 +63,14 @@ func TestMaskIDCard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MaskIDCard(tt.id); got != tt.want {
-				t.Fatalf("MaskIDCard(%q) = %q, want %q", tt.id, got, tt.want)
+			if got := IDCard(tt.id); got != tt.want {
+				t.Fatalf("IDCard(%q) = %q, want %q", tt.id, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestMaskBankCard(t *testing.T) {
+func TestBankCard(t *testing.T) {
 	tests := []struct {
 		name string
 		card string
@@ -84,14 +84,14 @@ func TestMaskBankCard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MaskBankCard(tt.card); got != tt.want {
-				t.Fatalf("MaskBankCard(%q) = %q, want %q", tt.card, got, tt.want)
+			if got := BankCard(tt.card); got != tt.want {
+				t.Fatalf("BankCard(%q) = %q, want %q", tt.card, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestMaskName(t *testing.T) {
+func TestName(t *testing.T) {
 	tests := []struct {
 		name  string
 		value string
@@ -106,14 +106,14 @@ func TestMaskName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MaskName(tt.value); got != tt.want {
-				t.Fatalf("MaskName(%q) = %q, want %q", tt.value, got, tt.want)
+			if got := Name(tt.value); got != tt.want {
+				t.Fatalf("Name(%q) = %q, want %q", tt.value, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestMaskEmail(t *testing.T) {
+func TestEmail(t *testing.T) {
 	tests := []struct {
 		name  string
 		email string
@@ -130,9 +130,30 @@ func TestMaskEmail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MaskEmail(tt.email); got != tt.want {
-				t.Fatalf("MaskEmail(%q) = %q, want %q", tt.email, got, tt.want)
+			if got := Email(tt.email); got != tt.want {
+				t.Fatalf("Email(%q) = %q, want %q", tt.email, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCompatibilityAliases(t *testing.T) {
+	if got := MaskString("1234567890", 3, 2, "****"); got != String("1234567890", 3, 2, "****") {
+		t.Fatalf("MaskString alias = %q, want %q", got, String("1234567890", 3, 2, "****"))
+	}
+	if got := MaskPhone("13812345678"); got != Phone("13812345678") {
+		t.Fatalf("MaskPhone alias = %q, want %q", got, Phone("13812345678"))
+	}
+	if got := MaskEmail("alice@example.com"); got != Email("alice@example.com") {
+		t.Fatalf("MaskEmail alias = %q, want %q", got, Email("alice@example.com"))
+	}
+	if got := MaskIDCard("110101199001011234"); got != IDCard("110101199001011234") {
+		t.Fatalf("MaskIDCard alias = %q, want %q", got, IDCard("110101199001011234"))
+	}
+	if got := MaskBankCard("6222021234567890123"); got != BankCard("6222021234567890123") {
+		t.Fatalf("MaskBankCard alias = %q, want %q", got, BankCard("6222021234567890123"))
+	}
+	if got := MaskName("张三丰"); got != Name("张三丰") {
+		t.Fatalf("MaskName alias = %q, want %q", got, Name("张三丰"))
 	}
 }
