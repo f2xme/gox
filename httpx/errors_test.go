@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/f2xme/gox/validator"
 )
 
 func TestStatusError_Error(t *testing.T) {
@@ -222,6 +224,12 @@ func TestDefaultErrorHandler(t *testing.T) {
 			wantMsg:  http.StatusText(http.StatusInternalServerError),
 		},
 		{
+			name:     "验证错误返回 400",
+			err:      fmt.Errorf("bind request: %w", validator.ErrValidation),
+			wantCode: http.StatusBadRequest,
+			wantMsg:  "bind request: validator: validation failed",
+		},
+		{
 			name:     "非法状态码兜底为 500",
 			err:      NewStatusError(0, "bad status"),
 			wantCode: http.StatusInternalServerError,
@@ -249,6 +257,28 @@ func TestDefaultErrorHandler(t *testing.T) {
 			}
 			if resp.Message != tc.wantMsg {
 				t.Fatalf("message: want %q, got %q", tc.wantMsg, resp.Message)
+			}
+		})
+	}
+}
+
+func TestNormalizeHTTPStatus(t *testing.T) {
+	tests := []struct {
+		name string
+		code int
+		want int
+	}{
+		{name: "下界合法", code: 100, want: 100},
+		{name: "常用状态码合法", code: http.StatusBadRequest, want: http.StatusBadRequest},
+		{name: "上界合法", code: 599, want: 599},
+		{name: "低于下界回退 500", code: 99, want: http.StatusInternalServerError},
+		{name: "高于上界回退 500", code: 600, want: http.StatusInternalServerError},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NormalizeHTTPStatus(tc.code); got != tc.want {
+				t.Fatalf("NormalizeHTTPStatus(%d): want %d, got %d", tc.code, tc.want, got)
 			}
 		})
 	}

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/f2xme/gox/validator"
 )
 
 // StatusError 表示带有 HTTP 状态码的错误。
@@ -129,9 +131,14 @@ func DefaultErrorHandler(ctx Context, err error) {
 		return
 	}
 
+	if errors.Is(err, validator.ErrValidation) {
+		writeError(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	var se *StatusError
 	if errors.As(err, &se) {
-		status := normalizeHTTPStatus(se.Status)
+		status := NormalizeHTTPStatus(se.Status)
 		writeError(ctx, status, responseMessage(status, se.Message))
 	} else {
 		writeError(ctx, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
@@ -146,7 +153,8 @@ func writeError(ctx Context, code int, message string) {
 	_ = ctx.JSON(code, errorResponse{Message: message})
 }
 
-func normalizeHTTPStatus(code int) int {
+// NormalizeHTTPStatus 归一化 HTTP 状态码，非法状态码回退为 500。
+func NormalizeHTTPStatus(code int) int {
 	if code < 100 || code > 599 {
 		return http.StatusInternalServerError
 	}
