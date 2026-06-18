@@ -25,6 +25,7 @@ This guide helps AI coding agents choose and use gox packages correctly.
 | Generate or verify CAPTCHA | `captcha` | `github.com/f2xme/gox/captcha` |
 | Load configuration | `config`, `config/adapter/env`, `config/adapter/viper` | `github.com/f2xme/gox/config` |
 | Configure databases | `database/adapter/*` | `github.com/f2xme/gox/database/adapter/pgsqldb` |
+| Search, write documents, manage indices, or reindex in Elasticsearch | `elasticsearch` | `github.com/f2xme/gox/elasticsearch` |
 | Hash, encrypt, or encode values | `encrypt`, `crypto` | `github.com/f2xme/gox/encrypt` |
 | Create structured errors | `errorx` | `github.com/f2xme/gox/errorx` |
 | Add graceful shutdown | `graceful` | `github.com/f2xme/gox/graceful` |
@@ -140,6 +141,34 @@ In async mode, `Info`, `Warn`, and `Error` copy the meta slice before enqueueing
 `InfoCtx`, `WarnCtx`, and `ErrorCtx` extract context fields before enqueueing, so
 the background worker does not retain or read the request context. Call
 `logx.Flush()` or `logx.Stop()` before shutdown to drain queued records.
+
+### Elasticsearch
+
+Use `elasticsearch` directly for Elasticsearch search, document writes, index
+management, aliases, and reindex workflows. This package wraps the official
+Elastic Go client directly and intentionally has no adapter layer.
+
+```go
+import "github.com/f2xme/gox/elasticsearch"
+
+client, err := elasticsearch.New(
+	elasticsearch.WithAddresses("http://localhost:9200"),
+)
+if err != nil {
+	return err
+}
+
+req := elasticsearch.NewBuilder("users").
+	Term("tenant_id", "t1").
+	MultiMatch("alice", []string{"name", "email"}).
+	Pager(1, 20)
+
+result, err := elasticsearch.SearchWithType[User](ctx, client, req)
+```
+
+For production, configure authentication and timeouts explicitly. Use
+`client.Native()` only when the wrapper does not expose the official API that a
+task needs.
 
 ### Adapters
 

@@ -44,6 +44,7 @@ SMS providers, queues, and similar integrations.
 | CAPTCHA | `captcha`, `captcha/generator/*`, `captcha/adapter/*` |
 | Configuration loading | `config`, `config/adapter/env`, `config/adapter/viper` |
 | Database setup | `database/adapter/mysqldb`, `database/adapter/pgsqldb`, `database/adapter/sqlitedb` |
+| Elasticsearch search, writes, indices, aliases, reindex | `elasticsearch` |
 | Encryption, hashing, AES, RSA | `encrypt` or `crypto` depending on existing package use |
 | Structured errors | `errorx` |
 | Graceful shutdown | `graceful` |
@@ -71,6 +72,10 @@ SMS providers, queues, and similar integrations.
   `logx.Flush()` or `logx.Stop()` before shutdown. Context logging must extract
   context fields before enqueueing and must not retain request contexts in
   background workers.
+- Use `elasticsearch` directly for Elasticsearch. It wraps the official Elastic
+  Go client and intentionally has no adapter layer. Configure auth and timeouts
+  explicitly for production, and use `client.Native()` for official APIs that
+  are not wrapped yet.
 - Look for `example_test.go` before inventing new usage patterns.
 - Placeholder adapters may exist. If an adapter explicitly says sending,
   charging, or gateway access is not implemented, do not treat it as production

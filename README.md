@@ -44,6 +44,7 @@ github.com/f2xme/gox/<package>
 | 缓存 | `cache`, `cache/adapter/*` | `github.com/f2xme/gox/cache` |
 | 配置加载 | `config`, `config/adapter/env`, `config/adapter/viper` | `github.com/f2xme/gox/config` |
 | 数据库连接 | `database/adapter/*` | `github.com/f2xme/gox/database/adapter/pgsqldb` |
+| Elasticsearch 搜索、写入、索引和 reindex | `elasticsearch` | `github.com/f2xme/gox/elasticsearch` |
 | 加密、哈希、AES、RSA | `encrypt`, `crypto` | `github.com/f2xme/gox/encrypt` |
 | 日志 | `logx`, `logx/adapter/zap` | `github.com/f2xme/gox/logx` |
 | JWT | `jwt` | `github.com/f2xme/gox/jwt` |
@@ -64,6 +65,7 @@ github.com/f2xme/gox/<package>
   - `database/adapter/mysqldb` - MySQL 适配器
   - `database/adapter/pgsqldb` - PostgreSQL 适配器
   - `database/adapter/sqlitedb` - SQLite 适配器
+- **elasticsearch** - Elasticsearch 客户端、查询构建、文档写入、索引、别名和 reindex 封装
 - **encrypt** - 加密工具封装
 - **errorx** - 错误处理增强
 - **graceful** - 优雅关闭封装
