@@ -298,6 +298,99 @@ if taskID != "" {
 err = client.FinishReindexWithAlias(ctx, "articles", newIndex)
 ```
 
+## 同义词
+
+管理同义词集合：
+
+```go
+rules := []elasticsearch.SynonymRule{
+	{ID: "r1", Synonyms: "phone, mobile"},
+	{ID: "r2", Synonyms: "tv, television"},
+	{ID: "r3", Synonyms: "laptop => notebook"},
+}
+
+result, err := client.PutSynonymSet(ctx, "products", rules)
+if err != nil {
+	return err
+}
+_ = result.ReloadAnalyzersDetails
+
+set, err := client.GetSynonymSet(ctx, "products")
+```
+
+分页列出同义词集合：
+
+```go
+sets, err := client.ListSynonymSets(
+	ctx,
+	elasticsearch.WithSynonymFrom(0),
+	elasticsearch.WithSynonymSize(20),
+)
+```
+
+管理单条规则：
+
+```go
+rule, err := client.GetSynonymRule(ctx, "products", "r1")
+result, err = client.PutSynonymRule(ctx, "products", "r1", "phone, mobile")
+err = client.DeleteSynonymRule(ctx, "products", "r1")
+_ = rule
+```
+
+删除集合：
+
+```go
+err := client.DeleteSynonymSet(ctx, "products")
+```
+
+Synonyms API 对应 Elasticsearch 的 `/_synonyms` 端点。生产环境通常需要具备 `manage_search_synonyms` 集群权限；更新同义词后，关联 analyzer 可能会 reload，调用方应关注 `SynonymUpdateResult.ReloadAnalyzersDetails`。
+
+## 任务
+
+查询单个任务：
+
+```go
+task, err := client.GetTask(
+	ctx,
+	"node_id:123",
+	elasticsearch.WithTaskWaitForCompletion(true),
+	elasticsearch.WithTaskTimeout(30*time.Second),
+)
+```
+
+列出任务：
+
+```go
+tasks, err := client.ListTasks(
+	ctx,
+	elasticsearch.WithTaskActions("indices:data/write/reindex"),
+	elasticsearch.WithTaskDetailed(true),
+	elasticsearch.WithTaskGroupBy(elasticsearch.TaskGroupByNodes),
+)
+```
+
+取消任务：
+
+```go
+cancel, err := client.CancelTask(
+	ctx,
+	"node_id:123",
+	elasticsearch.WithTaskWaitForCompletion(true),
+)
+```
+
+也可以按条件取消任务：
+
+```go
+cancel, err = client.CancelTasks(
+	ctx,
+	elasticsearch.WithTaskActions("indices:data/write/delete/byquery"),
+	elasticsearch.WithTaskNodes("node-a"),
+)
+```
+
+`TaskResponse`、`TaskListResponse` 和 `TaskCancelResponse` 都保留了 `Raw` 字段，便于读取 Elasticsearch 新版本新增的任务字段。取消任务只对 Elasticsearch 标记为 `cancellable` 的任务有效。
+
 ## Analyze
 
 ```go
@@ -327,6 +420,8 @@ resp, err := native.Info()
 - 大批量写入使用 `CreateBulk`，并记录返回错误；部分文档失败会作为错误返回。
 - 重建索引时让业务代码访问别名，不直接绑定物理索引名。
 - 大索引重建使用异步 reindex，等待任务完成后再切换别名。
+- 更新同义词后关注 analyzer reload 明细，避免搜索分析链路悄悄失效。
+- 取消任务前先通过 `ListTasks` 或 `GetTask` 确认任务是否 `cancellable`。
 - 官方客户端未封装的能力通过 `Native()` 使用，避免在 gox 包里重复造底层 API。
 
 ## 测试

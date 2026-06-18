@@ -37,6 +37,36 @@ type Analyzer interface {
 	Analyze(ctx context.Context, index string, body io.Reader) ([]AnalyzeToken, error)
 }
 
+// SynonymManager 定义同义词管理能力。
+type SynonymManager interface {
+	// ListSynonymSets 获取同义词集合列表。
+	ListSynonymSets(ctx context.Context, opts ...SynonymOption) (*SynonymSetList, error)
+	// GetSynonymSet 获取同义词集合。
+	GetSynonymSet(ctx context.Context, id string, opts ...SynonymOption) (*SynonymSet, error)
+	// PutSynonymSet 创建或更新同义词集合。
+	PutSynonymSet(ctx context.Context, id string, rules []SynonymRule) (*SynonymUpdateResult, error)
+	// DeleteSynonymSet 删除同义词集合。
+	DeleteSynonymSet(ctx context.Context, id string) error
+	// GetSynonymRule 获取同义词集合中的单条规则。
+	GetSynonymRule(ctx context.Context, setID, ruleID string) (*SynonymRule, error)
+	// PutSynonymRule 创建或更新同义词集合中的单条规则。
+	PutSynonymRule(ctx context.Context, setID, ruleID, synonyms string) (*SynonymUpdateResult, error)
+	// DeleteSynonymRule 删除同义词集合中的单条规则。
+	DeleteSynonymRule(ctx context.Context, setID, ruleID string) error
+}
+
+// TaskManager 定义任务管理能力。
+type TaskManager interface {
+	// GetTask 获取单个任务信息。
+	GetTask(ctx context.Context, taskID string, opts ...TaskOption) (*TaskResponse, error)
+	// ListTasks 获取任务列表。
+	ListTasks(ctx context.Context, opts ...TaskOption) (*TaskListResponse, error)
+	// CancelTasks 取消匹配条件的任务。
+	CancelTasks(ctx context.Context, opts ...TaskOption) (*TaskCancelResponse, error)
+	// CancelTask 取消指定任务。
+	CancelTask(ctx context.Context, taskID string, opts ...TaskOption) (*TaskCancelResponse, error)
+}
+
 // IndexManager 定义索引和别名管理能力。
 type IndexManager interface {
 	// CreateIndex 创建索引。

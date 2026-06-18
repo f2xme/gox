@@ -38,5 +38,7 @@ func (c *Client) Ping(ctx context.Context) error {
 var _ Searcher = (*Client)(nil)
 var _ Counter = (*Client)(nil)
 var _ Analyzer = (*Client)(nil)
+var _ SynonymManager = (*Client)(nil)
+var _ TaskManager = (*Client)(nil)
 var _ IndexManager = (*Client)(nil)
 var _ Writer = (*Client)(nil)

@@ -43,12 +43,16 @@ func TestIntegrationLocalElasticsearch(t *testing.T) {
 	index := fmt.Sprintf("gox_elasticsearch_it_%d", suffix)
 	secondIndex := fmt.Sprintf("gox_elasticsearch_it_second_%d", suffix)
 	alias := fmt.Sprintf("gox_elasticsearch_it_alias_%d", suffix)
+	synonymSet := fmt.Sprintf("gox_elasticsearch_it_synonyms_%d", suffix)
 
 	cleanupIndex(t, client, index)
 	cleanupIndex(t, client, secondIndex)
 	t.Cleanup(func() {
 		cleanupIndex(t, client, index)
 		cleanupIndex(t, client, secondIndex)
+		if err := client.DeleteSynonymSet(context.Background(), synonymSet); err != nil {
+			t.Logf("delete cleanup synonym set %s: %v", synonymSet, err)
+		}
 	})
 
 	mapping := &IndexMapping{
@@ -133,6 +137,59 @@ func TestIntegrationLocalElasticsearch(t *testing.T) {
 	}
 	if len(tokens) == 0 {
 		t.Fatalf("Analyze() returned no tokens")
+	}
+
+	updateResult, err := client.PutSynonymSet(ctx, synonymSet, []SynonymRule{
+		{ID: "r1", Synonyms: "phone, mobile"},
+		{ID: "r2", Synonyms: "tv, television"},
+	})
+	if err != nil {
+		t.Fatalf("PutSynonymSet() error = %v", err)
+	}
+	if updateResult.Raw == nil {
+		t.Fatalf("PutSynonymSet() raw response is nil")
+	}
+	gotSet, err := client.GetSynonymSet(ctx, synonymSet)
+	if err != nil {
+		t.Fatalf("GetSynonymSet() error = %v", err)
+	}
+	if gotSet.Count != 2 || gotSet.Rules[0].Synonyms == "" {
+		t.Fatalf("GetSynonymSet() = %#v", gotSet)
+	}
+	gotRule, err := client.GetSynonymRule(ctx, synonymSet, "r1")
+	if err != nil {
+		t.Fatalf("GetSynonymRule() error = %v", err)
+	}
+	if gotRule.Synonyms != "phone, mobile" {
+		t.Fatalf("GetSynonymRule() synonyms = %q, want phone, mobile", gotRule.Synonyms)
+	}
+	if _, err := client.PutSynonymRule(ctx, synonymSet, "r3", "laptop => notebook"); err != nil {
+		t.Fatalf("PutSynonymRule() error = %v", err)
+	}
+	if err := client.DeleteSynonymRule(ctx, synonymSet, "r2"); err != nil {
+		t.Fatalf("DeleteSynonymRule() error = %v", err)
+	}
+	sets, err := client.ListSynonymSets(ctx, WithSynonymSize(100))
+	if err != nil {
+		t.Fatalf("ListSynonymSets() error = %v", err)
+	}
+	foundSynonymSet := false
+	for _, item := range sets.Results {
+		if item.SynonymsSet == synonymSet {
+			foundSynonymSet = true
+			break
+		}
+	}
+	if !foundSynonymSet {
+		t.Fatalf("ListSynonymSets() did not include %s: %#v", synonymSet, sets.Results)
+	}
+
+	tasks, err := client.ListTasks(ctx, WithTaskDetailed(true), WithTaskGroupBy(TaskGroupByNodes))
+	if err != nil {
+		t.Fatalf("ListTasks() error = %v", err)
+	}
+	if tasks.Raw == nil {
+		t.Fatalf("ListTasks() raw response is nil")
 	}
 
 	if err := client.AddAlias(ctx, index, alias); err != nil {
