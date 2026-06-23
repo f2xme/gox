@@ -49,6 +49,10 @@ type Hit[T any] struct {
 	ID string `json:"_id"`
 	// Score 相关性分数。
 	Score float64 `json:"_score"`
+	// Sort 排序值，用于 search_after 游标。
+	Sort []any `json:"sort"`
+	// Highlight 命中高亮片段。
+	Highlight map[string][]string `json:"highlight"`
 	// Source 文档内容。
 	Source T `json:"_source"`
 }
@@ -61,6 +65,10 @@ type HitMap struct {
 	ID string `json:"_id"`
 	// Score 相关性分数。
 	Score float64 `json:"_score"`
+	// Sort 排序值，用于 search_after 游标。
+	Sort []any `json:"sort"`
+	// Highlight 命中高亮片段。
+	Highlight map[string][]string `json:"highlight"`
 	// Source 文档内容。
 	Source map[string]any `json:"_source"`
 }
@@ -207,10 +215,12 @@ func DecodeSearchHitMaps(r io.Reader) (*SearchResult[*HitMap], error) {
 	}
 	for _, hit := range resp.Hits.Hits {
 		result.Hits = append(result.Hits, &HitMap{
-			Index:  hit.Index,
-			ID:     hit.ID,
-			Score:  hit.Score,
-			Source: hit.Source,
+			Index:     hit.Index,
+			ID:        hit.ID,
+			Score:     hit.Score,
+			Sort:      hit.Sort,
+			Highlight: hit.Highlight,
+			Source:    hit.Source,
 		})
 	}
 	return result, nil

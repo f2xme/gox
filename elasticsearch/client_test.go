@@ -184,6 +184,9 @@ func TestSearchMapAnalyzeAndWriteMethods(t *testing.T) {
 	if searchResult.Total != 1 || searchResult.Hits[0].GetString("name") != "Alice" {
 		t.Fatalf("Search() = %#v", searchResult)
 	}
+	if len(searchResult.Hits[0].Sort) != 2 || len(searchResult.Hits[0].Highlight["name"]) != 1 {
+		t.Fatalf("Search() metadata = %#v", searchResult.Hits[0])
+	}
 
 	tokens, err := client.Analyze(context.Background(), "users", strings.NewReader(`{"text":"quick"}`))
 	if err != nil {
@@ -514,10 +517,12 @@ func writeSearchFixture(w http.ResponseWriter) {
 			"total": map[string]any{"value": 1, "relation": "eq"},
 			"hits": []map[string]any{
 				{
-					"_index":  "users",
-					"_id":     "1",
-					"_score":  1.0,
-					"_source": map[string]any{"id": "1", "name": "Alice"},
+					"_index":    "users",
+					"_id":       "1",
+					"_score":    1.0,
+					"sort":      []any{1.0, "1"},
+					"highlight": map[string][]string{"name": {"<em>Alice</em>"}},
+					"_source":   map[string]any{"id": "1", "name": "Alice"},
 				},
 			},
 		},
