@@ -1,14 +1,14 @@
 // Package sms 提供统一的短信服务抽象层。
 //
 // sms 包定义短信发送的标准接口和消息结构，让业务代码可以通过同一套 API
-// 使用不同短信服务商。具体服务商实现位于独立 adapter module 中。
+// 使用不同短信服务商。具体服务商实现位于 adapter 包或独立 adapter module 中。
 //
 // # 功能特性
 //
 //   - 统一接口：通过 SMS 接口屏蔽不同服务商 SDK 差异
 //   - 结构化消息：使用 Message 描述手机号、模板和模板参数
 //   - 上下文控制：Send 方法接收 context.Context，支持取消和超时
-//   - 独立适配器：阿里云、腾讯云适配器可按需引入
+//   - 独立适配器：阿里云、腾讯云、UniSMS、内存适配器可按需引入
 //
 // # 快速开始
 //
@@ -46,8 +46,10 @@
 //
 // # 可用适配器
 //
+//   - 内存短信：github.com/f2xme/gox/sms/adapter/memory
 //   - 阿里云短信：github.com/f2xme/gox/sms/adapter/aliyun
 //   - 腾讯云短信：github.com/f2xme/gox/sms/adapter/tencent
+//   - UniSMS：github.com/f2xme/gox/sms/adapter/uni
 //   - 火山引擎短信：github.com/f2xme/gox/sms/adapter/volcengine
 //     当前为占位模块，构造函数会返回 ErrNotImplemented。
 package sms
