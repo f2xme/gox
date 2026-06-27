@@ -132,16 +132,16 @@ func DefaultErrorHandler(ctx Context, err error) {
 	}
 
 	if errors.Is(err, validator.ErrValidation) {
-		writeError(ctx, http.StatusBadRequest, err.Error())
+		WriteError(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	var se *StatusError
 	if errors.As(err, &se) {
 		status := NormalizeHTTPStatus(se.Status)
-		writeError(ctx, status, responseMessage(status, se.Message))
+		WriteError(ctx, status, responseMessage(status, se.Message))
 	} else {
-		writeError(ctx, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+		WriteError(ctx, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 	}
 }
 
@@ -149,7 +149,8 @@ type errorResponse struct {
 	Message string `json:"message"`
 }
 
-func writeError(ctx Context, code int, message string) {
+// WriteError 写入统一的错误响应。
+func WriteError(ctx Context, code int, message string) {
 	_ = ctx.JSON(code, errorResponse{Message: message})
 }
 
