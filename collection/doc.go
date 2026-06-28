@@ -47,6 +47,14 @@
 //		fmt.Println(unique) // [1 2 3]
 //	}
 //
+// # 导入别名
+//
+// 其他包需要为 collection 设置导入别名时，默认使用 cx：
+//
+//	import cx "github.com/f2xme/gox/collection"
+//
+//	values := cx.Unique([]int64{1, 2, 2, 3})
+//
 // Set 集合示例：
 //
 //	package main
