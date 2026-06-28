@@ -11,6 +11,7 @@ func TestAliases(t *testing.T) {
 	var _ NullableString = sql.NullString{}
 	var _ NullableInt64 = sql.NullInt64{}
 	var _ NullableTime = sql.NullTime{}
+	var _ NullableBool = sql.NullBool{}
 }
 
 func TestString(t *testing.T) {
@@ -170,6 +171,25 @@ func TestStringChanged(t *testing.T) {
 	}
 	if StringNullChanged(&old, sql.NullString{String: "old", Valid: true}) {
 		t.Fatal("StringNullChanged(same) = true, want false")
+	}
+}
+
+func TestBool(t *testing.T) {
+	tests := []struct {
+		name  string
+		value bool
+		want  sql.NullBool
+	}{
+		{name: "false", value: false, want: sql.NullBool{Bool: false, Valid: true}},
+		{name: "true", value: true, want: sql.NullBool{Bool: true, Valid: true}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Bool(tt.value); got != tt.want {
+				t.Fatalf("Bool(%v) = %#v, want %#v", tt.value, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -369,6 +389,19 @@ func TestTime(t *testing.T) {
 	gotPtr := TimePtr(sql.NullTime{Time: now, Valid: true})
 	if gotPtr == nil || !gotPtr.Equal(now) {
 		t.Fatalf("TimePtr(value) = %#v, want %v", gotPtr, now)
+	}
+
+	if got := PtrTimeValue(nil); !got.IsZero() {
+		t.Fatalf("PtrTimeValue(nil) = %v, want zero", got)
+	}
+	if got := PtrTimeValue(&now); !got.Equal(now) {
+		t.Fatalf("PtrTimeValue(value) = %v, want %v", got, now)
+	}
+	if got := PtrTime(time.Time{}); got != nil {
+		t.Fatalf("PtrTime(zero) = %#v, want nil", got)
+	}
+	if got := PtrTime(now); got == nil || !got.Equal(now) {
+		t.Fatalf("PtrTime(value) = %#v, want %v", got, now)
 	}
 }
 

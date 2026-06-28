@@ -8,9 +8,10 @@
 //
 //   - 字符串转换：支持 string、*string 和 sql.NullString 互转
 //   - 整数转换：支持 int64、*int64 和 sql.NullInt64 互转
-//   - 时间转换：支持 *time.Time、sql.NullTime 和时间字符串互转
+//   - 布尔转换：支持 bool 转 sql.NullBool，false 也是有效值
+//   - 时间转换：支持 time.Time、*time.Time、sql.NullTime 和时间字符串互转
 //   - 扫描辅助：支持将 NULL 字符串和整数扫描为零值
-//   - 零值约定：值转换时将空字符串和非正整数视为 NULL
+//   - 零值约定：值转换时将空字符串和非正整数视为 NULL；布尔值不使用零值转 NULL
 //
 // # 快速开始
 //

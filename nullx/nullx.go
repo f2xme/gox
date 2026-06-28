@@ -15,6 +15,9 @@ type NullableInt64 = sql.NullInt64
 // NullableTime 是 sql.NullTime 的别名。
 type NullableTime = sql.NullTime
 
+// NullableBool 是 sql.NullBool 的别名。
+type NullableBool = sql.NullBool
+
 // String 将字符串转换为 sql.NullString，空字符串会转换为 NULL。
 func String(value string) sql.NullString {
 	return sql.NullString{String: value, Valid: value != ""}
@@ -126,6 +129,11 @@ func StringNullChanged(current *string, value sql.NullString) bool {
 		return value.Valid
 	}
 	return !value.Valid || *current != value.String
+}
+
+// Bool 将布尔值转换为 sql.NullBool，false 也是有效值。
+func Bool(value bool) sql.NullBool {
+	return sql.NullBool{Bool: value, Valid: true}
 }
 
 // Int64 将 int64 转换为 sql.NullInt64，非正整数会转换为 NULL。
@@ -262,6 +270,22 @@ func TimePtr(value sql.NullTime) *time.Time {
 // PtrNullTime 将 sql.NullTime 转换为时间指针，NULL 返回 nil。
 func PtrNullTime(value sql.NullTime) *time.Time {
 	return TimePtr(value)
+}
+
+// PtrTimeValue 从时间指针取出时间，nil 返回零值时间。
+func PtrTimeValue(value *time.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return *value
+}
+
+// PtrTime 将时间转换为时间指针，零值时间返回 nil。
+func PtrTime(value time.Time) *time.Time {
+	if value.IsZero() {
+		return nil
+	}
+	return &value
 }
 
 // TimeString 将 sql.NullTime 格式化为日期时间字符串，NULL 返回空字符串。
