@@ -1,22 +1,23 @@
-# 支付宝与微信扫码支付 Adapter 设计
+# 支付宝、微信与一码付 Adapter 设计
 
 日期：2026-07-12
 
 ## 目标
 
-把 `payment/adapter/alipay` 与 `payment/adapter/wechat` 从占位实现升级为可用于生产扫码支付的 adapter。
+把 `payment/adapter/alipay` 与 `payment/adapter/wechat` 从占位实现升级为可用于生产支付的 adapter，并增加 `payment/adapter/onepay` 聚合码牌：同一个二维码根据扫码客户端路由到微信或支付宝，在扫码时创建 provider 订单并拉起对应收银台。
 
 - 支付宝使用当面付预创建接口 `alipay.trade.precreate`。
 - 微信使用支付 API v3 Native 下单接口。
 - 两个平台统一通过 `payment.Payment` 暴露下单、查询、退款、关单。
 - 支付回调完成解析、验签；微信回调额外完成 AES-GCM 解密。
 - 微信退款回调完成解析、验签、解密。
+- 一码付生成中立 HTTPS URL 与 PNG；微信内走 OAuth + JSAPI，支付宝内走 WAP。
 - 底层统一使用 `github.com/go-pay/gopay`，初始目标版本为 `v1.5.122`；实现时若该版本不能通过兼容性验证，只允许升级到更高补丁版本并在文档记录原因。
 
 ## 非目标
 
-- 不生成二维码 PNG、SVG 或其他图片，只返回二维码内容字符串。
-- 不实现 APP、H5、JSAPI、小程序、付款码支付。
+- 直接 Native/当面付 API 不生成 provider 二维码图片，只返回二维码内容；仅一码付生成中立 URL 的 PNG。
+- 不实现 APP、小程序、付款码支付；支付宝 WAP 与微信 JSAPI 只服务于一码付移动端链路。
 - 不保存订单，不提供幂等数据库，不执行对账。
 - 不自动重试退款或网关写操作。
 - 不提供 HTTP webhook server；adapter 只解析调用方传入的请求。
@@ -39,6 +40,17 @@ type Payment interface {
 所有网络请求把调用方 context 直接传给 gopay。adapter 的 10 秒默认 HTTP client timeout 与 context deadline 同时生效，以更早到期者为准。nil context 返回 `ErrInvalidRequest`。
 
 ## 核心领域模型
+
+核心包增加 provider 标识：
+
+```go
+type Provider string
+
+const (
+	ProviderAlipay Provider = "alipay"
+	ProviderWechat Provider = "wechat"
+)
+```
 
 ### Order
 
@@ -164,6 +176,7 @@ func New(config Config, opts ...Option) (*Alipay, error)
 ```go
 type Config struct {
 	AppID                  string
+	OAuthAppSecret         string
 	MchID                  string
 	MerchantSerialNo       string
 	MerchantPrivateKey     string
@@ -176,6 +189,8 @@ func New(config Config, opts ...Option) (*WechatPay, error)
 ```
 
 密钥参数接收内容，不接收文件路径。微信 v3 不支持沙箱。构造时使用 gopay `NewClientV3`，并以微信支付公钥与公钥 ID 开启自动验签。
+
+`OAuthAppSecret` 用于一码付的公众号网页授权。它对 `Payment` 的 Native 操作不是必需配置；调用 OAuth 或 JSAPI 能力时缺失该字段返回 `ErrInvalidConfig`。
 
 ### 操作映射
 
@@ -197,6 +212,141 @@ func New(config Config, opts ...Option) (*WechatPay, error)
 7. 返回统一通知，不自动 ACK。
 
 解析函数消费 `http.Request.Body` 一次；nil request、nil body、重复消费导致的空 body 均返回 `ErrInvalidRequest`。
+
+## 一码付 Adapter
+
+`payment/adapter/onepay` 是标准库 `net/http` 码牌 handler。它依赖支付宝、微信 adapter 的可选 checkout 能力，不把 provider SDK 暴露给调用方。
+
+### Provider checkout 能力
+
+支付宝 adapter 增加：
+
+```go
+func (a *Alipay) WAPPay(ctx context.Context, order *payment.Order) (*payment.WAPResult, error)
+```
+
+`WAPResult.URL` 保存 gopay `TradeWapPay` 生成的完整支付宝收银台 URL。onepay 只接受支付宝官方 HTTPS gateway host，然后使用 HTTP 303 跳转。支付宝 adapter 内部同时持有 v3 client（查询、退款、关单、预创建）与 legacy client（WAP 页面支付），公共 API 不暴露差异。
+
+微信 adapter 增加：
+
+```go
+func (w *WechatPay) OAuthURL(redirectURL, state string) (string, error)
+func (w *WechatPay) ExchangeOAuthCode(ctx context.Context, code string) (openid string, err error)
+func (w *WechatPay) JSAPIPay(ctx context.Context, order *payment.Order, openid string) (*payment.JSAPIResult, error)
+```
+
+`JSAPIResult` 只包含调起微信支付所需的 `appId`、`timeStamp`、`nonceStr`、`package`、`signType` 与 `paySign`。
+
+onepay 用本地小接口按 Go 结构化接口规则接收这些 adapter；alipay/wechat 不导入 onepay，因此不存在 adapter 循环依赖。
+
+```go
+type AlipayCheckout interface {
+	WAPPay(ctx context.Context, order *payment.Order) (*payment.WAPResult, error)
+}
+
+type WechatCheckout interface {
+	OAuthURL(redirectURL, state string) (string, error)
+	ExchangeOAuthCode(ctx context.Context, code string) (string, error)
+	JSAPIPay(ctx context.Context, order *payment.Order, openid string) (*payment.JSAPIResult, error)
+}
+```
+
+### 公共 API
+
+```go
+type OrderResolver interface {
+	ResolveOrCreate(
+		ctx context.Context,
+		intentID string,
+		provider payment.Provider,
+	) (*payment.Order, error)
+}
+
+type Config struct {
+	BaseURL   string
+	Path      string
+	TokenKey  []byte
+	TokenTTL  time.Duration
+	Resolver  OrderResolver
+	Alipay    AlipayCheckout
+	Wechat    WechatCheckout
+}
+
+type Code struct {
+	URL       string
+	PNG       []byte
+	ExpiresAt time.Time
+}
+
+func New(config Config, opts ...Option) (*Service, error)
+func (s *Service) CreateCode(ctx context.Context, intentID string, opts ...CodeOption) (*Code, error)
+func (s *Service) Handler() http.Handler
+```
+
+- `TokenTTL` 默认 15 分钟，必须大于零且不超过 24 小时。
+- `WithExpiresAt` 可覆盖单个码的过期时间，但不得超过创建时间后 24 小时。
+- `Path` 默认 `/pay/`，handler 只处理该前缀下的 token。
+- `Path` 必须以 `/` 开头和结尾，不能包含 `.` 或 `..` path segment。
+- `BaseURL` 必须是 path 为空或 `/`，且无 userinfo、query、fragment 的 HTTPS origin；测试只允许 `localhost`、loopback IP 使用 HTTP。
+- `TokenKey` 必须恰好 32 bytes；构造函数复制 key，调用方后续修改原 slice 不影响 service。
+- `CreateCode` 拒绝空 intent ID 与 nil context。
+- onepay option 为 `WithQRSize(size int)`；单码 option 为 `WithExpiresAt(time.Time)`。
+
+### Token
+
+token 使用 AES-256-GCM，明文只含版本、intent ID、签发时间、过期时间；每次生成使用 `crypto/rand` 创建唯一 nonce。金额、标题、provider 订单号、通知 URL 均不进入二维码。
+
+解密时验证：编码、版本、GCM tag、签发时间最多允许比当前时间晚 1 分钟、过期时间、intent ID 非空。失败只返回统一安全错误，不区分密钥错误与 tag 错误。
+
+### 扫码路由
+
+UA 匹配不区分大小写：
+
+- 含 `MicroMessenger` → 微信。
+- 含 `AlipayClient` → 支付宝。
+- 其他客户端返回 HTTP 400 的安全提示页，不自动猜测渠道。
+
+UA 只选择 provider，不承担认证职责。
+
+### 微信链路
+
+1. 首次访问没有 OAuth code：生成独立随机 state 与 cookie nonce。
+2. state 包含 token hash、到期时间、随机 nonce，并用从 `TokenKey` 派生的 HMAC-SHA256 key 签名。
+3. 写入 `Secure`、`HttpOnly`、`SameSite=Lax`、限定当前 token path 的 cookie，然后重定向至微信 `snsapi_base` 授权。cookie 名含 token hash 前缀，避免同一浏览器并发支付互相覆盖。
+4. callback 校验 state 签名、state/cookie nonce、token hash 与到期时间；成功后立刻删除 cookie，阻止重放。
+5. adapter 以 code 换取 OpenID。
+6. 调用 `ResolveOrCreate(intentID, ProviderWechat)`，再发起 JSAPI 下单。
+7. onepay 输出固定 HTML，通过带 CSP nonce 的脚本调用 `WeixinJSBridge`。CSP 至少包含 `default-src 'none'`、`script-src 'nonce-<value>'`、`base-uri 'none'`、`frame-ancestors 'none'`；支付参数经 `html/template` 的 JavaScript 上下文转义。
+
+JS bridge 成功或失败仅用于用户界面展示，不修改服务端支付状态；最终结果只认验签、解密且通过业务金额校验的异步回调。
+
+### 支付宝链路
+
+1. 调用 `ResolveOrCreate(intentID, ProviderAlipay)`。
+2. adapter 发起支付宝 WAP 支付。
+3. onepay 要求 gateway scheme 为 HTTPS，host 精确匹配 `openapi.alipay.com` 或新版沙箱 `openapi-sandbox.dl.alipaydev.com`，再使用 HTTP 303 跳转到收银台 URL。
+
+请求参数不能覆盖 onepay 的 BaseURL、callback path 或任意 return URL。同步跳转只用于展示，最终结果只认验签后的异步回调。
+
+### Resolver 幂等契约
+
+Resolver 属于业务持久化边界，必须：
+
+- 原子检查主支付意图仍未支付。
+- 同一 intent、同一 provider 的重复扫码复用同一个 provider 订单号。
+- 不同 provider 使用不同订单号，并保留 provider 订单到 intent 的映射。
+- 首个成功回调以 compare-and-swap 将主意图置为已支付。
+- 首个成功后异步关闭另一个仍 pending 的 provider 订单。
+- provider 写请求发生不确定网络错误时先查询，不能盲目创建新订单。
+
+onepay 不保存订单，也不提供进程内锁冒充分布式幂等。
+
+### QR 输出
+
+- 使用 `github.com/yeqown/go-qrcode/v2` `v2.2.5`。
+- 默认输出 256×256 PNG、中等级纠错、保留标准白边。
+- `WithQRSize` 接受 128–1024 像素。
+- 全程内存编码，不创建临时文件。
 
 ## Options
 
@@ -223,6 +373,9 @@ ErrInvalidRequest
 ErrGateway
 ErrInvalidSignature
 ErrUnknownStatus
+ErrExpired
+ErrUnsupportedClient
+ErrInvalidOAuthState
 ```
 
 adapter 使用 `ProviderError` 保留：
@@ -237,6 +390,8 @@ adapter 使用 `ProviderError` 保留：
 
 context 取消与 deadline 错误保留原始 cause，使调用方仍可使用 `errors.Is(err, context.Canceled)` 和 `errors.Is(err, context.DeadlineExceeded)`。
 
+onepay HTTP 错误映射固定为：token 格式/验密失败 400、过期 410、未知扫码端 400、OAuth state 失败 400、Resolver 或 provider 失败 502。响应只含通用中文提示与随机 request ID，不返回内部错误文本。
+
 ## 幂等与安全边界
 
 - 商户订单号与退款单号承担 provider 侧幂等键职责。
@@ -249,6 +404,8 @@ context 取消与 deadline 错误保留原始 cause，使调用方仍可使用 `
 ## 内部结构
 
 每个 adapter 内部定义最小 gateway 接口，只包含本次需要的 gopay 调用。生产实现包装 gopay client；测试使用 fake gateway。gateway 接口不导出，避免第三方 SDK 成为 gox 公共 API。
+
+onepay 另定义不导出的 QR encoder 接口；生产实现包装 `yeqown/go-qrcode`，测试 fake 捕获实际编码输入，确保编码内容与 `Code.URL` 一致。
 
 实现文件布局：
 
@@ -272,6 +429,14 @@ payment/
     gateway.go
     notification.go
     mapping.go
+    example_test.go
+  adapter/onepay/
+    onepay.go
+    config.go
+    token.go
+    oauth_state.go
+    handler.go
+    template.go
     example_test.go
 ```
 
@@ -301,6 +466,18 @@ payment/
 - 覆盖签名错误、解密错误、AppID/MchID 错误、未知状态。
 - 覆盖 context 取消与超时传播。
 
+### 一码付
+
+- AES-GCM round trip、随机 nonce、篡改、错误密钥、过期、错误版本。
+- 微信、支付宝、未知 UA 的表驱动路由测试。
+- 使用 `httptest` 覆盖微信扫码、OAuth redirect、state/cookie、code exchange、JSAPI、bridge HTML 完整流程。
+- 使用 `httptest` 覆盖支付宝扫码、WAP 下单、gateway allowlist、HTTP 303 完整流程。
+- 覆盖 OAuth state 不匹配、cookie 缺失、重放、code exchange 失败。
+- 覆盖 HTML 注入 payload、CSP nonce、gateway host allowlist、开放重定向防护。
+- 覆盖 Resolver 重复扫码复用订单的契约示例。
+- 覆盖 context 取消、超时、provider 错误的安全错误页。
+- PNG 使用标准库 `image/png` 解码并校验尺寸；同时断言二维码输入 URL 与 `Code.URL` 完全一致。
+
 ### 验证命令
 
 ```bash
@@ -315,13 +492,16 @@ go build ./...
 
 - 更新 `payment/doc.go`，删除占位实现说明。
 - 增加支付宝、微信扫码下单与 HTTP 回调示例。
+- 增加 onepay 标准 `net/http` 挂载、Gin 挂载、二维码生成与 `OrderResolver` 幂等示例。
 - 更新 `AI_USAGE.md` 与 `llms.txt` 的 package map。
 - 明确旧 `NewAlipay`、`NewWechatPay` 和无 context 方法已删除。
-- 文档强调：二维码字符串需要调用方渲染；ACK 只能在业务事务成功后返回。
+- 文档强调：直接扫码的二维码字符串由调用方渲染；onepay 返回中立 URL 与 PNG；ACK 只能在业务事务成功后返回。
 
 ## 完成标准
 
 - 两个平台扫码下单返回可渲染的二维码内容。
+- onepay 生成可解码的中立 URL PNG；微信扫描完成 OAuth + JSAPI 拉起，支付宝扫描完成 WAP 收银台拉起。
+- 相同 intent/provider 重复扫码通过 Resolver 复用 provider 订单。
 - 四个支付操作均调用真实 gopay gateway，不再返回 `ErrNotImplemented`。
 - 支付回调均验签；微信支付与退款回调均完成验签和解密。
 - 所有已知状态按表映射，未知状态显式报错。
