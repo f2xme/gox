@@ -2,11 +2,6 @@ go 1.25.7
 
 use (
 	.
-	./oauth2
-	./oauth2/adapter/alipay
-	./oauth2/adapter/douyin
-	./oauth2/adapter/qq
-	./oauth2/adapter/wechat
 	./cache/adapter/redis
 	./config/adapter/env
 	./config/adapter/http
