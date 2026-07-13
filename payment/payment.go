@@ -13,6 +13,8 @@ const (
 	ProviderAlipay Provider = "alipay"
 	// ProviderWechat 表示微信支付。
 	ProviderWechat Provider = "wechat"
+	// ProviderMock 表示测试用内存支付服务。
+	ProviderMock Provider = "mock"
 )
 
 // Payment 定义统一的支付操作接口。
