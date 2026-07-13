@@ -14,6 +14,9 @@ use (
 	./httpx/adapter/gin
 	./logx/adapter/zap
 	./oss/adapter/aliyun
+	./payment/adapter/alipay
+	./payment/adapter/onepay
+	./payment/adapter/wechat
 	./queue
 	./queue/adapter/mem
 	./queue/adapter/rocketmq
