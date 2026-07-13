@@ -50,6 +50,8 @@ SMS providers, queues, and similar integrations.
 | Graceful shutdown | `graceful` |
 | ID generation | `idgen` |
 | JWT tokens | `jwt` |
+| Third-party OAuth2 login | `oauth2`, `oauth2/adapter/*` |
+| Alipay, WeChat Pay, unified payment QR | `payment`, `payment/adapter/alipay`, `payment/adapter/wechat`, `payment/adapter/onepay` |
 | Logging | `logx`, `logx/adapter/zap` |
 | Metrics | `metrics`, `metrics/adapter/*` |
 | Email | `email` |
@@ -77,6 +79,11 @@ SMS providers, queues, and similar integrations.
   explicitly for production, and use `client.Native()` for official APIs that
   are not wrapped yet.
 - Look for `example_test.go` before inventing new usage patterns.
+- Payment amounts are integer cents. Payment operations require context. Treat
+  verified callbacks as untrusted business events until order, amount, state,
+  and idempotency checks pass. `onepay.CheckoutResolver` must persist provider
+  order mappings and complete checkout artifacts. Repeated WeChat scans by the
+  same OpenID reuse unexpired JSAPI parameters.
 - Placeholder adapters may exist. If an adapter explicitly says sending,
   charging, or gateway access is not implemented, do not treat it as production
   integration.

@@ -1,6 +1,7 @@
 package zap_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,6 +13,28 @@ import (
 	"github.com/f2xme/gox/logx"
 	"github.com/f2xme/gox/logx/adapter/zap"
 )
+
+type lifecycleWriter struct {
+	bytes.Buffer
+	flushes int
+	syncs   int
+	closes  int
+}
+
+func (w *lifecycleWriter) Flush() error {
+	w.flushes++
+	return nil
+}
+
+func (w *lifecycleWriter) Sync() error {
+	w.syncs++
+	return nil
+}
+
+func (w *lifecycleWriter) Close() error {
+	w.closes++
+	return nil
+}
 
 func TestNew_BasicLogging(t *testing.T) {
 	r, w, _ := os.Pipe()
@@ -98,6 +121,88 @@ func TestNew_FileOutput(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "file-test") {
 		t.Errorf("expected log file to contain 'file-test', got %q", string(data))
+	}
+}
+
+func TestNew_WriterOutput(t *testing.T) {
+	writer := &lifecycleWriter{}
+	logger := zap.New(
+		zap.WithDisableConsole(),
+		zap.WithInfoLevel(),
+		zap.WithWriter(writer),
+	)
+	logger.Info("writer-test", logx.NewKV("key", "value"))
+
+	if f, ok := logger.(logx.Flusher); ok {
+		if err := f.Flush(); err != nil {
+			t.Fatalf("Flush() error = %v", err)
+		}
+	}
+	if !strings.Contains(writer.String(), "writer-test") || !strings.Contains(writer.String(), "value") {
+		t.Fatalf("writer output = %q", writer.String())
+	}
+	if writer.flushes == 0 {
+		t.Fatalf("Flush() was not called on writer")
+	}
+	flushes := writer.flushes
+	if s, ok := logger.(logx.Syncer); ok {
+		if err := s.Sync(); err != nil {
+			t.Fatalf("Sync() error = %v", err)
+		}
+	}
+	if writer.syncs != 1 {
+		t.Fatalf("Sync calls = %d, want 1", writer.syncs)
+	}
+	if writer.flushes != flushes {
+		t.Fatalf("Flush calls after Sync = %d, want %d", writer.flushes, flushes)
+	}
+
+	if s, ok := logger.(logx.Stopper); ok {
+		if err := s.Stop(); err != nil {
+			t.Fatalf("Stop() error = %v", err)
+		}
+	}
+	if writer.closes != 1 {
+		t.Fatalf("Close calls = %d, want 1", writer.closes)
+	}
+}
+
+func TestNew_StopIsIdempotent(t *testing.T) {
+	writer := &lifecycleWriter{}
+	logger := zap.New(zap.WithDisableConsole(), zap.WithWriter(writer))
+	stopper := logger.(logx.Stopper)
+
+	if err := stopper.Stop(); err != nil {
+		t.Fatalf("first Stop() error = %v", err)
+	}
+	if err := stopper.Stop(); err != nil {
+		t.Fatalf("second Stop() error = %v", err)
+	}
+	if writer.flushes != 1 || writer.closes != 1 {
+		t.Fatalf("lifecycle calls after repeated Stop: flushes=%d closes=%d, want 1/1", writer.flushes, writer.closes)
+	}
+}
+
+func TestNew_AsyncWriterLifecycleDoesNotDuplicateFlush(t *testing.T) {
+	writer := &lifecycleWriter{}
+	logger := zap.New(
+		zap.WithDisableConsole(),
+		zap.WithWriter(writer),
+		zap.WithAsyncBuffer(),
+	)
+	logger.Info("buffered")
+
+	if err := logger.(logx.Flusher).Flush(); err != nil {
+		t.Fatalf("Flush() error = %v", err)
+	}
+	if writer.syncs != 1 || writer.flushes != 0 {
+		t.Fatalf("after Flush: syncs=%d flushes=%d, want 1/0", writer.syncs, writer.flushes)
+	}
+	if err := logger.(logx.Stopper).Stop(); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+	if writer.syncs != 2 || writer.flushes != 0 || writer.closes != 1 {
+		t.Fatalf("after Stop: syncs=%d flushes=%d closes=%d, want 2/0/1", writer.syncs, writer.flushes, writer.closes)
 	}
 }
 

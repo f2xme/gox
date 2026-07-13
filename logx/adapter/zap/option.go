@@ -25,6 +25,7 @@ type BufferConfig struct {
 type Options struct {
 	Level          zapcore.Level
 	File           io.Writer
+	Writers        []io.Writer
 	TimeLayout     string
 	DisableConsole bool
 	CallerSkip     int
@@ -92,6 +93,24 @@ func WithFile(filename string) Option {
 	return func(c *Options) {
 		c.File = &lumberjack.Logger{Filename: filename}
 	}
+}
+
+// WithWriter 添加自定义日志输出。
+//
+// writer 会接收 zap 编码后的 JSON 日志行。若 writer 实现 Sync、Flush 或
+// Close 方法，zap 适配器会在生命周期操作中传播刷新与关闭。启用异步缓冲时，
+// 缓冲器通过 Sync 刷新实现 WriteSyncer 的 writer。
+func WithWriter(writer io.Writer) Option {
+	return func(c *Options) {
+		if writer != nil {
+			c.Writers = append(c.Writers, writer)
+		}
+	}
+}
+
+// WithWriteSyncer 添加自定义 zap WriteSyncer 输出。
+func WithWriteSyncer(writer zapcore.WriteSyncer) Option {
+	return WithWriter(writer)
 }
 
 // WithFileRotation 设置日志文件轮转配置

@@ -1,71 +1,197 @@
-// Package alipay 为 payment.Payment 接口提供支付宝适配器占位实现。
-//
-// 当前版本不会连接支付宝网关，所有支付操作都会返回
-// payment.ErrNotImplemented。
+// Package alipay 为 payment 包提供支付宝实现。
 package alipay
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/f2xme/gox/payment"
+	"github.com/go-pay/gopay"
 )
 
-// Alipay 是实现 payment.Payment 接口的支付宝适配器占位实现。
+// Alipay 实现支付宝当面付、WAP、查询、退款、关单和回调验签。
 type Alipay struct {
-	appID      string
-	privateKey string
-	publicKey  string
-	isSandbox  bool
+	config       Config
+	gateway      gateway
+	verifyNotify func(string, any) (bool, error)
 }
 
-// NewAlipay 创建新的支付宝适配器占位实现。
-//
-// 参数：
-//   - appID: 支付宝应用 ID
-//   - privateKey: 商户私钥，用于请求签名
-//   - publicKey: 支付宝公钥，用于响应验签
-//   - isSandbox: 是否使用沙箱环境
-func NewAlipay(appID, privateKey, publicKey string, isSandbox bool) *Alipay {
-	return &Alipay{
-		appID:      appID,
-		privateKey: privateKey,
-		publicKey:  publicKey,
-		isSandbox:  isSandbox,
-	}
-}
-
-// Pay 校验订单并返回 payment.ErrNotImplemented。
-func (a *Alipay) Pay(order *payment.Order) (*payment.PaymentResult, error) {
-	if err := payment.ValidateOrder(order); err != nil {
+// New 创建支付宝支付适配器。
+func New(config Config, opts ...Option) (*Alipay, error) {
+	if err := validateConfig(config); err != nil {
 		return nil, err
 	}
-
-	return nil, fmt.Errorf("alipay pay: %w", payment.ErrNotImplemented)
+	options := defaultOptions()
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+	gw, err := newGopayGateway(config, options)
+	if err != nil {
+		return nil, fmt.Errorf("%w: initialize alipay client: %v", payment.ErrInvalidConfig, err)
+	}
+	return &Alipay{config: config, gateway: gw, verifyNotify: verifySign}, nil
 }
 
-// Query 校验订单号并返回 payment.ErrNotImplemented。
-func (a *Alipay) Query(orderID string) (*payment.QueryResult, error) {
+func newWithGateway(config Config, gw gateway) *Alipay {
+	return &Alipay{config: config, gateway: gw, verifyNotify: verifySign}
+}
+
+// Pay 发起支付宝当面付预创建并返回二维码内容。
+func (a *Alipay) Pay(ctx context.Context, order *payment.Order) (*payment.PaymentResult, error) {
+	if err := validateCall(ctx, order); err != nil {
+		return nil, err
+	}
+	bm := orderBody(order)
+	resp, err := a.gateway.precreate(ctx, bm)
+	if err != nil {
+		return nil, providerError("pay", err)
+	}
+	if resp == nil || resp.Response == nil || resp.Response.QrCode == "" {
+		return nil, providerError("pay", fmt.Errorf("empty precreate response"))
+	}
+	return &payment.PaymentResult{OrderID: resp.Response.OutTradeNo, PayURL: resp.Response.QrCode}, nil
+}
+
+// WAPPay 创建支付宝手机网站收银台 URL。
+func (a *Alipay) WAPPay(ctx context.Context, order *payment.Order) (*payment.WAPResult, error) {
+	if err := validateCall(ctx, order); err != nil {
+		return nil, err
+	}
+	bm := orderBody(order)
+	if order.ReturnURL != "" {
+		bm.Set("return_url", order.ReturnURL)
+	}
+	url, err := a.gateway.wapPay(ctx, bm)
+	if err != nil {
+		return nil, providerError("wap_pay", err)
+	}
+	if url == "" {
+		return nil, providerError("wap_pay", fmt.Errorf("empty cashier URL"))
+	}
+	return &payment.WAPResult{URL: url}, nil
+}
+
+// Query 查询支付宝订单。
+func (a *Alipay) Query(ctx context.Context, orderID string) (*payment.QueryResult, error) {
+	if err := payment.ValidateContext(ctx); err != nil {
+		return nil, err
+	}
 	if err := payment.ValidateOrderID(orderID); err != nil {
 		return nil, err
 	}
-
-	return nil, fmt.Errorf("alipay query: %w", payment.ErrNotImplemented)
+	resp, err := a.gateway.query(ctx, gopay.BodyMap{"out_trade_no": orderID})
+	if err != nil {
+		return nil, providerError("query", err)
+	}
+	if resp == nil || resp.Response == nil {
+		return nil, providerError("query", fmt.Errorf("empty query response"))
+	}
+	status, err := mapPaymentStatus(resp.Response.TradeStatus)
+	if err != nil {
+		return nil, err
+	}
+	amount, err := yuanToCents(resp.Response.TotalAmount)
+	if err != nil {
+		return nil, providerError("query", err)
+	}
+	paidAt, err := parseAlipayTime(resp.Response.SendPayDate)
+	if err != nil {
+		return nil, providerError("query", err)
+	}
+	return &payment.QueryResult{
+		OrderID:       resp.Response.OutTradeNo,
+		TransactionID: resp.Response.TradeNo,
+		Status:        status,
+		Amount:        amount,
+		PaidAt:        paidAt,
+	}, nil
 }
 
-// Refund 校验退款请求并返回 payment.ErrNotImplemented。
-func (a *Alipay) Refund(req *payment.RefundRequest) (*payment.RefundResult, error) {
+// Refund 发起支付宝退款。
+func (a *Alipay) Refund(ctx context.Context, req *payment.RefundRequest) (*payment.RefundResult, error) {
+	if err := payment.ValidateContext(ctx); err != nil {
+		return nil, err
+	}
 	if err := payment.ValidateRefundRequest(req); err != nil {
 		return nil, err
 	}
-
-	return nil, fmt.Errorf("alipay refund: %w", payment.ErrNotImplemented)
+	bm := gopay.BodyMap{
+		"out_trade_no":   req.OrderID,
+		"out_request_no": req.RefundID,
+		"refund_amount":  centsToYuan(req.Amount),
+	}
+	if req.Reason != "" {
+		bm.Set("refund_reason", req.Reason)
+	}
+	resp, err := a.gateway.refund(ctx, bm)
+	if err != nil {
+		return nil, providerError("refund", err)
+	}
+	if resp == nil || resp.Response == nil {
+		return nil, providerError("refund", fmt.Errorf("empty refund response"))
+	}
+	refundAt, err := parseAlipayTime(resp.Response.GmtRefundPay)
+	if err != nil {
+		return nil, providerError("refund", err)
+	}
+	return &payment.RefundResult{
+		RefundID:      req.RefundID,
+		TransactionID: resp.Response.RefundSettlementId,
+		Status:        payment.RefundStatusSuccess,
+		RefundAt:      refundAt,
+	}, nil
 }
 
-// Close 校验订单号并返回 payment.ErrNotImplemented。
-func (a *Alipay) Close(orderID string) error {
+// Close 关闭支付宝订单。
+func (a *Alipay) Close(ctx context.Context, orderID string) error {
+	if err := payment.ValidateContext(ctx); err != nil {
+		return err
+	}
 	if err := payment.ValidateOrderID(orderID); err != nil {
 		return err
 	}
+	resp, err := a.gateway.close(ctx, gopay.BodyMap{"out_trade_no": orderID})
+	if err != nil {
+		return providerError("close", err)
+	}
+	if resp == nil || resp.Response == nil {
+		return providerError("close", fmt.Errorf("empty close response"))
+	}
+	return nil
+}
 
-	return fmt.Errorf("alipay close: %w", payment.ErrNotImplemented)
+func orderBody(order *payment.Order) gopay.BodyMap {
+	bm := gopay.BodyMap{
+		"out_trade_no": order.OrderID,
+		"total_amount": centsToYuan(order.Amount),
+		"subject":      order.Subject,
+		"notify_url":   order.NotifyURL,
+	}
+	if order.Description != "" {
+		bm.Set("body", order.Description)
+	}
+	if order.ExpireAt != nil {
+		bm.Set("time_expire", order.ExpireAt.In(alipayLocation).Format("2006-01-02 15:04:05"))
+	}
+	return bm
+}
+
+func validateCall(ctx context.Context, order *payment.Order) error {
+	if err := payment.ValidateContext(ctx); err != nil {
+		return err
+	}
+	return payment.ValidateOrder(order)
+}
+
+func providerError(operation string, err error) error {
+	if err == nil {
+		err = payment.ErrGateway
+	}
+	return &payment.ProviderError{
+		Provider:  payment.ProviderAlipay,
+		Operation: operation,
+		Err:       fmt.Errorf("%w: %w", payment.ErrGateway, err),
+	}
 }

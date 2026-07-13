@@ -1,6 +1,8 @@
 package zap
 
 import (
+	"io"
+
 	"github.com/f2xme/gox/config"
 	"github.com/f2xme/gox/logx"
 	gozap "go.uber.org/zap"
@@ -25,6 +27,8 @@ func New(opts ...Option) logx.Logger {
 	return &zapLogger{
 		logger:          logger,
 		bufferedWriters: result.bufferedWriters,
+		outputFlushers:  result.outputFlushers,
+		outputClosers:   result.outputClosers,
 	}
 }
 
@@ -41,6 +45,8 @@ func New(opts ...Option) logx.Logger {
 func NewLoggers(optSets ...[]Option) logx.Logger {
 	var allCores []zapcore.Core
 	var allBuffered []*zapcore.BufferedWriteSyncer
+	var allFlushers []func() error
+	var allClosers []io.Closer
 
 	for _, opts := range optSets {
 		cfg := defaultOptions()
@@ -50,12 +56,16 @@ func NewLoggers(optSets ...[]Option) logx.Logger {
 		result := buildCore(&cfg)
 		allCores = append(allCores, result.core)
 		allBuffered = append(allBuffered, result.bufferedWriters...)
+		allFlushers = append(allFlushers, result.outputFlushers...)
+		allClosers = append(allClosers, result.outputClosers...)
 	}
 
 	logger := gozap.New(zapcore.NewTee(allCores...))
 	return &zapLogger{
 		logger:          logger,
 		bufferedWriters: allBuffered,
+		outputFlushers:  allFlushers,
+		outputClosers:   allClosers,
 	}
 }
 

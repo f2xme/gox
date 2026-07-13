@@ -31,6 +31,8 @@ This guide helps AI coding agents choose and use gox packages correctly.
 | Add graceful shutdown | `graceful` | `github.com/f2xme/gox/graceful` |
 | Generate IDs | `idgen` | `github.com/f2xme/gox/idgen` |
 | Issue or verify JWTs | `jwt` | `github.com/f2xme/gox/jwt` |
+| Add third-party OAuth2 login | `oauth2`, `oauth2/adapter/*` | `github.com/f2xme/gox/oauth2` |
+| Add Alipay, WeChat Pay, or a unified QR code | `payment`, `payment/adapter/*` | `github.com/f2xme/gox/payment` |
 | Add logging | `logx`, `logx/adapter/zap` | `github.com/f2xme/gox/logx` |
 | Add metrics | `metrics`, `metrics/adapter/*` | `github.com/f2xme/gox/metrics` |
 | Send email | `email` | `github.com/f2xme/gox/email` |
@@ -187,6 +189,23 @@ if err != nil {
 
 var _ cache.Store = store
 ```
+
+### Payments
+
+Use `payment` for shared order/status/callback types. Use
+`payment/adapter/alipay` or `payment/adapter/wechat` for direct provider QR
+payments. Use `payment/adapter/onepay` when one neutral HTTPS QR must route
+WeChat scans to OAuth + JSAPI and Alipay scans to WAP.
+
+All amounts are integer cents. Pass `context.Context` to every payment
+operation. After a verified callback, the application must still check the
+stored order and amount, apply the state change idempotently, then write the
+adapter's success response.
+
+`onepay.CheckoutResolver` is the persistence boundary. It owns provider adapter
+calls and must atomically cache complete WAP or JSAPI checkout artifacts.
+Repeated WeChat scans by the same OpenID reuse an unexpired JSAPI result;
+different OpenIDs must not share a payer-bound WeChat order.
 
 When adding a new integration, place it under:
 

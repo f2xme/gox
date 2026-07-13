@@ -2,6 +2,7 @@ package zap
 
 import (
 	"errors"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -14,7 +15,11 @@ import (
 type zapLogger struct {
 	logger          *gozap.Logger
 	bufferedWriters []*zapcore.BufferedWriteSyncer
+	outputFlushers  []func() error
+	outputClosers   []io.Closer
 	mu              sync.Mutex
+	stopOnce        sync.Once
+	stopErr         error
 }
 
 var (
@@ -43,9 +48,14 @@ func (l *zapLogger) Fatal(err error, metas ...logx.Meta) {
 func (l *zapLogger) Flush() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	errs := make([]error, 0, len(l.bufferedWriters))
+	errs := make([]error, 0, len(l.bufferedWriters)+len(l.outputFlushers))
 	for _, bw := range l.bufferedWriters {
 		if err := bw.Sync(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	for _, flush := range l.outputFlushers {
+		if err := flush(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -53,19 +63,34 @@ func (l *zapLogger) Flush() error {
 }
 
 func (l *zapLogger) Sync() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.logger.Sync()
 }
 
 func (l *zapLogger) Stop() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	errs := make([]error, 0, len(l.bufferedWriters))
-	for _, bw := range l.bufferedWriters {
-		if err := bw.Stop(); err != nil {
-			errs = append(errs, err)
+	l.stopOnce.Do(func() {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		errs := make([]error, 0, len(l.bufferedWriters)+len(l.outputFlushers)+len(l.outputClosers))
+		for _, bw := range l.bufferedWriters {
+			if err := bw.Stop(); err != nil {
+				errs = append(errs, err)
+			}
 		}
-	}
-	return errors.Join(errs...)
+		for _, flush := range l.outputFlushers {
+			if err := flush(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		for _, closer := range l.outputClosers {
+			if err := closer.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		l.stopErr = errors.Join(errs...)
+	})
+	return l.stopErr
 }
 
 func toFields(metas []logx.Meta) []gozap.Field {
@@ -82,6 +107,8 @@ func toFields(metas []logx.Meta) []gozap.Field {
 type coreResult struct {
 	core            zapcore.Core
 	bufferedWriters []*zapcore.BufferedWriteSyncer
+	outputFlushers  []func() error
+	outputClosers   []io.Closer
 }
 
 func buildCore(cfg *Options) *coreResult {
@@ -103,19 +130,20 @@ func buildCore(cfg *Options) *coreResult {
 		cores = append(cores, zapcore.NewCore(jsonEncoder, zapcore.AddSync(os.Stdout), levelEnabler))
 	}
 
-	if cfg.File != nil {
+	for _, writer := range outputWriters(cfg) {
 		var ws zapcore.WriteSyncer
 		if cfg.Buffer != nil {
 			bws := &zapcore.BufferedWriteSyncer{
-				WS:            zapcore.AddSync(cfg.File),
+				WS:            zapcore.AddSync(writer),
 				Size:          cfg.Buffer.Size,
 				FlushInterval: cfg.Buffer.Interval,
 			}
 			result.bufferedWriters = append(result.bufferedWriters, bws)
 			ws = bws
 		} else {
-			ws = zapcore.AddSync(cfg.File)
+			ws = zapcore.AddSync(writer)
 		}
+		appendOutputLifecycle(result, writer, cfg.Buffer != nil)
 		cores = append(cores, zapcore.NewCore(jsonEncoder, ws, levelEnabler))
 	}
 
@@ -125,4 +153,30 @@ func buildCore(cfg *Options) *coreResult {
 
 	result.core = zapcore.NewTee(cores...)
 	return result
+}
+
+func outputWriters(cfg *Options) []io.Writer {
+	writers := make([]io.Writer, 0, len(cfg.Writers)+1)
+	if cfg.File != nil {
+		writers = append(writers, cfg.File)
+	}
+	writers = append(writers, cfg.Writers...)
+	return writers
+}
+
+func appendOutputLifecycle(result *coreResult, writer io.Writer, buffered bool) {
+	f, hasFlush := writer.(interface{ Flush() error })
+	s, hasSync := writer.(interface{ Sync() error })
+	if buffered {
+		if hasFlush && !hasSync {
+			result.outputFlushers = append(result.outputFlushers, f.Flush)
+		}
+	} else if hasFlush {
+		result.outputFlushers = append(result.outputFlushers, f.Flush)
+	} else if hasSync {
+		result.outputFlushers = append(result.outputFlushers, s.Sync)
+	}
+	if c, ok := writer.(io.Closer); ok {
+		result.outputClosers = append(result.outputClosers, c)
+	}
 }

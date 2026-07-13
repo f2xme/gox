@@ -113,6 +113,23 @@ Builder 同时实现 Request 接口，可直接传给 Search 和 Count：
 	err = client.UpdateDoc(ctx, "users", user)
 	err = client.DeleteDoc(ctx, "users", "u1")
 
+作为 logx/zap 日志输出：
+
+	logWriter, err := elasticsearch.NewLogWriter(client,
+		elasticsearch.WithLogIndex("app-logs"),
+		elasticsearch.WithLogBatchSize(500),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	logger := zap.New(
+		zap.WithDisableConsole(),
+		zap.WithWriter(logWriter),
+	)
+	logx.Init(logger)
+	defer logx.Stop()
+
 索引创建使用 IndexMapping：
 
 	mapping := &elasticsearch.IndexMapping{

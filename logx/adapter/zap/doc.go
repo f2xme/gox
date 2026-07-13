@@ -41,6 +41,14 @@ zap 是一个高性能的结构化日志库，本适配器将其封装为 logx.L
 		zap.WithFile("/var/log/app.log"),
 	)
 
+输出到自定义 writer：
+
+	logger := zap.New(
+		zap.WithInfoLevel(),
+		zap.WithDisableConsole(),
+		zap.WithWriter(writer),
+	)
+
 日志轮转：
 
 	logger := zap.New(
