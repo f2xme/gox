@@ -51,6 +51,7 @@ github.com/f2xme/gox/<package>
 | 队列 | `queue`, `queue/adapter/*` | `github.com/f2xme/gox/queue` |
 | 短信 | `sms`, `sms/adapter/*` | `github.com/f2xme/gox/sms` |
 | 对象存储 | `oss`, `oss/adapter/aliyun` | `github.com/f2xme/gox/oss` |
+| IP 地区查询 | `geo`, `geo/adapter/*` | `github.com/f2xme/gox/geo` |
 
 ### 可用包
 
@@ -73,6 +74,12 @@ github.com/f2xme/gox/<package>
   - `httpx/adapter/gin` - Gin 框架适配器
   - `httpx/testkit` - 面向 `httpx.Engine` 的 HTTP 集成测试工具
 - **idgen** - ID 生成器
+- **geo** - IP 地区查询
+  - `geo/adapter/memory` - 内存适配器（测试）
+  - `geo/adapter/http` - HTTP 在线 API 适配器
+  - `geo/adapter/amap` - 高德 IP 定位适配器
+  - `geo/adapter/baidu` - 百度 IP 查询适配器
+  - `geo/adapter/ip2region` - ip2region 离线 xdb 适配器
 - **jwt** - JWT 令牌处理
 - **logx** - 日志封装
   - 支持 `logx.Init(logger, logx.WithAsync())` 启用包级异步打印；退出前调用 `logx.Stop()` 或 `logx.Flush()` 排空队列

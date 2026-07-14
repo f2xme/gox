@@ -56,6 +56,7 @@ SMS providers, queues, and similar integrations.
 | Metrics | `metrics`, `metrics/adapter/*` |
 | Email | `email` |
 | Object storage | `oss`, `oss/adapter/aliyun` |
+| IP geolocation / region lookup | `geo`, `geo/adapter/memory`, `geo/adapter/http`, `geo/adapter/amap`, `geo/adapter/baidu`, `geo/adapter/ip2region` |
 | Queue abstraction | `queue`, `queue/adapter/mem`, `queue/adapter/rocketmq` |
 | Rate limiting | `ratelimit` |
 | SMS | `sms`, `sms/adapter/aliyun`, `sms/adapter/tencent`, `sms/adapter/volcengine` |

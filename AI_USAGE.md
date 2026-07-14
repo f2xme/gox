@@ -37,6 +37,7 @@ This guide helps AI coding agents choose and use gox packages correctly.
 | Add metrics | `metrics`, `metrics/adapter/*` | `github.com/f2xme/gox/metrics` |
 | Send email | `email` | `github.com/f2xme/gox/email` |
 | Use object storage | `oss`, `oss/adapter/aliyun` | `github.com/f2xme/gox/oss` |
+| Look up IP geolocation / region | `geo`, `geo/adapter/amap`, `geo/adapter/baidu`, `geo/adapter/*` | `github.com/f2xme/gox/geo` |
 | Use queues | `queue`, `queue/adapter/*` | `github.com/f2xme/gox/queue` |
 | Add rate limiting | `ratelimit` | `github.com/f2xme/gox/ratelimit` |
 | Send SMS | `sms`, `sms/adapter/*` | `github.com/f2xme/gox/sms` |

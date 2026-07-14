@@ -12,6 +12,7 @@ use (
 	./database/adapter/sqlitedb
 	./encrypt
 	./httpx/adapter/gin
+	./geo/adapter/ip2region
 	./logx/adapter/zap
 	./oss/adapter/aliyun
 	./payment/adapter/alipay
