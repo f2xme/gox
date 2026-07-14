@@ -40,5 +40,7 @@ Package qq 提供 QQ 互联网站应用登录适配器。
 
   - QQ 需要先通过 token 调用 openid 接口，再用 openid 获取用户信息。
   - state 参数需要由业务侧生成并校验。
+  - token / openid / userinfo 响应兼容 JSON、form 与 JSONP（callback(...)）；
+    error、expires_in 支持数字或字符串。解析失败或平台错误返回 *oauth2.ProviderError（含 Raw）。
 */
 package qq

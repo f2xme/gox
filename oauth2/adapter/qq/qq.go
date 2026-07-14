@@ -96,10 +96,16 @@ func (p *Provider) UserInfo(ctx context.Context, token *oauth2.Token) (*oauth2.U
 	if err != nil {
 		return nil, err
 	}
+	body := trimCallback(raw)
 
 	var resp userResponse
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return nil, fmt.Errorf("qq: decode user info: %w", err)
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, &oauth2.ProviderError{
+			Provider: providerName,
+			Code:     "decode_userinfo",
+			Message:  err.Error(),
+			Raw:      raw,
+		}
 	}
 	if resp.Ret != 0 {
 		return nil, &oauth2.ProviderError{
@@ -129,36 +135,41 @@ func (p *Provider) requestToken(ctx context.Context, values url.Values) (*oauth2
 	if err != nil {
 		return nil, err
 	}
+	// QQ 可能返回 JSON、form，或 JSONP（callback(...)）；Content-Type 偶发 text/html。
+	body := trimCallback(raw)
 
-	var resp tokenResponse
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		query, parseErr := url.ParseQuery(string(raw))
-		if parseErr != nil {
-			return nil, fmt.Errorf("qq: decode token: %w", err)
-		}
-		resp.AccessToken = query.Get("access_token")
-		resp.RefreshToken = query.Get("refresh_token")
-		resp.Scope = query.Get("scope")
-		resp.ExpiresIn, _ = strconv.ParseInt(query.Get("expires_in"), 10, 64)
-	}
-	if resp.Error != 0 {
+	accessToken, refreshToken, tokenType, scope, errCode, errDesc, expiresIn, parseOK := parseTokenBody(body)
+	if !parseOK {
 		return nil, &oauth2.ProviderError{
 			Provider: providerName,
-			Code:     strconv.Itoa(resp.Error),
-			Message:  resp.ErrorDescription,
+			Code:     "decode_token",
+			Message:  "qq token response unreadable",
 			Raw:      raw,
 		}
 	}
-	if resp.AccessToken == "" {
-		return nil, oauth2.ErrInvalidToken
+	if errCode != "" && errCode != "0" {
+		return nil, &oauth2.ProviderError{
+			Provider: providerName,
+			Code:     errCode,
+			Message:  firstNonEmpty(errDesc, "qq token error"),
+			Raw:      raw,
+		}
+	}
+	if accessToken == "" {
+		return nil, &oauth2.ProviderError{
+			Provider: providerName,
+			Code:     "empty_access_token",
+			Message:  firstNonEmpty(errDesc, "qq access_token empty"),
+			Raw:      raw,
+		}
 	}
 
 	return oauth2.NewToken(oauth2.TokenInfo{
-		AccessToken:  resp.AccessToken,
-		TokenType:    resp.TokenType,
-		RefreshToken: resp.RefreshToken,
-		ExpiresIn:    resp.ExpiresIn,
-		Scope:        resp.Scope,
+		AccessToken:  accessToken,
+		TokenType:    tokenType,
+		RefreshToken: refreshToken,
+		ExpiresIn:    expiresIn,
+		Scope:        scope,
 		Raw:          raw,
 	}), nil
 }
@@ -172,32 +183,128 @@ func (p *Provider) fillOpenID(ctx context.Context, token *oauth2.Token) (*oauth2
 	if err != nil {
 		return nil, err
 	}
-	var resp openIDResponse
-	if err := json.Unmarshal(trimCallback(raw), &resp); err != nil {
-		return nil, fmt.Errorf("qq: decode openid: %w", err)
-	}
-	if resp.Error != 0 {
+	body := trimCallback(raw)
+
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
 		return nil, &oauth2.ProviderError{
 			Provider: providerName,
-			Code:     strconv.Itoa(resp.Error),
-			Message:  resp.ErrorDescription,
+			Code:     "decode_openid",
+			Message:  err.Error(),
 			Raw:      raw,
 		}
 	}
-	if resp.OpenID == "" {
-		return nil, oauth2.ErrInvalidToken
+	if code := anyString(m["error"]); code != "" && code != "0" {
+		return nil, &oauth2.ProviderError{
+			Provider: providerName,
+			Code:     code,
+			Message:  firstNonEmpty(anyString(m["error_description"]), "qq openid error"),
+			Raw:      raw,
+		}
 	}
-	token.OpenID = resp.OpenID
-	token.UnionID = resp.UnionID
+	openID := anyString(m["openid"])
+	if openID == "" {
+		return nil, &oauth2.ProviderError{
+			Provider: providerName,
+			Code:     "empty_openid",
+			Message:  "qq openid empty",
+			Raw:      raw,
+		}
+	}
+	token.OpenID = openID
+	token.UnionID = anyString(m["unionid"])
 	return token, nil
 }
 
+// parseTokenBody 兼容 JSON / form 的 token 响应；error / expires_in 支持数字与字符串。
+func parseTokenBody(body []byte) (accessToken, refreshToken, tokenType, scope, errCode, errDesc string, expiresIn int64, ok bool) {
+	text := strings.TrimSpace(string(body))
+	if text == "" {
+		return "", "", "", "", "", "", 0, false
+	}
+
+	if strings.HasPrefix(text, "{") {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(text), &m); err == nil {
+			return anyString(m["access_token"]),
+				anyString(m["refresh_token"]),
+				anyString(m["token_type"]),
+				anyString(m["scope"]),
+				anyString(m["error"]),
+				anyString(m["error_description"]),
+				anyInt64(m["expires_in"]),
+				true
+		}
+	}
+
+	if query, err := url.ParseQuery(text); err == nil && (query.Get("access_token") != "" || query.Get("error") != "") {
+		expiresIn, _ = strconv.ParseInt(query.Get("expires_in"), 10, 64)
+		return query.Get("access_token"),
+			query.Get("refresh_token"),
+			query.Get("token_type"),
+			query.Get("scope"),
+			query.Get("error"),
+			query.Get("error_description"),
+			expiresIn,
+			true
+	}
+
+	return "", "", "", "", "", "", 0, false
+}
+
+func anyString(v any) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return t
+	case float64:
+		if t == float64(int64(t)) {
+			return strconv.FormatInt(int64(t), 10)
+		}
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case json.Number:
+		return t.String()
+	case bool:
+		return strconv.FormatBool(t)
+	default:
+		return fmt.Sprint(t)
+	}
+}
+
+func anyInt64(v any) int64 {
+	switch t := v.(type) {
+	case nil:
+		return 0
+	case float64:
+		return int64(t)
+	case json.Number:
+		n, _ := t.Int64()
+		return n
+	case string:
+		n, _ := strconv.ParseInt(t, 10, 64)
+		return n
+	case int64:
+		return t
+	case int:
+		return int64(t)
+	default:
+		return 0
+	}
+}
+
+// trimCallback 去掉 QQ 常见 JSONP 外壳 callback(...)。
 func trimCallback(raw []byte) []byte {
 	text := strings.TrimSpace(string(raw))
-	if strings.HasPrefix(text, "callback(") && strings.HasSuffix(text, ");") {
-		text = strings.TrimSuffix(strings.TrimPrefix(text, "callback("), ");")
+	if strings.HasPrefix(text, "callback(") {
+		text = strings.TrimPrefix(text, "callback(")
+		text = strings.TrimSpace(text)
+		text = strings.TrimSuffix(text, ";")
+		text = strings.TrimSpace(text)
+		text = strings.TrimSuffix(text, ")")
+		text = strings.TrimSpace(text)
 	}
-	return []byte(strings.TrimSpace(text))
+	return []byte(text)
 }
 
 func firstNonEmpty(values ...string) string {
@@ -207,24 +314,6 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-type tokenResponse struct {
-	AccessToken      string `json:"access_token"`
-	TokenType        string `json:"token_type"`
-	ExpiresIn        int64  `json:"expires_in"`
-	RefreshToken     string `json:"refresh_token"`
-	Scope            string `json:"scope"`
-	Error            int    `json:"error"`
-	ErrorDescription string `json:"error_description"`
-}
-
-type openIDResponse struct {
-	ClientID         string `json:"client_id"`
-	OpenID           string `json:"openid"`
-	UnionID          string `json:"unionid"`
-	Error            int    `json:"error"`
-	ErrorDescription string `json:"error_description"`
 }
 
 type userResponse struct {
