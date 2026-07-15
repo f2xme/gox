@@ -1,4 +1,3 @@
-// Package wechat 为 payment 包提供微信支付 V3 实现。
 package wechat
 
 import (
@@ -27,6 +26,16 @@ type WechatPay struct {
 }
 
 // New 创建微信支付适配器。
+//
+// 配置须与商户平台「验证微信支付身份」当前启用方式一致：
+//
+//   - 公钥：WechatPayPublicKey + WechatPayPublicKeyID（可省略 VerifyMode）
+//   - 平台证书静态：PlatformCert + PlatformCertSerialNo（可省略 VerifyMode）
+//   - 平台证书自动：须显式 VerifyModePlatformCertAuto（材料皆空时不会静默自动拉证）
+//
+// 平台证书自动模式在初始化时会请求微信证书接口；默认定时刷新会启动后台 goroutine。
+// 网络类失败多为 payment.ErrGateway，PEM/参数及部分配置类失败为 payment.ErrInvalidConfig。
+// 详见包文档与 Config 字段说明。
 func New(config Config, opts ...Option) (*WechatPay, error) {
 	if err := validateConfig(config); err != nil {
 		return nil, err
@@ -39,7 +48,8 @@ func New(config Config, opts ...Option) (*WechatPay, error) {
 	}
 	gw, err := newGopayGateway(config, options)
 	if err != nil {
-		return nil, fmt.Errorf("%w: initialize wechat client: %v", payment.ErrInvalidConfig, err)
+		// newGopayGateway 已按失败类型包装 ErrInvalidConfig / ErrGateway，保留错误链。
+		return nil, fmt.Errorf("initialize wechat client: %w", err)
 	}
 	w := newWithGateway(config, gw)
 	w.oauthClient = options.oauthClient()

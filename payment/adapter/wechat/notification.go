@@ -21,6 +21,44 @@ func (w *WechatPay) setNotifyDefaults() {
 	}
 }
 
+// verifyNotification 用已加载公钥验签；自动模式下若序列号未登记则补拉一次后再验。
+//
+// 与 gopay 同步应答验签（serial miss → AutoVerifySign(false)）对齐。
+// 若 key 已存在仍验签失败（签名本身错误），不会触发补拉。
+//
+// 返回错误始终可 errors.Is(..., ErrInvalidSignature)；补拉网络/配置失败时
+// 额外保留内层 ErrGateway / ErrInvalidConfig，便于运维分流。
+func (w *WechatPay) verifyNotification(notify *wx.V3NotifyReq) error {
+	keys := w.gateway.publicKeys()
+	err := w.verifyNotify(notify, keys)
+	if err == nil {
+		return nil
+	}
+	serial := notifySerial(notify)
+	if serial == "" {
+		return fmt.Errorf("%w: %w", payment.ErrInvalidSignature, err)
+	}
+	if _, ok := keys[serial]; ok {
+		// 序列号已登记仍失败：签名错误，不补拉。
+		return fmt.Errorf("%w: %w", payment.ErrInvalidSignature, err)
+	}
+	if refreshErr := w.gateway.ensurePublicKey(serial); refreshErr != nil {
+		// 同时包裹签名失败与补拉根因（%w 保留 classify 结果）。
+		return fmt.Errorf("%w: refresh platform cert for serial %s: %w", payment.ErrInvalidSignature, serial, refreshErr)
+	}
+	if retryErr := w.verifyNotify(notify, w.gateway.publicKeys()); retryErr != nil {
+		return fmt.Errorf("%w: %w", payment.ErrInvalidSignature, retryErr)
+	}
+	return nil
+}
+
+func notifySerial(notify *wx.V3NotifyReq) string {
+	if notify == nil || notify.SignInfo == nil {
+		return ""
+	}
+	return notify.SignInfo.HeaderSerial
+}
+
 // ParsePaymentNotification 验签、解密并解析微信支付通知。
 func (w *WechatPay) ParsePaymentNotification(ctx context.Context, req *http.Request) (*payment.PaymentNotification, error) {
 	if err := validateNotification(ctx, req); err != nil {
@@ -30,8 +68,8 @@ func (w *WechatPay) ParsePaymentNotification(ctx context.Context, req *http.Requ
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse wechat notification", payment.ErrInvalidRequest)
 	}
-	if err := w.verifyNotify(notify, w.gateway.publicKeys()); err != nil {
-		return nil, fmt.Errorf("%w: wechat notification", payment.ErrInvalidSignature)
+	if err := w.verifyNotification(notify); err != nil {
+		return nil, fmt.Errorf("%w: wechat notification: %w", payment.ErrInvalidSignature, err)
 	}
 	result, err := w.decryptPay(notify, w.config.APIV3Key)
 	if err != nil || result == nil {
@@ -63,8 +101,8 @@ func (w *WechatPay) ParseRefundNotification(ctx context.Context, req *http.Reque
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse wechat refund notification", payment.ErrInvalidRequest)
 	}
-	if err := w.verifyNotify(notify, w.gateway.publicKeys()); err != nil {
-		return nil, fmt.Errorf("%w: wechat refund notification", payment.ErrInvalidSignature)
+	if err := w.verifyNotification(notify); err != nil {
+		return nil, fmt.Errorf("%w: wechat refund notification: %w", payment.ErrInvalidSignature, err)
 	}
 	result, err := w.decryptRefund(notify, w.config.APIV3Key)
 	if err != nil || result == nil {
