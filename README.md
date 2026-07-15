@@ -88,8 +88,11 @@ github.com/f2xme/gox/<package>
 - **email** - 邮件服务封装
 - **oss** - 对象存储封装
 - **pager** - 分页工具
-- **payment** - 支付服务封装
-- **payment/adapter/alipay**、**payment/adapter/wechat** - 支付适配器占位实现，当前不会连接真实支付网关
+- **payment** - 统一支付领域接口（订单、状态、回调模型）
+  - `payment/adapter/alipay` - 支付宝当面付/WAP/查询/退款/关单/回调；支持密钥与公钥证书加签，正式/沙箱环境
+  - `payment/adapter/wechat` - 微信支付 V3 Native/JSAPI/查询/退款/关单/回调
+  - `payment/adapter/onepay` - 一码付：中立二维码按客户端路由微信或支付宝
+  - `payment/adapter/mock` - 内存 mock，仅用于测试
 - **queue** - 队列封装
   - `queue/adapter/mem` - 内存队列适配器
 - **ratelimit** - 限流工具

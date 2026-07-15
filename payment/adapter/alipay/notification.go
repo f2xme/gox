@@ -9,8 +9,42 @@ import (
 	aliyun "github.com/go-pay/gopay/alipay"
 )
 
-func verifySign(publicKey string, value any) (bool, error) {
-	return aliyun.VerifySign(publicKey, value)
+// notifyVerifier 异步通知验签函数，测试可注入。
+type notifyVerifier func(value any) (bool, error)
+
+// notifyVerifyMode 标识异步验签所用材料类型。
+type notifyVerifyMode string
+
+const (
+	notifyVerifyModeKey  notifyVerifyMode = "key"
+	notifyVerifyModeCert notifyVerifyMode = "cert"
+)
+
+func verifySignKey(publicKey string) notifyVerifier {
+	return func(value any) (bool, error) {
+		return aliyun.VerifySign(publicKey, value)
+	}
+}
+
+func verifySignCert(publicCert []byte) notifyVerifier {
+	return func(value any) (bool, error) {
+		return aliyun.VerifySignWithCert(publicCert, value)
+	}
+}
+
+// resolveNotifyVerifyMode 返回配置对应的异步验签模式。
+func resolveNotifyVerifyMode(config Config) notifyVerifyMode {
+	if config.useCertMode() {
+		return notifyVerifyModeCert
+	}
+	return notifyVerifyModeKey
+}
+
+func newNotifyVerifier(config Config) notifyVerifier {
+	if resolveNotifyVerifyMode(config) == notifyVerifyModeCert {
+		return verifySignCert([]byte(config.AlipayPublicCert))
+	}
+	return verifySignKey(config.AlipayPublicKey)
 }
 
 // ParsePaymentNotification 解析并验证支付宝支付通知。
@@ -31,7 +65,7 @@ func (a *Alipay) ParsePaymentNotification(ctx context.Context, req *http.Request
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse alipay notification: %v", payment.ErrInvalidRequest, err)
 	}
-	ok, err := a.verifyNotify(a.config.AlipayPublicKey, bm)
+	ok, err := a.verifyNotify(bm)
 	if err != nil || !ok {
 		return nil, fmt.Errorf("%w: alipay notification", payment.ErrInvalidSignature)
 	}

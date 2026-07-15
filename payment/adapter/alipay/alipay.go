@@ -1,4 +1,3 @@
-// Package alipay 为 payment 包提供支付宝实现。
 package alipay
 
 import (
@@ -10,13 +9,20 @@ import (
 )
 
 // Alipay 实现支付宝当面付、WAP、查询、退款、关单和回调验签。
+// 支持密钥/证书加签，以及正式/沙箱网关环境。
 type Alipay struct {
 	config       Config
 	gateway      gateway
-	verifyNotify func(string, any) (bool, error)
+	verifyNotify notifyVerifier
 }
 
 // New 创建支付宝支付适配器。
+//
+// 配置须提供密钥模式（AlipayPublicKey）或证书模式
+// （AppPublicCert + AlipayRootCert + AlipayPublicCert）之一。
+//
+// 环境通过 Environment 指定（EnvProduction / EnvSandbox）；
+// 未设置时回退 Production 字段，零值默认沙箱。
 func New(config Config, opts ...Option) (*Alipay, error) {
 	if err := validateConfig(config); err != nil {
 		return nil, err
@@ -29,13 +35,33 @@ func New(config Config, opts ...Option) (*Alipay, error) {
 	}
 	gw, err := newGopayGateway(config, options)
 	if err != nil {
-		return nil, fmt.Errorf("%w: initialize alipay client: %v", payment.ErrInvalidConfig, err)
+		return nil, fmt.Errorf("%w: initialize alipay client: %w", payment.ErrInvalidConfig, err)
 	}
-	return &Alipay{config: config, gateway: gw, verifyNotify: verifySign}, nil
+	return &Alipay{config: config, gateway: gw, verifyNotify: newNotifyVerifier(config)}, nil
 }
 
 func newWithGateway(config Config, gw gateway) *Alipay {
-	return &Alipay{config: config, gateway: gw, verifyNotify: verifySign}
+	return &Alipay{config: config, gateway: gw, verifyNotify: newNotifyVerifier(config)}
+}
+
+// Environment 返回当前生效的网关环境。
+func (a *Alipay) Environment() Environment {
+	return a.config.ResolveEnvironment()
+}
+
+// IsProduction 返回是否为正式环境。
+func (a *Alipay) IsProduction() bool {
+	return a.config.IsProduction()
+}
+
+// IsSandbox 返回是否为沙箱环境。
+func (a *Alipay) IsSandbox() bool {
+	return a.config.IsSandbox()
+}
+
+// GatewayBaseURL 返回当前使用的支付宝网关地址。
+func (a *Alipay) GatewayBaseURL() string {
+	return a.config.GatewayBaseURL()
 }
 
 // Pay 发起支付宝当面付预创建并返回二维码内容。

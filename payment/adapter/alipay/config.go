@@ -9,7 +9,38 @@ import (
 	"github.com/f2xme/gox/payment"
 )
 
+// Environment 表示支付宝开放平台网关环境。
+type Environment string
+
+const (
+	// EnvProduction 正式环境，网关为 https://openapi.alipay.com/gateway.do。
+	EnvProduction Environment = "production"
+	// EnvSandbox 沙箱环境，网关为 https://openapi-sandbox.dl.alipaydev.com/gateway.do。
+	// 须使用开放平台新版沙箱应用及对应密钥/证书，勿与正式环境凭证混用。
+	EnvSandbox Environment = "sandbox"
+)
+
+// 网关地址为与 go-pay 内部 baseUrl / sandboxBaseUrl 对齐的只读镜像，
+// 并非底层 client 的实时取值；升级 go-pay 时需核对是否漂移。
+const (
+	gatewayURLProduction = "https://openapi.alipay.com/gateway.do"
+	gatewayURLSandbox    = "https://openapi-sandbox.dl.alipaydev.com/gateway.do"
+)
+
 // Config 定义支付宝适配器配置。
+//
+// 支持两种加签/验签模式（二选一）：
+//
+//  1. 密钥模式：配置 PrivateKey + AlipayPublicKey
+//  2. 证书模式：配置 PrivateKey + AppPublicCert + AlipayRootCert + AlipayPublicCert
+//
+// 若证书三件套齐全，优先使用证书模式；AlipayPublicKey 可同时保留但不会参与证书模式验签。
+//
+// 环境选择：
+//
+//   - 推荐设置 Environment 为 EnvProduction 或 EnvSandbox
+//   - Environment 为空时回退到 Production：true 正式环境，false 沙箱
+//   - 零值配置默认走沙箱，避免误连正式网关
 type Config struct {
 	// AppID 是支付宝应用 ID。
 	AppID string
@@ -17,10 +48,65 @@ type Config struct {
 	SellerID string
 	// PrivateKey 是应用 RSA 私钥 PEM 内容。
 	PrivateKey string
-	// AlipayPublicKey 是支付宝 RSA 公钥 PEM 内容。
+	// AlipayPublicKey 是支付宝 RSA 公钥 PEM 内容（密钥模式）。
+	// 与证书模式二选一；证书三件套齐全时优先使用证书模式。
 	AlipayPublicKey string
+	// AppPublicCert 是应用公钥证书内容（证书模式，appCertPublicKey_*.crt）。
+	AppPublicCert string
+	// AlipayRootCert 是支付宝根证书内容（证书模式，alipayRootCert.crt）。
+	AlipayRootCert string
+	// AlipayPublicCert 是支付宝公钥证书内容（证书模式，alipayCertPublicKey_RSA2.crt）。
+	AlipayPublicCert string
+	// Environment 指定网关环境，推荐使用 EnvProduction 或 EnvSandbox。
+	// 为空时回退到 Production 字段。
+	Environment Environment
 	// Production 表示是否访问生产环境。
+	//
+	// Deprecated: 请使用 Environment（EnvProduction / EnvSandbox）。
+	// 仅当 Environment 为空时生效：true 正式环境，false 沙箱。
 	Production bool
+}
+
+// ResolveEnvironment 返回最终生效的网关环境。
+//
+// 非法 Environment 值回退到 Production 字段（与 GatewayBaseURL 语义一致）；
+// 经 New 创建时 validateConfig 会直接拒绝非法值。
+func (c Config) ResolveEnvironment() Environment {
+	switch c.Environment {
+	case EnvProduction, EnvSandbox:
+		return c.Environment
+	default:
+		// 含空字符串与非法值：统一按 Production 回退，避免
+		// IsProduction/IsSandbox/GatewayBaseURL 语义不一致。
+		if c.Production {
+			return EnvProduction
+		}
+		return EnvSandbox
+	}
+}
+
+// IsProduction 返回是否使用正式环境网关。
+func (c Config) IsProduction() bool {
+	return c.ResolveEnvironment() == EnvProduction
+}
+
+// IsSandbox 返回是否使用沙箱环境网关。
+func (c Config) IsSandbox() bool {
+	return c.ResolveEnvironment() == EnvSandbox
+}
+
+// GatewayBaseURL 返回当前配置对应的支付宝网关地址。
+// 该值为与 go-pay 约定一致的配置层镜像，非底层 HTTP client 的实时 URL。
+func (c Config) GatewayBaseURL() string {
+	if c.IsProduction() {
+		return gatewayURLProduction
+	}
+	return gatewayURLSandbox
+}
+
+// useCertMode 判断是否启用证书模式（三件证书均已配置）。
+func (c Config) useCertMode() bool {
+	return c.AppPublicCert != "" && c.AlipayRootCert != "" && c.AlipayPublicCert != ""
 }
 
 type options struct {
@@ -63,9 +149,41 @@ func validateConfig(config Config) error {
 		return fmt.Errorf("%w: alipay seller ID cannot be empty", payment.ErrInvalidConfig)
 	case config.PrivateKey == "":
 		return fmt.Errorf("%w: alipay private key cannot be empty", payment.ErrInvalidConfig)
-	case config.AlipayPublicKey == "":
-		return fmt.Errorf("%w: alipay public key cannot be empty", payment.ErrInvalidConfig)
-	default:
+	case config.Environment != "" && config.Environment != EnvProduction && config.Environment != EnvSandbox:
+		return fmt.Errorf("%w: alipay environment must be %q or %q", payment.ErrInvalidConfig, EnvProduction, EnvSandbox)
+	}
+
+	hasAppCert := config.AppPublicCert != ""
+	hasRootCert := config.AlipayRootCert != ""
+	hasPublicCert := config.AlipayPublicCert != ""
+	certCount := 0
+	if hasAppCert {
+		certCount++
+	}
+	if hasRootCert {
+		certCount++
+	}
+	if hasPublicCert {
+		certCount++
+	}
+
+	// 证书字段只配了一部分时给出明确错误，避免静默回退到密钥模式。
+	if certCount > 0 && certCount < 3 {
+		switch {
+		case !hasAppCert:
+			return fmt.Errorf("%w: alipay app public cert cannot be empty in cert mode", payment.ErrInvalidConfig)
+		case !hasRootCert:
+			return fmt.Errorf("%w: alipay root cert cannot be empty in cert mode", payment.ErrInvalidConfig)
+		default:
+			return fmt.Errorf("%w: alipay public cert cannot be empty in cert mode", payment.ErrInvalidConfig)
+		}
+	}
+
+	if config.useCertMode() {
 		return nil
 	}
+	if config.AlipayPublicKey == "" {
+		return fmt.Errorf("%w: alipay public key or full certificate set is required", payment.ErrInvalidConfig)
+	}
+	return nil
 }

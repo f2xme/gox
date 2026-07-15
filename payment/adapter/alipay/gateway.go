@@ -22,18 +22,27 @@ type gateway interface {
 type gopayGateway struct{ client *aliyun.Client }
 
 func newGopayGateway(config Config, opts options) (*gopayGateway, error) {
-	client, err := aliyun.NewClient(config.AppID, config.PrivateKey, config.Production)
+	client, err := aliyun.NewClient(config.AppID, config.PrivateKey, config.IsProduction())
 	if err != nil {
 		return nil, err
 	}
-	publicKey, err := xpem.DecodePublicKey([]byte(config.AlipayPublicKey))
+
+	verifyMaterial, err := configureSignMode(client, config)
 	if err != nil {
-		return nil, fmt.Errorf("decode alipay public key: %w", err)
+		return nil, err
 	}
-	if publicKey == nil {
-		return nil, fmt.Errorf("decode alipay public key: empty public key")
+	// 预解码校验材料，尽早暴露错误的公钥/证书内容。
+	// DecodePublicKey 在 PEM 类型不受支持时会返回 (nil, nil)，须显式拒绝，
+	// 否则 AutoVerifySign 会静默关闭同步验签。
+	pubKey, err := xpem.DecodePublicKey(verifyMaterial)
+	if err != nil {
+		return nil, fmt.Errorf("decode alipay verify material: %w", err)
 	}
-	client.AutoVerifySign([]byte(config.AlipayPublicKey))
+	if pubKey == nil {
+		return nil, fmt.Errorf("decode alipay verify material: empty public key")
+	}
+	client.AutoVerifySign(verifyMaterial)
+
 	httpClient := xhttp.NewClient().SetTimeout(opts.timeout)
 	if opts.transport != nil {
 		httpClient.SetTransport(opts.transport)
@@ -43,6 +52,21 @@ func newGopayGateway(config Config, opts options) (*gopayGateway, error) {
 		client.SetLogger(slogAdapter{logger: opts.logger})
 	}
 	return &gopayGateway{client: client}, nil
+}
+
+// configureSignMode 按配置选择密钥或证书模式，返回用于同步验签的材料。
+func configureSignMode(client *aliyun.Client, config Config) ([]byte, error) {
+	if config.useCertMode() {
+		if err := client.SetCertSnByContent(
+			[]byte(config.AppPublicCert),
+			[]byte(config.AlipayRootCert),
+			[]byte(config.AlipayPublicCert),
+		); err != nil {
+			return nil, fmt.Errorf("set alipay cert sn: %w", err)
+		}
+		return []byte(config.AlipayPublicCert), nil
+	}
+	return []byte(config.AlipayPublicKey), nil
 }
 
 func (g *gopayGateway) precreate(ctx context.Context, bm gopay.BodyMap) (*aliyun.TradePrecreateResponse, error) {

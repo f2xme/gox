@@ -51,7 +51,7 @@ SMS providers, queues, and similar integrations.
 | ID generation | `idgen` |
 | JWT tokens | `jwt` |
 | Third-party OAuth2 login | `oauth2`, `oauth2/adapter/*` |
-| Alipay, WeChat Pay, unified payment QR, payment tests | `payment`, `payment/adapter/alipay`, `payment/adapter/wechat`, `payment/adapter/onepay`, `payment/adapter/mock` |
+| Alipay (key/cert sign, sandbox/prod), WeChat Pay, unified payment QR, payment tests | `payment`, `payment/adapter/alipay`, `payment/adapter/wechat`, `payment/adapter/onepay`, `payment/adapter/mock` |
 | Logging | `logx`, `logx/adapter/zap` |
 | Metrics | `metrics`, `metrics/adapter/*` |
 | Email | `email` |

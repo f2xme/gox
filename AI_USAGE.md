@@ -200,6 +200,15 @@ WeChat scans to OAuth + JSAPI and Alipay scans to WAP. Use
 `payment/adapter/mock` for deterministic in-memory payment tests; it does not
 implement real provider protocols and must not be used for production charges.
 
+Alipay adapter notes:
+- Signing: key mode (`PrivateKey` + `AlipayPublicKey`) or cert mode
+  (`PrivateKey` + `AppPublicCert` + `AlipayRootCert` + `AlipayPublicCert`).
+  Prefer cert mode when the merchant app uses Alipay public-key certificates.
+- Environment: set `Environment` to `alipay.EnvSandbox` or
+  `alipay.EnvProduction`. Empty environment falls back to `Production` bool;
+  zero value defaults to sandbox. Sandbox requires new-sandbox app credentials
+  and gateway `openapi-sandbox.dl.alipaydev.com`.
+
 All amounts are integer cents. Pass `context.Context` to every payment
 operation. After a verified callback, the application must still check the
 stored order and amount, apply the state change idempotently, then write the
