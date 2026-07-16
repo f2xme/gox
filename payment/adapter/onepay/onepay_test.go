@@ -253,7 +253,8 @@ func TestHandlerWechatCustomPageTexts(t *testing.T) {
 		Resolver: r,
 		Wechat:   w,
 		WechatPage: WechatPage{
-			LoadingText: "正在支付…",
+			Title:       "  收银台  ",
+			LoadingText: "  正在支付…  ",
 			SuccessText: "已付成功",
 			FailText:    "付失败了",
 		},
@@ -268,13 +269,16 @@ func TestHandlerWechatCustomPageTexts(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, body)
 	}
-	for _, want := range []string{"正在支付…", `"已付成功"`, `"付失败了"`} {
+	for _, want := range []string{"收银台", "正在支付…", `"已付成功"`, `"付失败了"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q in %s", want, body)
 		}
 	}
-	if strings.Contains(body, DefaultWechatLoadingText) {
-		t.Fatalf("default loading should be overridden: %s", body)
+	if strings.Contains(body, DefaultWechatLoadingText) || strings.Contains(body, DefaultWechatTitle) {
+		t.Fatalf("defaults should be overridden: %s", body)
+	}
+	if csp := rec.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "default-src 'none'") || !strings.Contains(csp, "nonce-") {
+		t.Fatalf("csp = %q", csp)
 	}
 }
 
@@ -301,14 +305,99 @@ func TestHandlerWechatCustomTemplate(t *testing.T) {
 	}
 }
 
+func TestHandlerWechatBadTemplateReturns502(t *testing.T) {
+	// missing template name → Execute error; must not return partial 200
+	tpl := template.Must(template.New("bad").Parse(`{{template "missing"}}`))
+	r := &fakeResolver{}
+	w := &fakeWechat{openID: "openid"}
+	s, err := New(Config{
+		BaseURL:    "https://pay.example",
+		TokenKey:   bytes.Repeat([]byte{7}, 32),
+		Resolver:   r,
+		Wechat:     w,
+		WechatPage: WechatPage{Template: tpl},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _ := s.CreateCode(context.Background(), "intent-wx-bad-tpl")
+	path := strings.TrimPrefix(code.URL, "https://pay.example")
+	rec := completeWechatFlow(t, s, path)
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "WeixinJSBridge") {
+		t.Fatalf("should not leak bridge body on template error: %s", rec.Body.String())
+	}
+}
+
+func TestHandlerWechatPageEscapesXSS(t *testing.T) {
+	r := &fakeResolver{}
+	w := &fakeWechat{openID: "openid"}
+	s, err := New(Config{
+		BaseURL:  "https://pay.example",
+		TokenKey: bytes.Repeat([]byte{7}, 32),
+		Resolver: r,
+		Wechat:   w,
+		WechatPage: WechatPage{
+			Title:       `<img src=x onerror=alert(1)>`,
+			LoadingText: `<script>alert(1)</script>`,
+			SuccessText: `</script><script>alert(2)</script>`,
+			FailText:    `";alert(3)//`,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _ := s.CreateCode(context.Background(), "intent-wx-xss")
+	path := strings.TrimPrefix(code.URL, "https://pay.example")
+	rec := completeWechatFlow(t, s, path)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, body)
+	}
+	// HTML context: raw tags must not appear
+	for _, raw := range []string{
+		`<script>alert(1)</script>`,
+		`<img src=x onerror=alert(1)>`,
+		`</script><script>alert(2)</script>`,
+	} {
+		if strings.Contains(body, raw) {
+			t.Fatalf("raw XSS payload in body: %q\n%s", raw, body)
+		}
+	}
+	// HTML-escaped loading/title
+	if !strings.Contains(body, "&lt;script&gt;") && !strings.Contains(body, "&lt;img") {
+		t.Fatalf("expected HTML entity escape: %s", body)
+	}
+	// Success/Fail as JSON string literals (encoding/json escapes < and ")
+	if !strings.Contains(body, `\u003c`) && !strings.Contains(body, `\u003C`) {
+		t.Fatalf("expected JSON-escaped < in script strings: %s", body)
+	}
+	if !strings.Contains(body, `\u0022`) && !strings.Contains(body, `\"`) {
+		t.Fatalf("expected JSON-escaped quote in fail text: %s", body)
+	}
+}
+
 func TestResolveWechatPageDefaults(t *testing.T) {
 	got := resolveWechatPage(WechatPage{})
-	if got.LoadingText != DefaultWechatLoadingText || got.SuccessText != DefaultWechatSuccessText || got.FailText != DefaultWechatFailText {
+	if got.Title != DefaultWechatTitle || got.LoadingText != DefaultWechatLoadingText || got.SuccessText != DefaultWechatSuccessText || got.FailText != DefaultWechatFailText {
 		t.Fatalf("defaults = %+v", got)
 	}
-	got = resolveWechatPage(WechatPage{LoadingText: "x", SuccessText: "y", FailText: "z"})
-	if got.LoadingText != "x" || got.SuccessText != "y" || got.FailText != "z" {
-		t.Fatalf("custom = %+v", got)
+	got = resolveWechatPage(WechatPage{Title: "  t  ", LoadingText: "  x  ", SuccessText: " y ", FailText: "z "})
+	if got.Title != "t" || got.LoadingText != "x" || got.SuccessText != "y" || got.FailText != "z" {
+		t.Fatalf("trim = %+v", got)
+	}
+	got = resolveWechatPage(WechatPage{LoadingText: "   "})
+	if got.LoadingText != DefaultWechatLoadingText {
+		t.Fatalf("whitespace-only should default: %+v", got)
+	}
+}
+
+func TestWechatBridgeCSP(t *testing.T) {
+	csp := WechatBridgeCSP("abc")
+	if !strings.Contains(csp, "nonce-abc") || !strings.Contains(csp, "default-src 'none'") {
+		t.Fatalf("csp = %q", csp)
 	}
 }
 

@@ -22,7 +22,7 @@
 //		Resolver: businessResolver, // 业务实现 CheckoutResolver
 //		Wechat:   wechatClient,     // 提供 OAuth 的微信 adapter
 //		// 可选：覆盖默认「支付中…」等文案
-//		// WechatPage: onepay.WechatPage{LoadingText: "正在支付…"},
+//		// WechatPage: onepay.WechatPage{LoadingText: "正在支付…", Title: "收银台"},
 //	}, onepay.WithQRSize(256))
 //	if err != nil {
 //		log.Fatal(err)
@@ -32,6 +32,30 @@
 //	// code.URL 写入二维码；code.PNG 可直接下发图片
 //
 //	http.Handle("/pay/", svc.Handler()) // 或 mux.Handle("/pay/", svc.Handler())
+//
+// # 微信调起页（WechatPage）
+//
+// 默认 loading 文案为「支付中…」（旧版「正在调起微信支付…」已变更；E2E/文案断言需同步）。
+//
+// 自定义整页 Template 时数据为 WechatBridgeData，且必须兼容 WechatBridgeCSP：
+//
+//	tpl := template.Must(template.New("wx").Parse(`<!doctype html>
+//	<html lang="zh-CN"><head><meta charset="utf-8"><title>{{.Title}}</title></head>
+//	<body><p id="status">{{.LoadingText}}</p>
+//	<script nonce="{{.Nonce}}">
+//	const pay = {{.Params}};
+//	function invokePay(){
+//	  WeixinJSBridge.invoke('getBrandWCPayRequest', pay, function(res){
+//	    document.getElementById('status').textContent =
+//	      res.err_msg === 'get_brand_wcpay_request:ok' ? {{.SuccessText}} : {{.FailText}};
+//	  });
+//	}
+//	if (typeof WeixinJSBridge === 'undefined') {
+//	  document.addEventListener('WeixinJSBridgeReady', invokePay, false);
+//	} else { invokePay(); }
+//	</script></body></html>`))
+//
+//	WechatPage: onepay.WechatPage{Template: tpl, LoadingText: "支付中…"}
 //
 // # CheckoutResolver 契约
 //

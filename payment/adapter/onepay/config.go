@@ -47,15 +47,23 @@ type WechatOAuth interface {
 }
 
 // WechatPage 控制微信 JSAPI 调起页文案与模板。
-// 文案字段为空时使用 DefaultWechat* 常量；Template 为 nil 时使用包内默认 HTML。
+// 文案字段经 TrimSpace 后为空则使用 DefaultWechat* 常量；Template 为 nil 时使用包内默认 HTML。
 type WechatPage struct {
-	// LoadingText 调起收银台前的状态文案。
+	// Title 页面 <title>；空则 DefaultWechatTitle（「微信支付」）。
+	Title string
+	// LoadingText 调起收银台前的状态文案；空则 DefaultWechatLoadingText（「支付中…」）。
 	LoadingText string
 	// SuccessText 用户完成支付确认后的状态文案。
 	SuccessText string
 	// FailText 用户取消或支付失败时的状态文案。
 	FailText string
-	// Template 可选自定义整页 HTML。数据为 WechatBridgeData；须自行处理 CSP nonce 与 JSAPI 调起。
+	// Template 可选自定义整页 HTML。数据为 WechatBridgeData。
+	//
+	// 约束（handler 固定写入 WechatBridgeCSP(nonce)）：
+	//   - 无外链 script / style / img / font / connect
+	//   - inline <script> 必须带 nonce="{{.Nonce}}"
+	//   - 须自行调用 WeixinJSBridge.invoke('getBrandWCPayRequest', {{.Params}}, …)
+	// 最小示例见包文档「自定义微信调起页」。
 	Template *template.Template
 }
 
