@@ -3,6 +3,7 @@ package onepay
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net"
 	"net/url"
 	"strings"
@@ -45,6 +46,19 @@ type WechatOAuth interface {
 	ExchangeOAuthCode(ctx context.Context, code string) (string, error)
 }
 
+// WechatPage 控制微信 JSAPI 调起页文案与模板。
+// 文案字段为空时使用 DefaultWechat* 常量；Template 为 nil 时使用包内默认 HTML。
+type WechatPage struct {
+	// LoadingText 调起收银台前的状态文案。
+	LoadingText string
+	// SuccessText 用户完成支付确认后的状态文案。
+	SuccessText string
+	// FailText 用户取消或支付失败时的状态文案。
+	FailText string
+	// Template 可选自定义整页 HTML。数据为 WechatBridgeData；须自行处理 CSP nonce 与 JSAPI 调起。
+	Template *template.Template
+}
+
 // Config 定义一码付服务配置。
 type Config struct {
 	// BaseURL 是二维码访问使用的 HTTPS origin。
@@ -59,6 +73,8 @@ type Config struct {
 	Resolver CheckoutResolver
 	// Wechat 提供微信 OAuth 能力。
 	Wechat WechatOAuth
+	// WechatPage 微信 JSAPI 调起页；零值使用包默认文案与模板。
+	WechatPage WechatPage
 }
 
 type options struct{ qrSize int }
@@ -110,6 +126,7 @@ func normalizeConfig(c Config) (Config, *url.URL, error) {
 	if c.Resolver == nil || c.Wechat == nil {
 		return c, nil, fmt.Errorf("%w: onepay dependencies cannot be nil", payment.ErrInvalidConfig)
 	}
+	c.WechatPage = resolveWechatPage(c.WechatPage)
 	u.Path = ""
 	c.TokenKey = append([]byte(nil), c.TokenKey...)
 	return c, u, nil

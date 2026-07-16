@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"html/template"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
@@ -231,11 +232,83 @@ func TestHandlerWechatOAuthAndJSAPI(t *testing.T) {
 	req.AddCookie(cookies[0])
 	rec = httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "WeixinJSBridge.invoke") || !strings.Contains(rec.Body.String(), "prepay_id=p") {
-		t.Fatalf("JSAPI response = %d %s", rec.Code, rec.Body.String())
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, "WeixinJSBridge.invoke") || !strings.Contains(body, "prepay_id=p") {
+		t.Fatalf("JSAPI response = %d %s", rec.Code, body)
+	}
+	if !strings.Contains(body, DefaultWechatLoadingText) {
+		t.Fatalf("default loading text missing: %s", body)
 	}
 	if !strings.Contains(rec.Header().Get("Content-Security-Policy"), "default-src 'none'") || resolver.provider != payment.ProviderWechat || wechat.code != "oauth-code" || resolver.payerOpenID != "openid" {
 		t.Fatalf("callback state = %q %q", rec.Header().Get("Content-Security-Policy"), wechat.code)
+	}
+}
+
+func TestHandlerWechatCustomPageTexts(t *testing.T) {
+	r := &fakeResolver{}
+	w := &fakeWechat{openID: "openid"}
+	s, err := New(Config{
+		BaseURL:  "https://pay.example",
+		TokenKey: bytes.Repeat([]byte{7}, 32),
+		Resolver: r,
+		Wechat:   w,
+		WechatPage: WechatPage{
+			LoadingText: "正在支付…",
+			SuccessText: "已付成功",
+			FailText:    "付失败了",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _ := s.CreateCode(context.Background(), "intent-wx-custom")
+	path := strings.TrimPrefix(code.URL, "https://pay.example")
+	rec := completeWechatFlow(t, s, path)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, body)
+	}
+	for _, want := range []string{"正在支付…", `"已付成功"`, `"付失败了"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in %s", want, body)
+		}
+	}
+	if strings.Contains(body, DefaultWechatLoadingText) {
+		t.Fatalf("default loading should be overridden: %s", body)
+	}
+}
+
+func TestHandlerWechatCustomTemplate(t *testing.T) {
+	tpl := template.Must(template.New("custom").Parse(`<!doctype html><body data-custom="1"><p>{{.LoadingText}}</p><script nonce="{{.Nonce}}">const pay={{.Params}};const ok={{.SuccessText}};</script></body>`))
+	r := &fakeResolver{}
+	w := &fakeWechat{openID: "openid"}
+	s, err := New(Config{
+		BaseURL:    "https://pay.example",
+		TokenKey:   bytes.Repeat([]byte{7}, 32),
+		Resolver:   r,
+		Wechat:     w,
+		WechatPage: WechatPage{LoadingText: "自定义加载", Template: tpl},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _ := s.CreateCode(context.Background(), "intent-wx-tpl")
+	path := strings.TrimPrefix(code.URL, "https://pay.example")
+	rec := completeWechatFlow(t, s, path)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, `data-custom="1"`) || !strings.Contains(body, "自定义加载") || !strings.Contains(body, "prepay_id=p") {
+		t.Fatalf("custom template response = %d %s", rec.Code, body)
+	}
+}
+
+func TestResolveWechatPageDefaults(t *testing.T) {
+	got := resolveWechatPage(WechatPage{})
+	if got.LoadingText != DefaultWechatLoadingText || got.SuccessText != DefaultWechatSuccessText || got.FailText != DefaultWechatFailText {
+		t.Fatalf("defaults = %+v", got)
+	}
+	got = resolveWechatPage(WechatPage{LoadingText: "x", SuccessText: "y", FailText: "z"})
+	if got.LoadingText != "x" || got.SuccessText != "y" || got.FailText != "z" {
+		t.Fatalf("custom = %+v", got)
 	}
 }
 

@@ -96,13 +96,15 @@ func (s *Service) handleWechat(w http.ResponseWriter, r *http.Request, token str
 		return
 	}
 	nonce := s.randomString(18)
+	data, err := buildWechatBridgeData(nonce, checkout.JSAPI, s.config.WechatPage)
+	if err != nil {
+		s.writeError(w, http.StatusBadGateway, "支付服务暂时不可用，请稍后重试")
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'nonce-"+nonce+"'; base-uri 'none'; frame-ancestors 'none'")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = bridgeTemplate.Execute(w, struct {
-		Nonce  string
-		Params *payment.JSAPIResult
-	}{nonce, checkout.JSAPI})
+	_ = wechatBridgeTemplate(s.config.WechatPage).Execute(w, data)
 }
 
 func (s *Service) validCheckout(checkout *Checkout, provider payment.Provider) bool {

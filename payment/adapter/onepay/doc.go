@@ -9,6 +9,7 @@
 //   - 生成中立 HTTPS 支付 URL 与可扫码 PNG
 //   - AES-256-GCM 加密 token（金额、订单号不进二维码）
 //   - 微信：OAuth snsapi_base → OpenID → JSAPI bridge HTML（CSP nonce）
+//   - 微信调起页文案/模板可配（WechatPage）；零值用 DefaultWechat* 与默认 HTML
 //   - 支付宝：WAP 收银台 HTTP 303（仅官方 gateway host）
 //   - 未知客户端返回安全提示页，不猜测渠道
 //   - 标准库 net/http.Handler，可挂载到任意 HTTP 框架
@@ -20,6 +21,8 @@
 //		TokenKey: tokenKey32Bytes, // 恰好 32 字节
 //		Resolver: businessResolver, // 业务实现 CheckoutResolver
 //		Wechat:   wechatClient,     // 提供 OAuth 的微信 adapter
+//		// 可选：覆盖默认「支付中…」等文案
+//		// WechatPage: onepay.WechatPage{LoadingText: "正在支付…"},
 //	}, onepay.WithQRSize(256))
 //	if err != nil {
 //		log.Fatal(err)
