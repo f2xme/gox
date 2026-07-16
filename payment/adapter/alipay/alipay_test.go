@@ -351,6 +351,87 @@ func TestNewAcceptsCertMode(t *testing.T) {
 	}
 }
 
+func TestValidateAESKey(t *testing.T) {
+	// gopay 使用字符串原样字节作 AES key：长度须 16/24/32；空/纯空白表示不启用。
+	tests := []struct {
+		name    string
+		key     string
+		wantErr bool
+	}{
+		{name: "empty", key: ""},
+		{name: "whitespace only", key: "   "},
+		{name: "16 bytes", key: "0123456789abcdef"},
+		{name: "24 bytes open-platform style", key: "KvKUTqSVZX2fUgmxnFyMaQ=="},
+		{name: "32 bytes", key: "0123456789abcdef0123456789abcdef"},
+		{name: "too short", key: "short", wantErr: true},
+		{name: "15 bytes", key: "0123456789abcde", wantErr: true},
+		{name: "25 bytes", key: "0123456789abcdef012345678", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateAESKey(tt.key)
+			if tt.wantErr {
+				if !errors.Is(err, payment.ErrInvalidConfig) {
+					t.Fatalf("validateAESKey() = %v, want ErrInvalidConfig", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("validateAESKey() = %v", err)
+			}
+		})
+	}
+}
+
+func TestNewAcceptsAESKey(t *testing.T) {
+	// 合法长度 AESKey：New 成功并保留配置（加密路径由 gopay 在请求期执行）。
+	client, err := New(Config{
+		AppID:           "app",
+		SellerID:        "seller",
+		PrivateKey:      mustPrivatePEM(t),
+		AlipayPublicKey: mustPublicPEM(t),
+		AESKey:          "KvKUTqSVZX2fUgmxnFyMaQ==", // 24 chars → AES-192 key material in gopay
+		Environment:     EnvSandbox,
+	})
+	if err != nil {
+		t.Fatalf("New() with AESKey error = %v", err)
+	}
+	if client == nil || client.config.AESKey == "" {
+		t.Fatalf("expected AESKey retained on client config, got %#v", client)
+	}
+}
+
+func TestNewRejectsInvalidAESKey(t *testing.T) {
+	_, err := New(Config{
+		AppID:           "app",
+		SellerID:        "seller",
+		PrivateKey:      mustPrivatePEM(t),
+		AlipayPublicKey: mustPublicPEM(t),
+		AESKey:          "not-valid-aes-key-len",
+		Environment:     EnvSandbox,
+	})
+	if !errors.Is(err, payment.ErrInvalidConfig) {
+		t.Fatalf("New() invalid AESKey error = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestNewAcceptsEmptyAESKey(t *testing.T) {
+	client, err := New(Config{
+		AppID:           "app",
+		SellerID:        "seller",
+		PrivateKey:      mustPrivatePEM(t),
+		AlipayPublicKey: mustPublicPEM(t),
+		AESKey:          "",
+		Environment:     EnvSandbox,
+	})
+	if err != nil {
+		t.Fatalf("New() empty AESKey error = %v", err)
+	}
+	if client.config.AESKey != "" {
+		t.Fatalf("expected empty AESKey, got %q", client.config.AESKey)
+	}
+}
+
 func TestUseCertMode(t *testing.T) {
 	if (Config{}).useCertMode() {
 		t.Fatal("empty config should not use cert mode")

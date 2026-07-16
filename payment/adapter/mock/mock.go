@@ -256,6 +256,11 @@ func (c *Client) SetRefundStatus(refundID string, status payment.RefundStatus) e
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.setRefundStatusLocked(refundID, status)
+}
+
+// setRefundStatusLocked 在已持有 c.mu 时修改退款状态并协调订单退款汇总。
+func (c *Client) setRefundStatusLocked(refundID string, status payment.RefundStatus) error {
 	record, exists := c.refunds[refundID]
 	if !exists {
 		return fmt.Errorf("%w: mock refund %q not found", payment.ErrInvalidRequest, refundID)

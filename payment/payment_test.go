@@ -88,3 +88,27 @@ func TestProviderErrorUnwrap(t *testing.T) {
 		t.Fatal("expected error message")
 	}
 }
+
+func TestParseProvider(t *testing.T) {
+	tests := []struct {
+		in   string
+		want Provider
+	}{
+		{in: "", want: ProviderMock},
+		{in: "mock", want: ProviderMock},
+		{in: " WeChat ", want: ProviderWechat},
+		{in: "wx", want: ProviderWechat},
+		{in: "weixin", want: ProviderWechat},
+		{in: "alipay", want: ProviderAlipay},
+		{in: "ALI", want: ProviderAlipay},
+	}
+	for _, tt := range tests {
+		got, err := ParseProvider(tt.in)
+		if err != nil || got != tt.want {
+			t.Fatalf("ParseProvider(%q) = %q, %v want %q", tt.in, got, err, tt.want)
+		}
+	}
+	if _, err := ParseProvider("paypal"); !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("unknown provider error = %v", err)
+	}
+}

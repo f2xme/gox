@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/f2xme/gox/payment"
@@ -57,6 +58,17 @@ type Config struct {
 	AlipayRootCert string
 	// AlipayPublicCert 是支付宝公钥证书内容（证书模式，alipayCertPublicKey_RSA2.crt）。
 	AlipayPublicCert string
+	// AESKey 是透传给 gopay 的接口内容加密密钥（可选）。
+	//
+	// 非空时调用 gopay Client.SetAESKey；gopay 将字符串**原样**作为 AES 密钥字节
+	// （不做 Base64 解码），长度须为 16 / 24 / 32。
+	// 开放平台下发的 Base64 串常见为 24 字符（对应 16 字节密钥的编码），可直接填入，
+	// 但与官方「先 Base64 解码再作 AES key」的语义不同，且 gopay v1.5.x 标注
+	// SetAESKey「目前不可用，设置后会报错」（缺少 encrypt_type、响应不自动解密等）。
+	//
+	// 因此本字段为实验性透传：勿默认等同于已支持开放平台「接口内容加密」生产能力。
+	// 未开启内容加密时请留空。使用前须在目标 gopay 版本上自测。
+	AESKey string
 	// Environment 指定网关环境，推荐使用 EnvProduction 或 EnvSandbox。
 	// 为空时回退到 Production 字段。
 	Environment Environment
@@ -179,6 +191,10 @@ func validateConfig(config Config) error {
 		}
 	}
 
+	if err := validateAESKey(config.AESKey); err != nil {
+		return err
+	}
+
 	if config.useCertMode() {
 		return nil
 	}
@@ -186,4 +202,19 @@ func validateConfig(config Config) error {
 		return fmt.Errorf("%w: alipay public key or full certificate set is required", payment.ErrInvalidConfig)
 	}
 	return nil
+}
+
+// validateAESKey 校验 AESKey：空表示不启用；非空须为 gopay 可用的 16/24/32 字节密钥串。
+func validateAESKey(aesKey string) error {
+	key := strings.TrimSpace(aesKey)
+	if key == "" {
+		return nil
+	}
+	// gopay encryptBizContent 使用 []byte(aesKey) 直接作为 cipher key，须满足 AES 密钥长度。
+	switch len(key) {
+	case 16, 24, 32:
+		return nil
+	default:
+		return fmt.Errorf("%w: alipay AESKey length must be 16, 24 or 32 (gopay uses raw string bytes as AES key, no Base64 decode)", payment.ErrInvalidConfig)
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/go-pay/crypto/xpem"
 	"github.com/go-pay/gopay"
@@ -42,6 +43,10 @@ func newGopayGateway(config Config, opts options) (*gopayGateway, error) {
 		return nil, fmt.Errorf("decode alipay verify material: empty public key")
 	}
 	client.AutoVerifySign(verifyMaterial)
+	// 可选透传：gopay SetAESKey（字符串原样作密钥字节）。上游标注内容加密仍不完整，见 Config.AESKey。
+	if aesKey := strings.TrimSpace(config.AESKey); aesKey != "" {
+		client.SetAESKey(aesKey)
+	}
 
 	httpClient := xhttp.NewClient().SetTimeout(opts.timeout)
 	if opts.transport != nil {

@@ -197,13 +197,23 @@ Use `payment` for shared order/status/callback types. Use
 `payment/adapter/alipay` or `payment/adapter/wechat` for direct provider QR
 payments. Use `payment/adapter/onepay` when one neutral HTTPS QR must route
 WeChat scans to OAuth + JSAPI and Alipay scans to WAP. Use
-`payment/adapter/mock` for deterministic in-memory payment tests; it does not
-implement real provider protocols and must not be used for production charges.
+`payment/adapter/mock` for deterministic in-memory payment tests and local
+dev without merchant credentials. Prefer interface injection
+(`payment.Payment` / `PaymentNotifier`) and `PAYMENT_PROVIDER=mock|wechat|alipay`.
+Local full flow: `mock.New()` then `PayAndDeliver` / `CompletePayment` /
+`DeliverPaymentNotification` (no network, no real keys). Use
+`payment.ParseProvider` then switch; `mock.NewForProvider` wires the mock path
+only. Construct wechat/alipay adapters in application code with real
+credentials. Mock does not implement real provider protocols and must not be
+used for production charges.
 
 Alipay adapter notes:
 - Signing: key mode (`PrivateKey` + `AlipayPublicKey`) or cert mode
   (`PrivateKey` + `AppPublicCert` + `AlipayRootCert` + `AlipayPublicCert`).
   Prefer cert mode when the merchant app uses Alipay public-key certificates.
+- Optional experimental `AESKey`: passed through to gopay `SetAESKey` (raw string
+  bytes as AES key, length 16/24/32). gopay marks content encryption incomplete;
+  leave empty unless you have verified behavior on your gopay version.
 - Environment: set `Environment` to `alipay.EnvSandbox` or
   `alipay.EnvProduction`. Empty environment falls back to `Production` bool;
   zero value defaults to sandbox. Sandbox requires new-sandbox app credentials

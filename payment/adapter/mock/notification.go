@@ -40,9 +40,14 @@ func (c *Client) PaymentNotificationRequest(orderID string) (*http.Request, erro
 		return nil, err
 	}
 	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.paymentNotificationRequestLocked(orderID)
+}
+
+// paymentNotificationRequestLocked 在已持有 c.mu 时根据当前快照构造支付回调请求。
+func (c *Client) paymentNotificationRequestLocked(orderID string) (*http.Request, error) {
 	record, exists := c.payments[orderID]
 	if !exists {
-		c.mu.RUnlock()
 		return nil, fmt.Errorf("%w: mock order %q not found", payment.ErrInvalidRequest, orderID)
 	}
 	envelope := notificationEnvelope{
@@ -56,7 +61,6 @@ func (c *Client) PaymentNotificationRequest(orderID string) (*http.Request, erro
 		OccurredAt:    cloneTime(record.PaidAt),
 		Extra:         cloneMap(record.Order.Extra),
 	}
-	c.mu.RUnlock()
 	return newNotificationRequest("https://mock.invalid/payment/notify", envelope)
 }
 
@@ -66,12 +70,20 @@ func (c *Client) RefundNotificationRequest(refundID string) (*http.Request, erro
 		return nil, fmt.Errorf("%w: refund ID cannot be empty", payment.ErrInvalidRequest)
 	}
 	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.refundNotificationRequestLocked(refundID)
+}
+
+// refundNotificationRequestLocked 在已持有 c.mu 时根据当前快照构造退款回调请求。
+func (c *Client) refundNotificationRequestLocked(refundID string) (*http.Request, error) {
 	refund, exists := c.refunds[refundID]
 	if !exists {
-		c.mu.RUnlock()
 		return nil, fmt.Errorf("%w: mock refund %q not found", payment.ErrInvalidRequest, refundID)
 	}
-	order := c.payments[refund.Request.OrderID]
+	order, exists := c.payments[refund.Request.OrderID]
+	if !exists {
+		return nil, fmt.Errorf("%w: mock order %q not found", payment.ErrInvalidRequest, refund.Request.OrderID)
+	}
 	envelope := notificationEnvelope{
 		Version:          notificationVersion,
 		Kind:             matchRefundKind,
@@ -84,7 +96,6 @@ func (c *Client) RefundNotificationRequest(refundID string) (*http.Request, erro
 		Amount:           refund.Request.Amount,
 		OccurredAt:       cloneTime(refund.Result.RefundAt),
 	}
-	c.mu.RUnlock()
 	return newNotificationRequest("https://mock.invalid/refund/notify", envelope)
 }
 
