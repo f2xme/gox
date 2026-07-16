@@ -16,6 +16,13 @@ type Alipay struct {
 	verifyNotify notifyVerifier
 }
 
+// 编译期断言：Alipay 实现核心支付与支付回调接口。
+// 当面付退款为同步接口，故不实现 payment.RefundNotifier。
+var (
+	_ payment.Payment         = (*Alipay)(nil)
+	_ payment.PaymentNotifier = (*Alipay)(nil)
+)
+
 // New 创建支付宝支付适配器。
 //
 // 配置须提供密钥模式（AlipayPublicKey）或证书模式

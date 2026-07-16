@@ -53,5 +53,9 @@ JSAPI 支付；支付宝扫码后进入 WAP 收银台。业务必须实现 Check
 持久化并复用完整 WAP 或 JSAPI artifact。同一 OpenID 重复微信扫码复用未过期
 JSAPI 参数；不同 provider 使用不同订单号。首个成功回调应原子完成主支付意图，
 随后关闭另一平台仍待支付的订单。
+
+内存骨架与挂载示例见 payment/adapter/onepay 的 ExampleCheckoutResolver、
+ExampleNew_createCodeAndMount（骨架勿直接用于生产）。通用回调 handler 形态见本包
+Example_paymentNotifyHandler（仅 success 入账；忽略状态也写 SuccessResponse）。
 */
 package payment

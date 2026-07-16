@@ -25,6 +25,13 @@ type WechatPay struct {
 	decryptRefund func(*wx.V3NotifyReq, string) (*wx.V3DecryptRefundResult, error)
 }
 
+// 编译期断言：WechatPay 实现核心支付、支付回调与退款回调接口。
+var (
+	_ payment.Payment         = (*WechatPay)(nil)
+	_ payment.PaymentNotifier = (*WechatPay)(nil)
+	_ payment.RefundNotifier  = (*WechatPay)(nil)
+)
+
 // New 创建微信支付适配器。
 //
 // 配置须与商户平台「验证微信支付身份」当前启用方式一致：

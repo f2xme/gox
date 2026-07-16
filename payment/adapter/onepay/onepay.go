@@ -1,4 +1,3 @@
-// Package onepay 实现支付宝与微信共用的中立支付二维码。
 package onepay
 
 import (
