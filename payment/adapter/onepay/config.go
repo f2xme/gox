@@ -63,7 +63,8 @@ type WechatPage struct {
 	//   - 无外链 script / style / img / font / connect
 	//   - inline <script> 必须带 nonce="{{.Nonce}}"
 	//   - 须自行调用 WeixinJSBridge.invoke('getBrandWCPayRequest', {{.Params}}, …)
-	// 最小示例见包文档「自定义微信调起页」。
+	//   - {{.SuccessText}}/{{.FailText}} 仅放 script；HTML 正文只用 Title/LoadingText
+	// 最小示例见包文档「微信调起页（WechatPage）」。
 	Template *template.Template
 }
 

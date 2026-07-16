@@ -37,7 +37,9 @@
 //
 // 默认 loading 文案为「支付中…」（旧版「正在调起微信支付…」已变更；E2E/文案断言需同步）。
 //
-// 自定义整页 Template 时数据为 WechatBridgeData，且必须兼容 WechatBridgeCSP：
+// 自定义整页 Template 时数据为 WechatBridgeData，且必须兼容 WechatBridgeCSP。
+// SuccessText/FailText 为 JSON 字符串字面量（template.JS），只应出现在 <script> 中；
+// HTML 标题与正文仅使用 Title / LoadingText。
 //
 //	tpl := template.Must(template.New("wx").Parse(`<!doctype html>
 //	<html lang="zh-CN"><head><meta charset="utf-8"><title>{{.Title}}</title></head>

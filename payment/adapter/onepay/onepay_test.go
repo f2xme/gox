@@ -366,9 +366,12 @@ func TestHandlerWechatPageEscapesXSS(t *testing.T) {
 			t.Fatalf("raw XSS payload in body: %q\n%s", raw, body)
 		}
 	}
-	// HTML-escaped loading/title
-	if !strings.Contains(body, "&lt;script&gt;") && !strings.Contains(body, "&lt;img") {
-		t.Fatalf("expected HTML entity escape: %s", body)
+	// HTML-escaped loading + title both required
+	if !strings.Contains(body, "&lt;script&gt;") {
+		t.Fatalf("expected escaped loading script tag: %s", body)
+	}
+	if !strings.Contains(body, "&lt;img") {
+		t.Fatalf("expected escaped title img: %s", body)
 	}
 	// Success/Fail as JSON string literals (encoding/json escapes < and ")
 	if !strings.Contains(body, `\u003c`) && !strings.Contains(body, `\u003C`) {
@@ -376,6 +379,25 @@ func TestHandlerWechatPageEscapesXSS(t *testing.T) {
 	}
 	if !strings.Contains(body, `\u0022`) && !strings.Contains(body, `\"`) {
 		t.Fatalf("expected JSON-escaped quote in fail text: %s", body)
+	}
+}
+
+func TestRenderWechatBridgeSeparatesFromCommit(t *testing.T) {
+	data, err := buildWechatBridgeData("n", &payment.JSAPIResult{AppID: "a", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s"}, WechatPage{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := renderWechatBridge(data, defaultBridgeTemplate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(body, []byte(DefaultWechatLoadingText)) || !bytes.Contains(body, []byte("prepay_id=p")) {
+		t.Fatalf("render body = %s", body)
+	}
+	// bad template fails before any http write
+	bad := template.Must(template.New("bad").Parse(`{{template "missing"}}`))
+	if _, err := renderWechatBridge(data, bad); err == nil {
+		t.Fatal("want render error")
 	}
 }
 

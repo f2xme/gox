@@ -3,6 +3,7 @@ package onepay
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
@@ -29,8 +30,8 @@ func WechatBridgeCSP(nonce string) string {
 
 // WechatBridgeData 是默认/自定义微信调起页模板的数据。
 //
-//   - Title / LoadingText：HTML 正文，已由 html/template 转义
-//   - SuccessText / FailText：JSON 字符串字面量（含引号），可安全嵌入 script
+//   - Title / LoadingText：仅用于 HTML 正文/标题，由 html/template 转义
+//   - SuccessText / FailText：仅用于 <script> 内（JSON 字符串字面量，含引号）；勿写入 HTML 正文
 //   - Params：JSAPI 六元组；在 script 上下文中由 html/template 按 json tag 输出
 //   - Nonce：须写入 script 的 nonce 属性，并与响应 CSP 一致
 type WechatBridgeData struct {
@@ -82,11 +83,16 @@ func resolveWechatPage(page WechatPage) WechatPage {
 	return page
 }
 
-func buildWechatBridgeData(nonce string, params *payment.JSAPIResult, page WechatPage) WechatBridgeData {
+func buildWechatBridgeData(nonce string, params *payment.JSAPIResult, page WechatPage) (WechatBridgeData, error) {
 	page = resolveWechatPage(page)
-	// json.Marshal(string) 对合法 UTF-8 串不会失败；忽略 err 以简化调用方。
-	successJSON, _ := json.Marshal(page.SuccessText)
-	failJSON, _ := json.Marshal(page.FailText)
+	successJSON, err := json.Marshal(page.SuccessText)
+	if err != nil {
+		return WechatBridgeData{}, fmt.Errorf("marshal wechat success text: %w", err)
+	}
+	failJSON, err := json.Marshal(page.FailText)
+	if err != nil {
+		return WechatBridgeData{}, fmt.Errorf("marshal wechat fail text: %w", err)
+	}
 	return WechatBridgeData{
 		Nonce:       nonce,
 		Params:      params,
@@ -94,7 +100,7 @@ func buildWechatBridgeData(nonce string, params *payment.JSAPIResult, page Wecha
 		LoadingText: page.LoadingText,
 		SuccessText: template.JS(successJSON),
 		FailText:    template.JS(failJSON),
-	}
+	}, nil
 }
 
 func wechatBridgeTemplate(page WechatPage) *template.Template {
@@ -104,15 +110,20 @@ func wechatBridgeTemplate(page WechatPage) *template.Template {
 	return defaultBridgeTemplate
 }
 
-// writeWechatBridge 先渲染到 buffer，成功后再写响应，避免坏模板写出半页 200。
-func writeWechatBridge(w http.ResponseWriter, nonce string, data WechatBridgeData, tpl *template.Template) error {
+// renderWechatBridge 只渲染模板，不写响应。失败时调用方仍可 writeError。
+func renderWechatBridge(data WechatBridgeData, tpl *template.Template) ([]byte, error) {
 	var buf bytes.Buffer
 	if err := tpl.Execute(&buf, data); err != nil {
-		return err
+		return nil, err
 	}
+	return buf.Bytes(), nil
+}
+
+// commitWechatBridge 写入已渲染的调起页。调用后响应可能已提交，不得再 writeError。
+func commitWechatBridge(w http.ResponseWriter, nonce string, body []byte) error {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", WechatBridgeCSP(nonce))
 	w.Header().Set("Cache-Control", "no-store")
-	_, err := w.Write(buf.Bytes())
+	_, err := w.Write(body)
 	return err
 }

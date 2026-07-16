@@ -96,11 +96,19 @@ func (s *Service) handleWechat(w http.ResponseWriter, r *http.Request, token str
 		return
 	}
 	nonce := s.randomString(18)
-	data := buildWechatBridgeData(nonce, checkout.JSAPI, s.config.WechatPage)
-	if err := writeWechatBridge(w, nonce, data, wechatBridgeTemplate(s.config.WechatPage)); err != nil {
+	data, err := buildWechatBridgeData(nonce, checkout.JSAPI, s.config.WechatPage)
+	if err != nil {
 		s.writeError(w, http.StatusBadGateway, "支付服务暂时不可用，请稍后重试")
 		return
 	}
+	body, err := renderWechatBridge(data, wechatBridgeTemplate(s.config.WechatPage))
+	if err != nil {
+		// 尚未写响应，可安全替换为错误页
+		s.writeError(w, http.StatusBadGateway, "支付服务暂时不可用，请稍后重试")
+		return
+	}
+	// commit 后响应可能已发出；Write 失败（客户端断开等）不得再 writeError
+	_ = commitWechatBridge(w, nonce, body)
 }
 
 func (s *Service) validCheckout(checkout *Checkout, provider payment.Provider) bool {
