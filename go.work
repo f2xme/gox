@@ -27,5 +27,6 @@ use (
 	./sms/adapter/tencent
 	./sms/adapter/uni
 	./sms/adapter/volcengine
+	./idverify/adapter/aliyun
 	./validator
 )
