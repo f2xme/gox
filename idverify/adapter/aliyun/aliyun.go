@@ -150,9 +150,13 @@ func isClientFault(code string) bool {
 	}
 }
 
-// mapParamIllegal 将阿里云「参数非法」类响应映射为业务不匹配结果。
+// mapParamIllegal 将阿里云 client-fault 上的「参数非法」映射为业务不匹配结果。
 // 例：code=401 message=参数非法(identifyNum) → CodeIDInvalid（非 ErrUnavailable）。
+// 仅在 isClientFault(code) 时生效，避免 5xx 文案误匹配。
 func mapParamIllegal(got callResult, start time.Time) (idverify.Result, bool) {
+	if !isClientFault(got.Code) {
+		return idverify.Result{}, false
+	}
 	msg := strings.TrimSpace(got.Message)
 	if msg == "" {
 		return idverify.Result{}, false
@@ -180,9 +184,9 @@ func mapParamIllegal(got callResult, start time.Time) (idverify.Result, bool) {
 		base.ErrorMessage = "invalid name"
 		return base, true
 	default:
-		// 其它参数非法：证件侧兜底，避免误报系统错误
+		// 其它参数非法：证件侧兜底；ErrorMessage 固定英文，原始 message 见日志/ProviderCode
 		base.ErrorCode = idverify.CodeIDInvalid
-		base.ErrorMessage = msg
+		base.ErrorMessage = "invalid id number"
 		return base, true
 	}
 }

@@ -120,6 +120,18 @@ func TestAliyunParamIllegalUserName(t *testing.T) {
 	}
 }
 
+func TestAliyunParamIllegalIgnoresNonClientFault(t *testing.T) {
+	// 5xx + 文案碰巧含「参数非法」不得当业务结果（应走系统不可用/failover）
+	v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"), WithEndpoints("ep-a"))
+	v.withCaller(func(context.Context, string, string, string) (callResult, error) {
+		return callResult{HTTPStatus: 200, Code: "500", Message: "参数非法(identifyNum)"}, nil
+	})
+	_, err := v.Verify(context.Background(), idverify.Request{Name: "a", IDNumber: "1"})
+	if err == nil || !errors.Is(err, idverify.ErrUnavailable) {
+		t.Fatalf("want ErrUnavailable, got %v", err)
+	}
+}
+
 func TestAliyunHTTPStatusAndNotConfigured(t *testing.T) {
 	v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"), WithEndpoints("ep-a", "ep-b"))
 	var calls int
