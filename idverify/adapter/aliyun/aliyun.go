@@ -93,6 +93,10 @@ func (v *Verifier) Verify(ctx context.Context, req idverify.Request) (idverify.R
 		if got.Code == apiOK {
 			return mapBiz(got, start)
 		}
+		// 参数非法属于用户输入/业务侧问题，不重试其它节点，也不当系统不可用。
+		if res, ok := mapParamIllegal(got, start); ok {
+			return res, nil
+		}
 		if isClientFault(got.Code) {
 			return idverify.Result{Provider: idverify.ProviderAliyun, Duration: time.Since(start)},
 				idverify.Wrap(idverify.ProviderAliyun, "verify",
@@ -143,6 +147,43 @@ func isClientFault(code string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// mapParamIllegal 将阿里云「参数非法」类响应映射为业务不匹配结果。
+// 例：code=401 message=参数非法(identifyNum) → CodeIDInvalid（非 ErrUnavailable）。
+func mapParamIllegal(got callResult, start time.Time) (idverify.Result, bool) {
+	msg := strings.TrimSpace(got.Message)
+	if msg == "" {
+		return idverify.Result{}, false
+	}
+	// 阿里云常见：参数非法(identifyNum) / 参数非法(userName)
+	if !strings.Contains(msg, "参数非法") && !strings.Contains(strings.ToLower(msg), "invalid parameter") {
+		return idverify.Result{}, false
+	}
+
+	base := idverify.Result{
+		Provider:     idverify.ProviderAliyun,
+		ProviderCode: got.Code,
+		RequestID:    got.RequestID,
+		Duration:     time.Since(start),
+	}
+	lower := strings.ToLower(msg)
+	switch {
+	case strings.Contains(lower, "identifynum"), strings.Contains(lower, "identify_num"), strings.Contains(msg, "身份证"):
+		base.ErrorCode = idverify.CodeIDInvalid
+		base.ErrorMessage = "invalid id number"
+		return base, true
+	case strings.Contains(lower, "username"), strings.Contains(lower, "user_name"), strings.Contains(msg, "姓名"):
+		// 姓名参数非法：按信息不匹配处理（用户可改后重试）
+		base.ErrorCode = idverify.CodeNameMismatch
+		base.ErrorMessage = "invalid name"
+		return base, true
+	default:
+		// 其它参数非法：证件侧兜底，避免误报系统错误
+		base.ErrorCode = idverify.CodeIDInvalid
+		base.ErrorMessage = msg
+		return base, true
 	}
 }
 

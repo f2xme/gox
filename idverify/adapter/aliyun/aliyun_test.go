@@ -80,6 +80,46 @@ func TestAliyunFailoverAndClientFault(t *testing.T) {
 	}
 }
 
+func TestAliyunParamIllegalIdentifyNum(t *testing.T) {
+	// 生产日志：code=401 message=参数非法(identifyNum) 应是业务证件无效，非系统不可用
+	var n int32
+	v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"), WithEndpoints("ep-a", "ep-b"))
+	v.withCaller(func(context.Context, string, string, string) (callResult, error) {
+		atomic.AddInt32(&n, 1)
+		return callResult{
+			HTTPStatus: 200,
+			Code:       "401",
+			Message:    "参数非法(identifyNum)",
+			RequestID:  "req-1",
+		}, nil
+	})
+	res, err := v.Verify(context.Background(), idverify.Request{Name: "张三", IDNumber: "110101199001011234"})
+	if err != nil {
+		t.Fatalf("want biz result nil err, got %v", err)
+	}
+	if res.Matched || res.ErrorCode != idverify.CodeIDInvalid {
+		t.Fatalf("res=%+v", res)
+	}
+	if res.RequestID != "req-1" {
+		t.Fatalf("requestId=%s", res.RequestID)
+	}
+	// 参数非法不 failover 第二节点
+	if atomic.LoadInt32(&n) != 1 {
+		t.Fatalf("calls=%d", n)
+	}
+}
+
+func TestAliyunParamIllegalUserName(t *testing.T) {
+	v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"))
+	v.withCaller(func(context.Context, string, string, string) (callResult, error) {
+		return callResult{HTTPStatus: 200, Code: "401", Message: "参数非法(userName)"}, nil
+	})
+	res, err := v.Verify(context.Background(), idverify.Request{Name: "a", IDNumber: "1"})
+	if err != nil || res.Matched || res.ErrorCode != idverify.CodeNameMismatch {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+}
+
 func TestAliyunHTTPStatusAndNotConfigured(t *testing.T) {
 	v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"), WithEndpoints("ep-a", "ep-b"))
 	var calls int
