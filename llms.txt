@@ -60,6 +60,7 @@ SMS providers, queues, and similar integrations.
 | Queue abstraction | `queue`, `queue/adapter/mem`, `queue/adapter/rocketmq` |
 | Rate limiting | `ratelimit` |
 | SMS | `sms`, `sms/adapter/aliyun`, `sms/adapter/tencent`, `sms/adapter/volcengine` |
+| Real-name / ID two-factor verify (name + national ID) | `idverify`, `idverify/adapter/mock`, `idverify/adapter/baidu`, `idverify/adapter/aliyun` |
 | Tracing | `trace` |
 
 ## Common Usage Rules
