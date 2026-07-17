@@ -16,7 +16,7 @@ func TestAliyunVerifySuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v.WithCaller(func(_ context.Context, endpoint, name, id string) (callResult, error) {
+	v.withCaller(func(_ context.Context, endpoint, name, id string) (callResult, error) {
 		atomic.AddInt32(&calls, 1)
 		if endpoint != "ep-a" || name != "张三" {
 			t.Fatalf("endpoint=%s name=%s", endpoint, name)
@@ -43,7 +43,7 @@ func TestAliyunBizCodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"))
-		v.WithCaller(func(context.Context, string, string, string) (callResult, error) {
+		v.withCaller(func(context.Context, string, string, string) (callResult, error) {
 			return callResult{HTTPStatus: 200, Code: "200", BizCode: tt.biz}, nil
 		})
 		res, err := v.Verify(context.Background(), idverify.Request{Name: "a", IDNumber: "1"})
@@ -56,7 +56,7 @@ func TestAliyunBizCodes(t *testing.T) {
 func TestAliyunFailoverAndClientFault(t *testing.T) {
 	var calls []string
 	v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"), WithEndpoints("ep-a", "ep-b"))
-	v.WithCaller(func(_ context.Context, endpoint, _, _ string) (callResult, error) {
+	v.withCaller(func(_ context.Context, endpoint, _, _ string) (callResult, error) {
 		calls = append(calls, endpoint)
 		if endpoint == "ep-a" {
 			return callResult{}, fmt.Errorf("network")
@@ -70,7 +70,7 @@ func TestAliyunFailoverAndClientFault(t *testing.T) {
 
 	calls = nil
 	var n int32
-	v.WithCaller(func(context.Context, string, string, string) (callResult, error) {
+	v.withCaller(func(context.Context, string, string, string) (callResult, error) {
 		atomic.AddInt32(&n, 1)
 		return callResult{HTTPStatus: 200, Code: "410", Message: "not open"}, nil
 	})
@@ -83,7 +83,7 @@ func TestAliyunFailoverAndClientFault(t *testing.T) {
 func TestAliyunHTTPStatusAndNotConfigured(t *testing.T) {
 	v := MustNew(WithAccessKeyID("ak"), WithAccessKeySecret("sk"), WithEndpoints("ep-a", "ep-b"))
 	var calls int
-	v.WithCaller(func(_ context.Context, endpoint, _, _ string) (callResult, error) {
+	v.withCaller(func(_ context.Context, endpoint, _, _ string) (callResult, error) {
 		calls++
 		if endpoint == "ep-a" {
 			return callResult{HTTPStatus: 502, Code: "200", BizCode: "1"}, nil

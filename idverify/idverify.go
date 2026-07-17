@@ -37,10 +37,15 @@ func (r Request) Normalize() Request {
 	}
 }
 
-// Valid 检查请求是否具备基本字段。
+// Valid 检查请求是否具备基本字段（会先 Normalize）。
 func (r Request) Valid() bool {
 	n := r.Normalize()
-	return n.Name != "" && n.IDNumber != ""
+	return n.hasFields()
+}
+
+// hasFields 假定调用方已 Normalize。
+func (r Request) hasFields() bool {
+	return r.Name != "" && r.IDNumber != ""
 }
 
 // Result 二要素核验业务结果。
@@ -49,7 +54,8 @@ func (r Request) Valid() bool {
 //   - Matched == true 表示一致；
 //   - Matched == false 表示业务不一致（姓名/证件不匹配等），应查看 ErrorCode。
 //
-// 系统错误（配置、网络、上游 5xx 等）通过 error 返回，此时 Result 可能为零值或仅含 Duration。
+// 系统错误（配置、网络、上游 5xx 等）通过 error 返回；此时 Result 通常仅含 Provider 与 Duration，
+// 不含业务 ErrorCode。
 type Result struct {
 	// Matched 是否核验为同一人。
 	Matched bool

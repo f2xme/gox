@@ -47,8 +47,8 @@ var _ idverify.Verifier = (*Verifier)(nil)
 // Provider 返回 aliyun。
 func (v *Verifier) Provider() string { return idverify.ProviderAliyun }
 
-// WithCaller 覆盖底层调用（测试用）。
-func (v *Verifier) WithCaller(fn caller) *Verifier {
+// withCaller 覆盖底层调用，仅测试使用。
+func (v *Verifier) withCaller(fn caller) *Verifier {
 	if fn != nil {
 		v.call = fn
 	}
@@ -62,11 +62,11 @@ func (v *Verifier) Verify(ctx context.Context, req idverify.Request) (idverify.R
 		return idverify.Result{Duration: time.Since(start)}, fmt.Errorf("%w: context is nil", idverify.ErrInvalidArgument)
 	}
 	if err := ctx.Err(); err != nil {
-		return idverify.Result{Duration: time.Since(start)}, idverify.Wrap(idverify.ProviderAliyun, "verify", err)
+		return idverify.Result{Duration: time.Since(start)}, err
 	}
 
 	req = req.Normalize()
-	if !req.Valid() {
+	if req.Name == "" || req.IDNumber == "" {
 		return idverify.Result{Provider: idverify.ProviderAliyun, Duration: time.Since(start)},
 			fmt.Errorf("%w: name and id number are required", idverify.ErrInvalidArgument)
 	}
@@ -79,7 +79,7 @@ func (v *Verifier) Verify(ctx context.Context, req idverify.Request) (idverify.R
 	var lastSys error
 	for _, ep := range v.options.Endpoints {
 		if err := ctx.Err(); err != nil {
-			return idverify.Result{Duration: time.Since(start)}, idverify.Wrap(idverify.ProviderAliyun, "verify", err)
+			return idverify.Result{Duration: time.Since(start)}, err
 		}
 		got, err := callFn(ctx, ep, req.Name, req.IDNumber)
 		if err != nil {

@@ -39,20 +39,20 @@ func (v *Verifier) Provider() string { return idverify.ProviderBaidu }
 func (v *Verifier) Verify(ctx context.Context, req idverify.Request) (idverify.Result, error) {
 	start := time.Now()
 	if ctx == nil {
-		return result(start, false, "", "", "", fmt.Errorf("%w: context is nil", idverify.ErrInvalidArgument))
+		return resultErr(start, fmt.Errorf("%w: context is nil", idverify.ErrInvalidArgument))
 	}
 	if err := ctx.Err(); err != nil {
-		return result(start, false, "", "", "", idverify.Wrap(idverify.ProviderBaidu, "verify", err))
+		return resultErr(start, err)
 	}
 
 	req = req.Normalize()
-	if !req.Valid() {
-		return result(start, false, "", "", "", fmt.Errorf("%w: name and id number are required", idverify.ErrInvalidArgument))
+	if req.Name == "" || req.IDNumber == "" {
+		return resultErr(start, fmt.Errorf("%w: name and id number are required", idverify.ErrInvalidArgument))
 	}
 
 	token, err := v.getAccessToken(ctx)
 	if err != nil {
-		return result(start, false, "", "", "", err)
+		return resultErr(start, err)
 	}
 
 	body, err := json.Marshal(map[string]string{
@@ -60,34 +60,40 @@ func (v *Verifier) Verify(ctx context.Context, req idverify.Request) (idverify.R
 		"name":           req.Name,
 	})
 	if err != nil {
-		return result(start, false, "", "", "", idverify.Wrap(idverify.ProviderBaidu, "marshal", err))
+		return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "marshal", err))
 	}
 
-	endpoint := v.options.MatchURL + "?access_token=" + url.QueryEscape(token)
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	matchURL, err := url.Parse(v.options.MatchURL)
 	if err != nil {
-		return result(start, false, "", "", "", idverify.Wrap(idverify.ProviderBaidu, "request", err))
+		return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "request", err))
+	}
+	q := matchURL.Query()
+	q.Set("access_token", token)
+	matchURL.RawQuery = q.Encode()
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, matchURL.String(), bytes.NewReader(body))
+	if err != nil {
+		return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "request", err))
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := v.options.HTTPClient.Do(httpReq)
 	if err != nil {
-		return result(start, false, "", "", "", idverify.Wrap(idverify.ProviderBaidu, "http", fmt.Errorf("%w: %w", idverify.ErrUnavailable, err)))
+		return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "http", fmt.Errorf("%w: %w", idverify.ErrUnavailable, err)))
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return result(start, false, "", "", "", idverify.Wrap(idverify.ProviderBaidu, "read", err))
+		return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "read", err))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return result(start, false, "", "", "", idverify.Wrap(idverify.ProviderBaidu, "http",
+		return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "http",
 			fmt.Errorf("%w: status %d: %s", idverify.ErrUnavailable, resp.StatusCode, truncate(string(raw), 200))))
 	}
 
 	var parsed matchResp
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return result(start, false, "", "", "", idverify.Wrap(idverify.ProviderBaidu, "decode", err))
+		return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "decode", err))
 	}
 
 	code := normalizeCode(parsed.ErrorCode)
@@ -124,7 +130,7 @@ func (v *Verifier) Verify(ctx context.Context, req idverify.Request) (idverify.R
 	if msg == "" {
 		msg = "baidu idmatch error " + code
 	}
-	return result(start, false, code, msg, "", idverify.Wrap(idverify.ProviderBaidu, "verify",
+	return resultErr(start, idverify.Wrap(idverify.ProviderBaidu, "verify",
 		fmt.Errorf("%w: error_code=%s error_msg=%s", idverify.ErrUnavailable, code, msg)))
 }
 
@@ -142,11 +148,12 @@ type tokenResp struct {
 
 func (v *Verifier) getAccessToken(ctx context.Context) (string, error) {
 	v.mu.Lock()
-	defer v.mu.Unlock()
-
 	if v.accessToken != "" && time.Now().Before(v.tokenExpiry) {
-		return v.accessToken, nil
+		tok := v.accessToken
+		v.mu.Unlock()
+		return tok, nil
 	}
+	v.mu.Unlock()
 
 	form := url.Values{}
 	form.Set("grant_type", "client_credentials")
@@ -197,19 +204,22 @@ func (v *Verifier) getAccessToken(ctx context.Context) (string, error) {
 	if time.Duration(expiresIn)*time.Second <= margin {
 		margin = time.Duration(expiresIn) * time.Second / 2
 	}
+	expiry := time.Now().Add(time.Duration(expiresIn)*time.Second - margin)
+
+	v.mu.Lock()
+	// 并发刷新时可能已有更新 token，仍写入最新成功结果
 	v.accessToken = parsed.AccessToken
-	v.tokenExpiry = time.Now().Add(time.Duration(expiresIn)*time.Second - margin)
-	return v.accessToken, nil
+	v.tokenExpiry = expiry
+	tok := v.accessToken
+	v.mu.Unlock()
+	return tok, nil
 }
 
-func result(start time.Time, matched bool, code, msg, reqID string, err error) (idverify.Result, error) {
+// resultErr 系统错误：仅填 Provider + Duration，不填业务 ErrorCode。
+func resultErr(start time.Time, err error) (idverify.Result, error) {
 	return idverify.Result{
-		Matched:      matched,
-		Provider:     idverify.ProviderBaidu,
-		ErrorCode:    code,
-		ErrorMessage: msg,
-		RequestID:    reqID,
-		Duration:     time.Since(start),
+		Provider: idverify.ProviderBaidu,
+		Duration: time.Since(start),
 	}, err
 }
 

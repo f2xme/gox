@@ -58,4 +58,14 @@ func TestMockSystemErrorAndInvalidArg(t *testing.T) {
 	if !errors.Is(err, idverify.ErrInvalidArgument) {
 		t.Fatalf("err=%v", err)
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = v2.Verify(ctx, idverify.Request{Name: "a", IDNumber: "1"})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("want context.Canceled, got %v", err)
+	}
+	if errors.Is(err, idverify.ErrUnavailable) {
+		t.Fatal("canceled must not be ErrUnavailable")
+	}
 }

@@ -29,11 +29,11 @@ func (v *Verifier) Verify(ctx context.Context, req idverify.Request) (idverify.R
 		return idverify.Result{Duration: time.Since(start)}, fmt.Errorf("%w: context is nil", idverify.ErrInvalidArgument)
 	}
 	if err := ctx.Err(); err != nil {
-		return idverify.Result{Duration: time.Since(start)}, fmt.Errorf("%w: %w", idverify.ErrUnavailable, err)
+		return idverify.Result{Duration: time.Since(start)}, err
 	}
 
 	req = req.Normalize()
-	if !req.Valid() {
+	if req.Name == "" || req.IDNumber == "" {
 		return idverify.Result{Provider: idverify.ProviderMock, Duration: time.Since(start)},
 			fmt.Errorf("%w: name and id number are required", idverify.ErrInvalidArgument)
 	}
