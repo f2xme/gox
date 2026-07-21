@@ -11,6 +11,8 @@ const defaultEndpoint = "https://restapi.amap.com/v3/ip"
 type Options struct {
 	// Key 高德 Web 服务 API Key，必填。
 	Key string
+	// PrivateKey 数字签名私钥，开启数字签名认证时填写。
+	PrivateKey string
 	// Endpoint API 地址，默认 https://restapi.amap.com/v3/ip。
 	Endpoint string
 	// Timeout 单次请求超时，默认 5 秒；<=0 时回落为默认 5 秒。
@@ -39,6 +41,17 @@ func defaultOptions() Options {
 func WithKey(key string) Option {
 	return func(o *Options) {
 		o.Key = key
+	}
+}
+
+// WithPrivateKey 设置高德数字签名私钥。
+//
+// 示例：
+//
+//	New(WithKey("your-amap-key"), WithPrivateKey("your-private-key"))
+func WithPrivateKey(privateKey string) Option {
+	return func(o *Options) {
+		o.PrivateKey = privateKey
 	}
 }
 

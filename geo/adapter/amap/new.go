@@ -35,9 +35,10 @@ func New(opts ...Option) (*Locator, error) {
 	}
 
 	return &Locator{
-		key:      strings.TrimSpace(options.Key),
-		endpoint: strings.TrimSpace(options.Endpoint),
-		client:   client,
+		key:        strings.TrimSpace(options.Key),
+		privateKey: strings.TrimSpace(options.PrivateKey),
+		endpoint:   strings.TrimSpace(options.Endpoint),
+		client:     client,
 	}, nil
 }
 
