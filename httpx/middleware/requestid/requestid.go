@@ -16,7 +16,7 @@ func New(opts ...Option) httpx.Middleware {
 				id = o.generator()
 			}
 			ctx.SetHeader(o.headerKey, id)
-			ctx.Set("request_id", id)
+			ctx.Set(contextKey, id)
 
 			if o.handler != nil {
 				o.handler(ctx, id)
@@ -27,7 +27,12 @@ func New(opts ...Option) httpx.Middleware {
 	}
 }
 
-// Get 从上下文头中获取请求 ID
+// Get 从上下文获取请求 ID。
 func Get(ctx httpx.Context) string {
+	if value, ok := ctx.Get(contextKey); ok {
+		if id, ok := value.(string); ok {
+			return id
+		}
+	}
 	return ctx.Header(defaultHeaderKey).String()
 }

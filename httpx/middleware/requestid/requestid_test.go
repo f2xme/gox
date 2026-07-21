@@ -11,8 +11,7 @@ func TestNew_GeneratesID(t *testing.T) {
 	mw := New()
 	var capturedID string
 	handler := mw(func(ctx httpx.Context) error {
-		v, _ := ctx.Get("request_id")
-		capturedID = v.(string)
+		capturedID = Get(ctx)
 		return nil
 	})
 	ctx := mock.NewMockContext("GET", "/test")
@@ -103,9 +102,42 @@ func TestNew_WithHandler(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	ctx := mock.NewMockContext("GET", "/test")
-	ctx.Headers[defaultHeaderKey] = "test-id"
-	if Get(ctx) != "test-id" {
-		t.Errorf("expected 'test-id', got %q", Get(ctx))
+	tests := []struct {
+		name      string
+		contextID any
+		headerID  string
+		want      string
+	}{
+		{
+			name:      "gets ID from context",
+			contextID: "context-id",
+			headerID:  "header-id",
+			want:      "context-id",
+		},
+		{
+			name:     "falls back to request header",
+			headerID: "header-id",
+			want:     "header-id",
+		},
+		{
+			name:      "ignores non-string context value",
+			contextID: 123,
+			headerID:  "header-id",
+			want:      "header-id",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mock.NewMockContext("GET", "/test")
+			if tt.contextID != nil {
+				ctx.Set(contextKey, tt.contextID)
+			}
+			ctx.Headers[defaultHeaderKey] = tt.headerID
+
+			if got := Get(ctx); got != tt.want {
+				t.Errorf("Get() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

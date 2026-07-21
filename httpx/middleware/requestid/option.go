@@ -17,7 +17,10 @@ type Options struct {
 // Option 配置请求 ID 中间件
 type Option func(*Options)
 
-const defaultHeaderKey = "X-Request-ID"
+const (
+	defaultHeaderKey = "X-Request-ID"
+	contextKey       = "request_id"
+)
 
 func defaultOptions() *Options {
 	return &Options{
