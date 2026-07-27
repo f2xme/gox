@@ -170,8 +170,8 @@ result, err := elasticsearch.SearchWithType[User](ctx, client, req)
 ```
 
 For production, configure authentication and timeouts explicitly. Use
-`client.Native()` only when the wrapper does not expose the official API that a
-task needs.
+the matching `esapi` request with `client.Native()` only when the wrapper does
+not expose the API that a task needs.
 
 ### Adapters
 

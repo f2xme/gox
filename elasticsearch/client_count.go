@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 // Count 统计匹配文档数量。
@@ -17,11 +19,10 @@ func (c *Client) Count(ctx context.Context, req Request) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	resp, err := c.client.Count(
-		c.client.Count.WithContext(ctx),
-		c.client.Count.WithIndex(req.Index()),
-		c.client.Count.WithBody(body),
-	)
+	resp, err := (esapi.CountRequest{
+		Index: []string{req.Index()},
+		Body:  body,
+	}).Do(ctx, c.client)
 	if err != nil {
 		return 0, fmt.Errorf("elastic: count %s: %w", req.Index(), err)
 	}

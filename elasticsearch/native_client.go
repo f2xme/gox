@@ -5,26 +5,27 @@ import (
 	"fmt"
 
 	elastic "github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 // Client 是基于官方 go-elasticsearch/v8 的 Elasticsearch 客户端。
 type Client struct {
-	client *elastic.Client
+	client *elastic.BaseClient
 }
 
-// Native 返回底层官方 Elasticsearch 客户端。
-func (c *Client) Native() *elastic.Client {
+// Native 返回不附带全量 API 的底层 Elasticsearch 客户端。
+func (c *Client) Native() *elastic.BaseClient {
 	return c.client
 }
 
-// Unwrap 返回底层官方 Elasticsearch 客户端。
+// Unwrap 返回不附带全量 API 的底层 Elasticsearch 客户端。
 func (c *Client) Unwrap() any {
 	return c.client
 }
 
 // Ping 检查 Elasticsearch 连通性。
 func (c *Client) Ping(ctx context.Context) error {
-	resp, err := c.client.Info(c.client.Info.WithContext(ctx))
+	resp, err := (esapi.InfoRequest{}).Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: ping: %w", err)
 	}

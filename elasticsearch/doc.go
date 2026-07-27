@@ -191,7 +191,7 @@ Task API 可用于查询 reindex、delete by query 等长任务，也可以取�
   - 重建索引推荐通过别名访问业务索引，避免业务代码绑定物理索引名。
   - 更新 synonyms 后，关联 analyzer 可能会 reload；生产环境应关注返回的 reload 明细。
   - 取消 task 只对 Elasticsearch 标记为 cancellable 的任务有效。
-  - 需要官方客户端未封装能力时，可通过 client.Native() 获取原生客户端。
+  - 需要未封装能力时，可用对应 esapi Request 对 client.Native() 执行 Do。
 
 # 测试
 

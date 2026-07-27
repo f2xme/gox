@@ -404,11 +404,12 @@ tokens, err := client.Analyze(ctx, "articles", body)
 
 ## 访问官方客户端
 
-当 gox 封装还没有覆盖某个 API 时，可以取出官方客户端：
+当 gox 封装还没有覆盖某个 API 时，可让对应 `esapi` Request 使用底层客户端：
 
 ```go
-native := client.Native()
-resp, err := native.Info()
+import "github.com/elastic/go-elasticsearch/v8/esapi"
+
+resp, err := (esapi.InfoRequest{}).Do(ctx, client.Native())
 ```
 
 ## 生产建议
@@ -422,7 +423,7 @@ resp, err := native.Info()
 - 大索引重建使用异步 reindex，等待任务完成后再切换别名。
 - 更新同义词后关注 analyzer reload 明细，避免搜索分析链路悄悄失效。
 - 取消任务前先通过 `ListTasks` 或 `GetTask` 确认任务是否 `cancellable`。
-- 官方客户端未封装的能力通过 `Native()` 使用，避免在 gox 包里重复造底层 API。
+- 官方客户端未封装的能力通过对应 `esapi` Request 和 `Native()` 使用。
 
 ## 测试
 

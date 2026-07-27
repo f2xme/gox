@@ -13,17 +13,12 @@ import (
 // ListSynonymSets 获取同义词集合列表。
 func (c *Client) ListSynonymSets(ctx context.Context, opts ...SynonymOption) (*SynonymSetList, error) {
 	options := applySynonymOptions(opts...)
-	callOpts := []func(*esapi.SynonymsGetSynonymsSetsRequest){
-		c.client.SynonymsGetSynonymsSets.WithContext(ctx),
-	}
-	if options.From != nil {
-		callOpts = append(callOpts, c.client.SynonymsGetSynonymsSets.WithFrom(*options.From))
-	}
-	if options.Size != nil {
-		callOpts = append(callOpts, c.client.SynonymsGetSynonymsSets.WithSize(*options.Size))
+	req := esapi.SynonymsGetSynonymsSetsRequest{
+		From: options.From,
+		Size: options.Size,
 	}
 
-	resp, err := c.client.SynonymsGetSynonymsSets(callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: list synonym sets: %w", err)
 	}
@@ -42,17 +37,13 @@ func (c *Client) ListSynonymSets(ctx context.Context, opts ...SynonymOption) (*S
 // GetSynonymSet 获取同义词集合。
 func (c *Client) GetSynonymSet(ctx context.Context, id string, opts ...SynonymOption) (*SynonymSet, error) {
 	options := applySynonymOptions(opts...)
-	callOpts := []func(*esapi.SynonymsGetSynonymRequest){
-		c.client.SynonymsGetSynonym.WithContext(ctx),
-	}
-	if options.From != nil {
-		callOpts = append(callOpts, c.client.SynonymsGetSynonym.WithFrom(*options.From))
-	}
-	if options.Size != nil {
-		callOpts = append(callOpts, c.client.SynonymsGetSynonym.WithSize(*options.Size))
+	req := esapi.SynonymsGetSynonymRequest{
+		DocumentID: id,
+		From:       options.From,
+		Size:       options.Size,
 	}
 
-	resp, err := c.client.SynonymsGetSynonym(id, callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: get synonym set %s: %w", id, err)
 	}
@@ -75,11 +66,10 @@ func (c *Client) PutSynonymSet(ctx context.Context, id string, rules []SynonymRu
 		return nil, fmt.Errorf("elastic: marshal synonym set %s: %w", id, err)
 	}
 
-	resp, err := c.client.SynonymsPutSynonym(
-		id,
-		bytes.NewReader(body),
-		c.client.SynonymsPutSynonym.WithContext(ctx),
-	)
+	resp, err := (esapi.SynonymsPutSynonymRequest{
+		DocumentID: id,
+		Body:       bytes.NewReader(body),
+	}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: put synonym set %s: %w", id, err)
 	}
@@ -92,10 +82,7 @@ func (c *Client) PutSynonymSet(ctx context.Context, id string, rules []SynonymRu
 
 // DeleteSynonymSet 删除同义词集合。
 func (c *Client) DeleteSynonymSet(ctx context.Context, id string) error {
-	resp, err := c.client.SynonymsDeleteSynonym(
-		id,
-		c.client.SynonymsDeleteSynonym.WithContext(ctx),
-	)
+	resp, err := (esapi.SynonymsDeleteSynonymRequest{DocumentID: id}).Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: delete synonym set %s: %w", id, err)
 	}
@@ -108,11 +95,10 @@ func (c *Client) DeleteSynonymSet(ctx context.Context, id string) error {
 
 // GetSynonymRule 获取同义词集合中的单条规则。
 func (c *Client) GetSynonymRule(ctx context.Context, setID, ruleID string) (*SynonymRule, error) {
-	resp, err := c.client.SynonymsGetSynonymRule(
-		ruleID,
-		setID,
-		c.client.SynonymsGetSynonymRule.WithContext(ctx),
-	)
+	resp, err := (esapi.SynonymsGetSynonymRuleRequest{
+		RuleID: ruleID,
+		SetID:  setID,
+	}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: get synonym rule %s/%s: %w", setID, ruleID, err)
 	}
@@ -135,12 +121,11 @@ func (c *Client) PutSynonymRule(ctx context.Context, setID, ruleID, synonyms str
 		return nil, fmt.Errorf("elastic: marshal synonym rule %s/%s: %w", setID, ruleID, err)
 	}
 
-	resp, err := c.client.SynonymsPutSynonymRule(
-		bytes.NewReader(body),
-		ruleID,
-		setID,
-		c.client.SynonymsPutSynonymRule.WithContext(ctx),
-	)
+	resp, err := (esapi.SynonymsPutSynonymRuleRequest{
+		Body:   bytes.NewReader(body),
+		RuleID: ruleID,
+		SetID:  setID,
+	}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: put synonym rule %s/%s: %w", setID, ruleID, err)
 	}
@@ -153,11 +138,10 @@ func (c *Client) PutSynonymRule(ctx context.Context, setID, ruleID, synonyms str
 
 // DeleteSynonymRule 删除同义词集合中的单条规则。
 func (c *Client) DeleteSynonymRule(ctx context.Context, setID, ruleID string) error {
-	resp, err := c.client.SynonymsDeleteSynonymRule(
-		ruleID,
-		setID,
-		c.client.SynonymsDeleteSynonymRule.WithContext(ctx),
-	)
+	resp, err := (esapi.SynonymsDeleteSynonymRuleRequest{
+		RuleID: ruleID,
+		SetID:  setID,
+	}).Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: delete synonym rule %s/%s: %w", setID, ruleID, err)
 	}

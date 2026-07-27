@@ -22,15 +22,16 @@ func (c *Client) CreateDoc(ctx context.Context, index string, doc Document, opts
 	}
 
 	writeOptions := ApplyWriteOptions(opts...)
-	callOpts := []func(*esapi.IndexRequest){
-		c.client.Index.WithContext(ctx),
-		c.client.Index.WithDocumentID(doc.ID()),
+	req := esapi.IndexRequest{
+		Index:      index,
+		DocumentID: doc.ID(),
+		Body:       bytes.NewReader(body),
 	}
 	if writeOptions.Refresh {
-		callOpts = append(callOpts, c.client.Index.WithRefresh("true"))
+		req.Refresh = "true"
 	}
 
-	resp, err := c.client.Index(index, bytes.NewReader(body), callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: create document %s/%s: %w", index, doc.ID(), err)
 	}
@@ -116,13 +117,15 @@ func (c *Client) UpdateDoc(ctx context.Context, index string, doc Document, opts
 		return fmt.Errorf("elastic: marshal update document %s/%s: %w", index, doc.ID(), err)
 	}
 
-	callOpts := []func(*esapi.UpdateRequest){
-		c.client.Update.WithContext(ctx),
+	req := esapi.UpdateRequest{
+		Index:      index,
+		DocumentID: doc.ID(),
+		Body:       bytes.NewReader(body),
 	}
 	if ApplyWriteOptions(opts...).Refresh {
-		callOpts = append(callOpts, c.client.Update.WithRefresh("true"))
+		req.Refresh = "true"
 	}
-	resp, err := c.client.Update(index, doc.ID(), bytes.NewReader(body), callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: update document %s/%s: %w", index, doc.ID(), err)
 	}
@@ -135,13 +138,14 @@ func (c *Client) UpdateDoc(ctx context.Context, index string, doc Document, opts
 
 // DeleteDoc 删除文档。
 func (c *Client) DeleteDoc(ctx context.Context, index string, id string, opts ...WriteOption) error {
-	callOpts := []func(*esapi.DeleteRequest){
-		c.client.Delete.WithContext(ctx),
+	req := esapi.DeleteRequest{
+		Index:      index,
+		DocumentID: id,
 	}
 	if ApplyWriteOptions(opts...).Refresh {
-		callOpts = append(callOpts, c.client.Delete.WithRefresh("true"))
+		req.Refresh = "true"
 	}
-	resp, err := c.client.Delete(index, id, callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: delete document %s/%s: %w", index, id, err)
 	}

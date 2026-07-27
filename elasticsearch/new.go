@@ -38,7 +38,7 @@ func NewContext(ctx context.Context, opts ...Option) (*Client, error) {
 		}
 	}
 
-	native, err := elastic.NewClient(elastic.Config{
+	native, err := elastic.NewBaseClient(elastic.Config{
 		Addresses:    o.Addresses,
 		Username:     o.Username,
 		Password:     o.Password,

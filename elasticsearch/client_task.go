@@ -12,17 +12,13 @@ import (
 // GetTask 获取单个任务信息。
 func (c *Client) GetTask(ctx context.Context, taskID string, opts ...TaskOption) (*TaskResponse, error) {
 	options := applyTaskOptions(opts...)
-	callOpts := []func(*esapi.TasksGetRequest){
-		c.client.Tasks.Get.WithContext(ctx),
-	}
-	if options.Timeout > 0 {
-		callOpts = append(callOpts, c.client.Tasks.Get.WithTimeout(options.Timeout))
-	}
-	if options.WaitForCompletion != nil {
-		callOpts = append(callOpts, c.client.Tasks.Get.WithWaitForCompletion(*options.WaitForCompletion))
+	req := esapi.TasksGetRequest{
+		TaskID:            taskID,
+		Timeout:           options.Timeout,
+		WaitForCompletion: options.WaitForCompletion,
 	}
 
-	resp, err := c.client.Tasks.Get(taskID, callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: get task %s: %w", taskID, err)
 	}
@@ -36,32 +32,17 @@ func (c *Client) GetTask(ctx context.Context, taskID string, opts ...TaskOption)
 // ListTasks 获取任务列表。
 func (c *Client) ListTasks(ctx context.Context, opts ...TaskOption) (*TaskListResponse, error) {
 	options := applyTaskOptions(opts...)
-	callOpts := []func(*esapi.TasksListRequest){
-		c.client.Tasks.List.WithContext(ctx),
-	}
-	if len(options.Actions) > 0 {
-		callOpts = append(callOpts, c.client.Tasks.List.WithActions(options.Actions...))
-	}
-	if options.Detailed != nil {
-		callOpts = append(callOpts, c.client.Tasks.List.WithDetailed(*options.Detailed))
-	}
-	if options.GroupBy != "" {
-		callOpts = append(callOpts, c.client.Tasks.List.WithGroupBy(string(options.GroupBy)))
-	}
-	if len(options.Nodes) > 0 {
-		callOpts = append(callOpts, c.client.Tasks.List.WithNodes(options.Nodes...))
-	}
-	if options.ParentTaskID != "" {
-		callOpts = append(callOpts, c.client.Tasks.List.WithParentTaskID(options.ParentTaskID))
-	}
-	if options.Timeout > 0 {
-		callOpts = append(callOpts, c.client.Tasks.List.WithTimeout(options.Timeout))
-	}
-	if options.WaitForCompletion != nil {
-		callOpts = append(callOpts, c.client.Tasks.List.WithWaitForCompletion(*options.WaitForCompletion))
+	req := esapi.TasksListRequest{
+		Actions:           options.Actions,
+		Detailed:          options.Detailed,
+		GroupBy:           string(options.GroupBy),
+		Nodes:             options.Nodes,
+		ParentTaskID:      options.ParentTaskID,
+		Timeout:           options.Timeout,
+		WaitForCompletion: options.WaitForCompletion,
 	}
 
-	resp, err := c.client.Tasks.List(callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: list tasks: %w", err)
 	}
@@ -75,23 +56,14 @@ func (c *Client) ListTasks(ctx context.Context, opts ...TaskOption) (*TaskListRe
 // CancelTasks 取消匹配条件的任务。
 func (c *Client) CancelTasks(ctx context.Context, opts ...TaskOption) (*TaskCancelResponse, error) {
 	options := applyTaskOptions(opts...)
-	callOpts := []func(*esapi.TasksCancelRequest){
-		c.client.Tasks.Cancel.WithContext(ctx),
-	}
-	if len(options.Actions) > 0 {
-		callOpts = append(callOpts, c.client.Tasks.Cancel.WithActions(options.Actions...))
-	}
-	if len(options.Nodes) > 0 {
-		callOpts = append(callOpts, c.client.Tasks.Cancel.WithNodes(options.Nodes...))
-	}
-	if options.ParentTaskID != "" {
-		callOpts = append(callOpts, c.client.Tasks.Cancel.WithParentTaskID(options.ParentTaskID))
-	}
-	if options.WaitForCompletion != nil {
-		callOpts = append(callOpts, c.client.Tasks.Cancel.WithWaitForCompletion(*options.WaitForCompletion))
+	req := esapi.TasksCancelRequest{
+		Actions:           options.Actions,
+		Nodes:             options.Nodes,
+		ParentTaskID:      options.ParentTaskID,
+		WaitForCompletion: options.WaitForCompletion,
 	}
 
-	resp, err := c.client.Tasks.Cancel(callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: cancel tasks: %w", err)
 	}
@@ -105,15 +77,12 @@ func (c *Client) CancelTasks(ctx context.Context, opts ...TaskOption) (*TaskCanc
 // CancelTask 取消指定任务。
 func (c *Client) CancelTask(ctx context.Context, taskID string, opts ...TaskOption) (*TaskCancelResponse, error) {
 	options := applyTaskOptions(opts...)
-	callOpts := []func(*esapi.TasksCancelRequest){
-		c.client.Tasks.Cancel.WithContext(ctx),
-		c.client.Tasks.Cancel.WithTaskID(taskID),
-	}
-	if options.WaitForCompletion != nil {
-		callOpts = append(callOpts, c.client.Tasks.Cancel.WithWaitForCompletion(*options.WaitForCompletion))
+	req := esapi.TasksCancelRequest{
+		TaskID:            taskID,
+		WaitForCompletion: options.WaitForCompletion,
 	}
 
-	resp, err := c.client.Tasks.Cancel(callOpts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: cancel task %s: %w", taskID, err)
 	}

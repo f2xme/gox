@@ -18,18 +18,16 @@ func (c *Client) CreateIndex(ctx context.Context, index string, mapping *IndexMa
 
 // CreateIndexWithMapping 创建带 settings 和 mappings 的索引。
 func (c *Client) CreateIndexWithMapping(ctx context.Context, index string, mapping *IndexMapping) error {
-	opts := []func(*esapi.IndicesCreateRequest){
-		c.client.Indices.Create.WithContext(ctx),
-	}
+	req := esapi.IndicesCreateRequest{Index: index}
 	if mapping != nil {
 		body, err := json.Marshal(mapping)
 		if err != nil {
 			return fmt.Errorf("elastic: marshal index mapping %s: %w", index, err)
 		}
-		opts = append(opts, c.client.Indices.Create.WithBody(bytes.NewReader(body)))
+		req.Body = bytes.NewReader(body)
 	}
 
-	resp, err := c.client.Indices.Create(index, opts...)
+	resp, err := req.Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: create index %s: %w", index, err)
 	}
@@ -42,7 +40,7 @@ func (c *Client) CreateIndexWithMapping(ctx context.Context, index string, mappi
 
 // DeleteIndex 删除索引。
 func (c *Client) DeleteIndex(ctx context.Context, index string) error {
-	resp, err := c.client.Indices.Delete([]string{index}, c.client.Indices.Delete.WithContext(ctx))
+	resp, err := (esapi.IndicesDeleteRequest{Index: []string{index}}).Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: delete index %s: %w", index, err)
 	}
@@ -55,7 +53,7 @@ func (c *Client) DeleteIndex(ctx context.Context, index string) error {
 
 // IndexExists 判断索引是否存在。
 func (c *Client) IndexExists(ctx context.Context, index string) (bool, error) {
-	resp, err := c.client.Indices.Exists([]string{index}, c.client.Indices.Exists.WithContext(ctx))
+	resp, err := (esapi.IndicesExistsRequest{Index: []string{index}}).Do(ctx, c.client)
 	if err != nil {
 		return false, fmt.Errorf("elastic: check index exists %s: %w", index, err)
 	}
@@ -71,10 +69,7 @@ func (c *Client) IndexExists(ctx context.Context, index string) (bool, error) {
 
 // RefreshIndex 刷新索引。
 func (c *Client) RefreshIndex(ctx context.Context, index string) error {
-	resp, err := c.client.Indices.Refresh(
-		c.client.Indices.Refresh.WithContext(ctx),
-		c.client.Indices.Refresh.WithIndex(index),
-	)
+	resp, err := (esapi.IndicesRefreshRequest{Index: []string{index}}).Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: refresh index %s: %w", index, err)
 	}
@@ -87,10 +82,7 @@ func (c *Client) RefreshIndex(ctx context.Context, index string) error {
 
 // GetAliasIndices 获取别名指向的索引列表。
 func (c *Client) GetAliasIndices(ctx context.Context, alias string) ([]string, error) {
-	resp, err := c.client.Indices.GetAlias(
-		c.client.Indices.GetAlias.WithContext(ctx),
-		c.client.Indices.GetAlias.WithName(alias),
-	)
+	resp, err := (esapi.IndicesGetAliasRequest{Name: []string{alias}}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: get alias %s: %w", alias, err)
 	}
@@ -142,10 +134,9 @@ func (c *Client) updateAliases(ctx context.Context, actions []AliasAction) error
 		return fmt.Errorf("elastic: marshal alias actions: %w", err)
 	}
 
-	resp, err := c.client.Indices.UpdateAliases(
-		bytes.NewReader(body),
-		c.client.Indices.UpdateAliases.WithContext(ctx),
-	)
+	resp, err := (esapi.IndicesUpdateAliasesRequest{
+		Body: bytes.NewReader(body),
+	}).Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: update aliases: %w", err)
 	}
@@ -167,12 +158,13 @@ func (c *Client) Reindex(ctx context.Context, sourceIndex, destIndex string) err
 		return fmt.Errorf("elastic: marshal reindex request: %w", err)
 	}
 
-	resp, err := c.client.Reindex(
-		bytes.NewReader(body),
-		c.client.Reindex.WithContext(ctx),
-		c.client.Reindex.WithWaitForCompletion(true),
-		c.client.Reindex.WithRefresh(true),
-	)
+	waitForCompletion := true
+	refresh := true
+	resp, err := (esapi.ReindexRequest{
+		Body:              bytes.NewReader(body),
+		WaitForCompletion: &waitForCompletion,
+		Refresh:           &refresh,
+	}).Do(ctx, c.client)
 	if err != nil {
 		return fmt.Errorf("elastic: reindex %s to %s: %w", sourceIndex, destIndex, err)
 	}
@@ -194,11 +186,11 @@ func (c *Client) ReindexAsync(ctx context.Context, sourceIndex, destIndex string
 		return "", fmt.Errorf("elastic: marshal async reindex request: %w", err)
 	}
 
-	resp, err := c.client.Reindex(
-		bytes.NewReader(body),
-		c.client.Reindex.WithContext(ctx),
-		c.client.Reindex.WithWaitForCompletion(false),
-	)
+	waitForCompletion := false
+	resp, err := (esapi.ReindexRequest{
+		Body:              bytes.NewReader(body),
+		WaitForCompletion: &waitForCompletion,
+	}).Do(ctx, c.client)
 	if err != nil {
 		return "", fmt.Errorf("elastic: async reindex %s to %s: %w", sourceIndex, destIndex, err)
 	}
@@ -218,7 +210,7 @@ func (c *Client) ReindexAsync(ctx context.Context, sourceIndex, destIndex string
 
 // GetTaskStatus 获取任务是否完成。
 func (c *Client) GetTaskStatus(ctx context.Context, taskID string) (bool, error) {
-	resp, err := c.client.Tasks.Get(taskID, c.client.Tasks.Get.WithContext(ctx))
+	resp, err := (esapi.TasksGetRequest{TaskID: taskID}).Do(ctx, c.client)
 	if err != nil {
 		return false, fmt.Errorf("elastic: get task %s: %w", taskID, err)
 	}
@@ -262,10 +254,7 @@ func (c *Client) WaitForTask(ctx context.Context, taskID string, checkInterval t
 
 // GetIndexSettings 获取索引 settings。
 func (c *Client) GetIndexSettings(ctx context.Context, index string) (map[string]any, error) {
-	resp, err := c.client.Indices.GetSettings(
-		c.client.Indices.GetSettings.WithContext(ctx),
-		c.client.Indices.GetSettings.WithIndex(index),
-	)
+	resp, err := (esapi.IndicesGetSettingsRequest{Index: []string{index}}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: get index settings %s: %w", index, err)
 	}
@@ -278,10 +267,7 @@ func (c *Client) GetIndexSettings(ctx context.Context, index string) (map[string
 
 // GetIndexMapping 获取索引 mappings。
 func (c *Client) GetIndexMapping(ctx context.Context, index string) (map[string]any, error) {
-	resp, err := c.client.Indices.GetMapping(
-		c.client.Indices.GetMapping.WithContext(ctx),
-		c.client.Indices.GetMapping.WithIndex(index),
-	)
+	resp, err := (esapi.IndicesGetMappingRequest{Index: []string{index}}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: get index mapping %s: %w", index, err)
 	}

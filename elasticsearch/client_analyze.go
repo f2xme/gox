@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 // Analyze 执行 Elasticsearch analyze 请求。
 func (c *Client) Analyze(ctx context.Context, index string, body io.Reader) ([]AnalyzeToken, error) {
-	resp, err := c.client.Indices.Analyze(
-		c.client.Indices.Analyze.WithContext(ctx),
-		c.client.Indices.Analyze.WithIndex(index),
-		c.client.Indices.Analyze.WithBody(body),
-	)
+	resp, err := (esapi.IndicesAnalyzeRequest{
+		Index: index,
+		Body:  body,
+	}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: analyze %s: %w", index, err)
 	}

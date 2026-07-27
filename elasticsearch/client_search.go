@@ -11,11 +11,10 @@ func (c *Client) searchRaw(ctx context.Context, req Request) (*esapi.Response, e
 	if req == nil {
 		return nil, fmt.Errorf("elastic: search request is nil")
 	}
-	resp, err := c.client.Search(
-		c.client.Search.WithContext(ctx),
-		c.client.Search.WithIndex(req.Index()),
-		c.client.Search.WithBody(req.Body()),
-	)
+	resp, err := (esapi.SearchRequest{
+		Index: []string{req.Index()},
+		Body:  req.Body(),
+	}).Do(ctx, c.client)
 	if err != nil {
 		return nil, fmt.Errorf("elastic: search %s: %w", req.Index(), err)
 	}
