@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/f2xme/gox/oauth2"
@@ -206,8 +205,8 @@ func isSuccessCode(code string) bool {
 	return code == "" || code == "10000"
 }
 
-func parseExpiresIn(value string) int64 {
-	expiresIn, _ := strconv.ParseInt(value, 10, 64)
+func parseExpiresIn(value json.Number) int64 {
+	expiresIn, _ := value.Int64()
 	return expiresIn
 }
 
@@ -227,17 +226,17 @@ type tokenEnvelope struct {
 }
 
 type tokenResponse struct {
-	Code         string `json:"code"`
-	Msg          string `json:"msg"`
-	SubCode      string `json:"sub_code"`
-	SubMsg       string `json:"sub_msg"`
-	AccessToken  string `json:"access_token"`
-	ExpiresIn    string `json:"expires_in"`
-	RefreshToken string `json:"refresh_token"`
-	ReExpiresIn  string `json:"re_expires_in"`
-	UserID       string `json:"user_id"`
-	AlipayUserID string `json:"alipay_user_id"`
-	OpenID       string `json:"open_id"`
+	Code         string      `json:"code"`
+	Msg          string      `json:"msg"`
+	SubCode      string      `json:"sub_code"`
+	SubMsg       string      `json:"sub_msg"`
+	AccessToken  string      `json:"access_token"`
+	ExpiresIn    json.Number `json:"expires_in"`
+	RefreshToken string      `json:"refresh_token"`
+	ReExpiresIn  json.Number `json:"re_expires_in"`
+	UserID       string      `json:"user_id"`
+	AlipayUserID string      `json:"alipay_user_id"`
+	OpenID       string      `json:"open_id"`
 }
 
 type userEnvelope struct {

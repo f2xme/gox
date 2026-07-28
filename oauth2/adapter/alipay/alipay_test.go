@@ -115,6 +115,60 @@ func TestExchangeAndUserInfo(t *testing.T) {
 	}
 }
 
+func TestExchangeExpirationFieldFormats(t *testing.T) {
+	keys := testKeyPair(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		var expiresIn, reExpiresIn any
+		switch r.Form.Get("code") {
+		case "numbers":
+			expiresIn, reExpiresIn = 7200, 2592000
+		case "strings":
+			expiresIn, reExpiresIn = "7200", "2592000"
+		case "null":
+			expiresIn, reExpiresIn = nil, nil
+		case "invalid-expires":
+			expiresIn, reExpiresIn = "invalid", "2592000"
+		case "invalid-re-expires":
+			expiresIn, reExpiresIn = "7200", "invalid"
+		}
+		writeSignedResponse(t, w, keys.key, "alipay_system_oauth_token_response", map[string]any{
+			"code":          "10000",
+			"access_token":  "access",
+			"expires_in":    expiresIn,
+			"refresh_token": "refresh",
+			"re_expires_in": reExpiresIn,
+		})
+	}))
+	defer server.Close()
+
+	provider := New(WithClientID("app-id"), WithPrivateKey(keys.privatePEM), WithAlipayPublicKey(keys.publicPEM), WithEndpoints("", server.URL))
+	tests := []struct {
+		name      string
+		expiresIn int64
+		wantError bool
+	}{
+		{name: "numbers", expiresIn: 7200},
+		{name: "strings", expiresIn: 7200},
+		{name: "null"},
+		{name: "invalid-expires", wantError: true},
+		{name: "invalid-re-expires", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token, err := provider.Exchange(context.Background(), tt.name)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("Exchange() error = %v, wantError %v", err, tt.wantError)
+			}
+			if err == nil && token.ExpiresIn != tt.expiresIn {
+				t.Fatalf("ExpiresIn = %d, want %d", token.ExpiresIn, tt.expiresIn)
+			}
+		})
+	}
+}
+
 func TestExchangeProviderError(t *testing.T) {
 	keys := testKeyPair(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
