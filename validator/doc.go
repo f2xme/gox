@@ -1,14 +1,14 @@
 /*
 Package validator 提供数据验证功能，封装 go-playground/validator/v10。
 
-validator 包提供结构体标签验证、自定义验证规则和中文错误消息支持。
-基于 go-playground/validator/v10，提供更简洁的 API 和开箱即用的中文支持。
+validator 包提供结构体标签验证、自定义验证规则和多语言错误消息支持。
+基于 go-playground/validator/v10，提供更简洁的 API 和开箱即用的中英文支持。
 
 # 功能特性
 
   - 结构体标签验证
   - 自定义验证规则
-  - 中文错误消息
+  - 中文、英文错误消息
   - label 字段名标签支持
   - 中国大陆手机号、身份证号、银行卡号验证
   - 并发安全
@@ -30,6 +30,19 @@ validator 包提供结构体标签验证、自定义验证规则和中文错误�
 	if err := validator.Validate(user); err != nil {
 		log.Fatal(err)
 	}
+
+# 多语言错误消息
+
+	// Validate 固定使用中文，保持向后兼容。
+	err := validator.Validate(user)
+
+	// ValidateWithLang 接受语言码，不接受原始 Accept-Language 请求头。
+	type APIUser struct {
+		Name string `json:"name" validate:"required"`
+	}
+	v := validator.New(validator.WithFieldNameTag("json"))
+	err = v.ValidateWithLang(APIUser{}, validator.LangEN)
+	err = v.ValidateWithLang(APIUser{}, "zh-CN") // 区域变体归一为 zh
 
 # 字段名标签
 

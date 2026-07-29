@@ -483,3 +483,76 @@ func TestValidate_BankCard(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateWithLang(t *testing.T) {
+	type User struct {
+		Name string `validate:"required"`
+	}
+
+	tests := []struct {
+		lang string
+		want string
+	}{
+		{LangZH, "Name为必填字段"},
+		{"zh-CN", "Name为必填字段"},
+		{LangEN, "Name is a required field"},
+		{"en-US", "Name is a required field"},
+		{"fr", "Name为必填字段"},
+	}
+	v := New()
+	for _, tt := range tests {
+		t.Run(tt.lang, func(t *testing.T) {
+			err := v.ValidateWithLang(User{}, tt.lang)
+			if err == nil || err.Error() != tt.want {
+				t.Fatalf("ValidateWithLang(_, %q) = %v, want %q", tt.lang, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateWithLang_StableFieldTag(t *testing.T) {
+	type User struct {
+		Name string `json:"name" validate:"required" label:"姓名"`
+	}
+
+	v := New(WithFieldNameTag("json"))
+	if got := v.ValidateWithLang(User{}, LangZH).Error(); got != "name为必填字段" {
+		t.Fatalf("zh = %q", got)
+	}
+	if got := v.ValidateWithLang(User{}, LangEN).Error(); got != "name is a required field" {
+		t.Fatalf("en = %q", got)
+	}
+}
+
+func TestRegisterTranslationLang(t *testing.T) {
+	type User struct {
+		Code string `validate:"pin"`
+	}
+
+	v := New()
+	if err := v.RegisterValidation("pin", func(validator.FieldLevel) bool { return false }); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.RegisterTranslationLang("pin", LangZH, "{0}必须是4位"); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.RegisterTranslationLang("pin", LangEN, "{0} must be 4 digits"); err != nil {
+		t.Fatal(err)
+	}
+	if got := v.ValidateWithLang(User{}, LangZH).Error(); got != "Code必须是4位" {
+		t.Fatalf("zh = %q", got)
+	}
+	if got := v.ValidateWithLang(User{}, LangEN).Error(); got != "Code must be 4 digits" {
+		t.Fatalf("en = %q", got)
+	}
+}
+
+func TestValidate_Phone_English(t *testing.T) {
+	type User struct {
+		Phone string `validate:"phone" label:"Phone"`
+	}
+	err := New().ValidateWithLang(User{Phone: "123"}, LangEN)
+	if err == nil || err.Error() != "Phone is not a valid mobile phone number" {
+		t.Fatalf("got %v", err)
+	}
+}

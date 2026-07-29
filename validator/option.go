@@ -19,6 +19,7 @@ func defaultOptions() Options {
 // WithFieldNameTag 设置错误消息中使用的字段名标签。
 //
 // 传入空字符串时，错误消息使用结构体字段名。
+// 多语言接口建议使用 json 等稳定字段名；展示名由业务 i18n 层处理。
 //
 // 示例：
 //

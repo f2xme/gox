@@ -32,6 +32,22 @@ func ExampleValidate() {
 	// 验证成功
 }
 
+// ExampleValidator_ValidateWithLang 演示按语言输出错误消息
+func ExampleValidator_ValidateWithLang() {
+	type User struct {
+		Name string `json:"name" validate:"required"`
+	}
+
+	v := validator.New(validator.WithFieldNameTag("json"))
+	err := v.ValidateWithLang(User{}, validator.LangEN)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Output:
+	// name is a required field
+}
+
 // ExampleValidator_RegisterValidation 演示注册自定义验证规则
 func ExampleValidator_RegisterValidation() {
 	type Product struct {
