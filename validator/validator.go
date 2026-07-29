@@ -12,10 +12,14 @@ import (
 
 // Validator 封装 go-playground/validator 实例，提供数据验证功能。
 // 实例是并发安全的，可以在多个 goroutine 中共享使用。
+//
+// 默认注册中文（zh）与英文（en）错误消息；Validate() 使用默认语言（zh），
+// ValidateWithLang() 可按请求语言输出对应文案。
 type Validator struct {
-	validate *validator.Validate
-	trans    map[string]ut.Translator
-	mu       sync.RWMutex
+	validate    *validator.Validate
+	trans       map[string]ut.Translator // lang → translator
+	defaultLang string
+	mu          sync.RWMutex
 }
 
 var (
@@ -24,14 +28,21 @@ var (
 	defaultValidatorOnce sync.Once
 )
 
-// New 创建一个新的验证器实例，默认支持中文、英文错误消息和中国本地化验证规则。
+// New 创建一个新的验证器实例。
+//
+// 默认：
+//   - 字段名标签：label
+//   - 默认语言：zh
+//   - 已注册语言：zh、en
+//   - 内置中国本地化规则：phone / id_card / bank_card
 //
 // 返回的验证器实例是并发安全的，可以在多个 goroutine 中共享使用。
 //
 // 示例：
 //
 //	v := validator.New()
-//	err := v.Validate(user)
+//	err := v.Validate(user)                      // 中文
+//	err = v.ValidateWithLang(user, validator.LangEN) // 英文
 func New(opts ...Option) *Validator {
 	options := defaultOptions()
 	for _, opt := range opts {
@@ -50,9 +61,27 @@ func New(opts ...Option) *Validator {
 		return fld.Name
 	})
 
+	transMap := setupTranslators(validate, options.Locales)
+	defaultLang := NormalizeLang(options.DefaultLang)
+	if defaultLang == "" {
+		defaultLang = LangZH
+	}
+	if _, ok := transMap[defaultLang]; !ok {
+		// 回退：优先 zh，否则取任意已注册语言
+		if _, ok := transMap[LangZH]; ok {
+			defaultLang = LangZH
+		} else {
+			for lang := range transMap {
+				defaultLang = lang
+				break
+			}
+		}
+	}
+
 	v := &Validator{
-		validate: validate,
-		trans:    setupTranslators(validate),
+		validate:    validate,
+		trans:       transMap,
+		defaultLang: defaultLang,
 	}
 	v.registerBuiltinValidations()
 
@@ -79,29 +108,51 @@ func Default() *Validator {
 	return getDefaultValidator()
 }
 
+// DefaultLang 返回 Validate() 使用的默认语言。
+func (v *Validator) DefaultLang() string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.defaultLang
+}
+
+// Locales 返回已注册的语言列表（无序）。
+func (v *Validator) Locales() []string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	out := make([]string, 0, len(v.trans))
+	for lang := range v.trans {
+		out = append(out, lang)
+	}
+	return out
+}
+
 // Validate 验证结构体字段是否符合标签定义的规则。
 //
-// 如果验证失败，返回包含所有错误信息的 error（中文描述）。
-// 如果验证成功，返回 nil。
+// 使用默认语言（见 WithDefaultLang，默认 zh）生成错误消息。
+// 需要按请求语言输出时，请使用 ValidateWithLang。
+//
+// 如果验证失败，返回 *ValidationError；成功返回 nil。
 //
 // 参数 i 应该是一个结构体或结构体指针。
 //
 // 示例：
 //
 //	type User struct {
-//	    Name string `validate:"required"`
+//	    Name string `validate:"required" label:"姓名"`
 //	}
-//	user := User{Name: ""}
-//	err := v.Validate(user) // 返回错误：Name为必填字段
+//	err := v.Validate(User{}) // 姓名为必填字段
 func (v *Validator) Validate(i any) error {
-	return v.ValidateWithLang(i, LangZH)
+	return v.ValidateWithLang(i, v.DefaultLang())
 }
 
 // ValidateWithLang 使用指定语言验证结构体。
 //
-// 支持 zh、en 及其区域变体；未知语言回退到中文。
-// lang 是语言码，不是 Accept-Language 请求头。
-// 字段名标签不随语言变化；多语言接口应配合 json 等稳定字段标签。
+// lang 会归一化（zh-CN → zh）。未注册语言回退到默认语言。
+//
+// 示例：
+//
+//	err := v.ValidateWithLang(user, "en")
+//	err := v.ValidateWithLang(user, "zh-CN")
 func (v *Validator) ValidateWithLang(i any, lang string) error {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
@@ -121,22 +172,37 @@ func (v *Validator) ValidateWithLang(i any, lang string) error {
 
 // formatErrors 将验证错误格式化为可识别的验证错误。
 func (v *Validator) formatErrors(errs validator.ValidationErrors, lang string) error {
-	trans := v.trans[normalizeLang(lang)]
-	if trans == nil {
-		trans = v.trans[LangZH]
-	}
+	trans := v.translatorLocked(lang)
 	fields := make([]FieldError, 0, len(errs))
-	for _, err := range errs {
+	for _, fe := range errs {
 		fields = append(fields, FieldError{
-			Namespace:   err.Namespace(),
-			Field:       err.Field(),
-			StructField: err.StructField(),
-			Tag:         err.Tag(),
-			Param:       err.Param(),
-			Message:     err.Translate(trans),
+			Namespace:   fe.Namespace(),
+			Field:       fe.Field(),
+			StructField: fe.StructField(),
+			Tag:         fe.Tag(),
+			Param:       fe.Param(),
+			Message:     fe.Translate(trans),
 		})
 	}
 	return &ValidationError{fields: fields}
+}
+
+// translatorLocked 在已持有读锁时解析 translator。
+func (v *Validator) translatorLocked(lang string) ut.Translator {
+	lang = NormalizeLang(lang)
+	if lang != "" {
+		if t, ok := v.trans[lang]; ok {
+			return t
+		}
+	}
+	if t, ok := v.trans[v.defaultLang]; ok {
+		return t
+	}
+	for _, t := range v.trans {
+		return t
+	}
+	// 不应发生：New 至少注册一种语言
+	return nil
 }
 
 // RegisterValidation 注册自定义验证规则。
@@ -161,28 +227,55 @@ func (v *Validator) RegisterValidation(tag string, fn validator.Func) error {
 	return v.validate.RegisterValidation(tag, fn)
 }
 
-// RegisterTranslation 为中文注册自定义验证规则的翻译消息。
+// RegisterTranslation 为默认语言注册自定义验证规则的翻译消息。
 //
-// tag 是验证标签名称，message 是错误消息模板。
+// tag 是验证标签名称，message 是错误消息模板（{0} 为字段名）。
+//
+// 需要多语言时请用 RegisterTranslationLang 或 RegisterTranslations。
 //
 // 示例：
 //
 //	v.RegisterTranslation("custom_username", "用户名格式不正确")
 func (v *Validator) RegisterTranslation(tag, message string) error {
-	return v.RegisterTranslationLang(tag, LangZH, message)
+	return v.RegisterTranslationLang(tag, v.DefaultLang(), message)
 }
 
 // RegisterTranslationLang 为指定语言注册自定义验证规则的翻译消息。
+//
+// 示例：
+//
+//	v.RegisterTranslationLang("custom_username", "zh", "{0}用户名格式不正确")
+//	v.RegisterTranslationLang("custom_username", "en", "{0} is not a valid username")
 func (v *Validator) RegisterTranslationLang(tag, lang, message string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	lang = normalizeLang(lang)
+	lang = NormalizeLang(lang)
+	if lang == "" {
+		lang = v.defaultLang
+	}
 	trans, ok := v.trans[lang]
 	if !ok {
-		return fmt.Errorf("validator: unknown locale %q", lang)
+		return errUnknownLocale(lang)
 	}
 	return v.registerTranslationLocked(tag, trans, message)
+}
+
+// RegisterTranslations 为多种语言批量注册同一 tag 的翻译。
+//
+// 示例：
+//
+//	v.RegisterTranslations("custom_username", map[string]string{
+//	    "zh": "{0}用户名格式不正确",
+//	    "en": "{0} is not a valid username",
+//	})
+func (v *Validator) RegisterTranslations(tag string, messages map[string]string) error {
+	for lang, message := range messages {
+		if err := v.RegisterTranslationLang(tag, lang, message); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (v *Validator) registerTranslationLocked(tag string, trans ut.Translator, message string) error {
@@ -199,7 +292,7 @@ func (v *Validator) registerTranslationLocked(tag string, trans ut.Translator, m
 	)
 }
 
-// Validate 使用默认验证器验证结构体。
+// Validate 使用默认验证器验证结构体（默认语言）。
 //
 // 这是一个便捷函数，内部使用全局默认验证器实例。
 // 默认验证器是并发安全的。
@@ -217,6 +310,15 @@ func Validate(i any) error {
 	return getDefaultValidator().Validate(i)
 }
 
+// ValidateWithLang 使用默认验证器、指定语言验证结构体。
+//
+// 示例：
+//
+//	err := validator.ValidateWithLang(user, "en")
+func ValidateWithLang(i any, lang string) error {
+	return getDefaultValidator().ValidateWithLang(i, lang)
+}
+
 // RegisterValidation 在默认验证器上注册自定义验证规则。
 //
 // 这是一个便捷函数，内部使用全局默认验证器实例。
@@ -231,15 +333,23 @@ func RegisterValidation(tag string, fn validator.Func) error {
 	return getDefaultValidator().RegisterValidation(tag, fn)
 }
 
-// RegisterTranslation 在默认验证器上注册自定义翻译消息。
-//
-// 这是一个便捷函数，内部使用全局默认验证器实例。
+// RegisterTranslation 在默认验证器上为默认语言注册自定义翻译消息。
 //
 // 示例：
 //
 //	validator.RegisterTranslation("phone", "手机号格式不正确")
 func RegisterTranslation(tag, message string) error {
 	return getDefaultValidator().RegisterTranslation(tag, message)
+}
+
+// RegisterTranslationLang 在默认验证器上为指定语言注册自定义翻译消息。
+func RegisterTranslationLang(tag, lang, message string) error {
+	return getDefaultValidator().RegisterTranslationLang(tag, lang, message)
+}
+
+// RegisterTranslations 在默认验证器上批量注册多语言翻译。
+func RegisterTranslations(tag string, messages map[string]string) error {
+	return getDefaultValidator().RegisterTranslations(tag, messages)
 }
 
 func parseTagName(tag string) string {
@@ -257,16 +367,34 @@ func parseTagName(tag string) string {
 
 func (v *Validator) registerBuiltinValidations() {
 	_ = v.validate.RegisterValidation("phone", validatePhone)
-	_ = v.RegisterTranslationLang("phone", LangZH, "{0}手机号格式不正确")
-	_ = v.RegisterTranslationLang("phone", LangEN, "{0} is not a valid mobile phone number")
+	_ = v.registerBuiltinTranslations("phone", map[string]string{
+		LangZH: "{0}手机号格式不正确",
+		LangEN: "{0} is not a valid mobile phone number",
+	})
 
 	_ = v.validate.RegisterValidation("id_card", validateIDCard)
-	_ = v.RegisterTranslationLang("id_card", LangZH, "{0}身份证号格式不正确")
-	_ = v.RegisterTranslationLang("id_card", LangEN, "{0} is not a valid ID card number")
+	_ = v.registerBuiltinTranslations("id_card", map[string]string{
+		LangZH: "{0}身份证号格式不正确",
+		LangEN: "{0} is not a valid ID card number",
+	})
 
 	_ = v.validate.RegisterValidation("bank_card", validateBankCard)
-	_ = v.RegisterTranslationLang("bank_card", LangZH, "{0}银行卡号格式不正确")
-	_ = v.RegisterTranslationLang("bank_card", LangEN, "{0} is not a valid bank card number")
+	_ = v.registerBuiltinTranslations("bank_card", map[string]string{
+		LangZH: "{0}银行卡号格式不正确",
+		LangEN: "{0} is not a valid bank card number",
+	})
+}
+
+// registerBuiltinTranslations 仅向已注册语言写入内置文案。
+func (v *Validator) registerBuiltinTranslations(tag string, messages map[string]string) error {
+	filtered := make(map[string]string, len(messages))
+	for lang, message := range messages {
+		lang = NormalizeLang(lang)
+		if _, ok := v.trans[lang]; ok {
+			filtered[lang] = message
+		}
+	}
+	return v.RegisterTranslations(tag, filtered)
 }
 
 // validatePhone 验证中国大陆手机号（11位，1开头）

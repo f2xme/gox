@@ -2,13 +2,13 @@
 Package validator 提供数据验证功能，封装 go-playground/validator/v10。
 
 validator 包提供结构体标签验证、自定义验证规则和多语言错误消息支持。
-基于 go-playground/validator/v10，提供更简洁的 API 和开箱即用的中英文支持。
+基于 go-playground/validator/v10，默认注册中文（zh）与英文（en）翻译。
 
 # 功能特性
 
   - 结构体标签验证
   - 自定义验证规则
-  - 中文、英文错误消息
+  - 多语言错误消息（内置 zh / en，ValidateWithLang 按语言输出）
   - label 字段名标签支持
   - 中国大陆手机号、身份证号、银行卡号验证
   - 并发安全
@@ -33,16 +33,24 @@ validator 包提供结构体标签验证、自定义验证规则和多语言错�
 
 # 多语言错误消息
 
-	// Validate 固定使用中文，保持向后兼容。
+	// Validate() 使用默认语言（zh）
 	err := validator.Validate(user)
 
-	// ValidateWithLang 接受语言码，不接受原始 Accept-Language 请求头。
-	type APIUser struct {
-		Name string `json:"name" validate:"required"`
-	}
-	v := validator.New(validator.WithFieldNameTag("json"))
-	err = v.ValidateWithLang(APIUser{}, validator.LangEN)
-	err = v.ValidateWithLang(APIUser{}, "zh-CN") // 区域变体归一为 zh
+	// 按请求语言输出
+	err = validator.ValidateWithLang(user, "en")
+	err = validator.ValidateWithLang(user, "zh-CN") // 归一为 zh
+
+	// 自定义默认语言 / 仅注册部分语言
+	v := validator.New(
+	    validator.WithDefaultLang(validator.LangEN),
+	    validator.WithLocales(validator.LangZH, validator.LangEN),
+	)
+
+	// 自定义规则的多语言文案
+	_ = v.RegisterTranslations("username", map[string]string{
+	    "zh": "{0}只能包含字母、数字和下划线",
+	    "en": "{0} may only contain letters, numbers and underscores",
+	})
 
 # 字段名标签
 

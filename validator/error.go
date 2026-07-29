@@ -2,6 +2,7 @@ package validator
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -13,6 +14,10 @@ import (
 //	    // 处理参数验证失败
 //	}
 var ErrValidation = errors.New("validator: validation failed")
+
+func errUnknownLocale(lang string) error {
+	return fmt.Errorf("validator: unknown or unregistered locale %q", lang)
+}
 
 // FieldError 表示单个字段的验证错误。
 type FieldError struct {

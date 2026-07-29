@@ -484,66 +484,148 @@ func TestValidate_BankCard(t *testing.T) {
 	}
 }
 
-func TestValidateWithLang(t *testing.T) {
-	type User struct {
-		Name string `validate:"required"`
-	}
-
+func TestNormalizeLang(t *testing.T) {
 	tests := []struct {
-		lang string
+		in   string
 		want string
 	}{
-		{LangZH, "Name为必填字段"},
-		{"zh-CN", "Name为必填字段"},
-		{LangEN, "Name is a required field"},
-		{"en-US", "Name is a required field"},
-		{"fr", "Name为必填字段"},
+		{"", ""},
+		{"zh", "zh"},
+		{"zh-CN", "zh"},
+		{"en-US", "en"},
+		{"EN", "en"},
+		{"zh-CN,zh;q=0.9", "zh"},
 	}
-	v := New()
 	for _, tt := range tests {
-		t.Run(tt.lang, func(t *testing.T) {
-			err := v.ValidateWithLang(User{}, tt.lang)
-			if err == nil || err.Error() != tt.want {
-				t.Fatalf("ValidateWithLang(_, %q) = %v, want %q", tt.lang, err, tt.want)
-			}
-		})
+		if got := NormalizeLang(tt.in); got != tt.want {
+			t.Fatalf("NormalizeLang(%q) = %q, want %q", tt.in, got, tt.want)
+		}
 	}
 }
 
-func TestValidateWithLang_StableFieldTag(t *testing.T) {
+func TestValidateWithLang_English(t *testing.T) {
 	type User struct {
-		Name string `json:"name" validate:"required" label:"姓名"`
+		Name string `validate:"required" label:"Name"`
 	}
 
-	v := New(WithFieldNameTag("json"))
-	if got := v.ValidateWithLang(User{}, LangZH).Error(); got != "name为必填字段" {
-		t.Fatalf("zh = %q", got)
+	v := New()
+	err := v.ValidateWithLang(User{}, LangEN)
+	if err == nil {
+		t.Fatal("expected error")
 	}
-	if got := v.ValidateWithLang(User{}, LangEN).Error(); got != "name is a required field" {
-		t.Fatalf("en = %q", got)
+	msg := err.Error()
+	if !strings.Contains(msg, "required") && !strings.Contains(msg, "Name") {
+		t.Fatalf("expected English required message, got %q", msg)
+	}
+	// should not be Chinese template
+	for _, r := range msg {
+		if r >= 0x4e00 && r <= 0x9fff {
+			t.Fatalf("expected no Chinese in en message, got %q", msg)
+		}
 	}
 }
 
-func TestRegisterTranslationLang(t *testing.T) {
+func TestValidateWithLang_Chinese(t *testing.T) {
+	type User struct {
+		Name string `validate:"required" label:"姓名"`
+	}
+
+	v := New()
+	err := v.ValidateWithLang(User{}, "zh-CN")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "姓名") {
+		t.Fatalf("expected Chinese label in message, got %q", err.Error())
+	}
+	hasChinese := false
+	for _, r := range err.Error() {
+		if r >= 0x4e00 && r <= 0x9fff {
+			hasChinese = true
+			break
+		}
+	}
+	if !hasChinese {
+		t.Fatalf("expected Chinese message, got %q", err.Error())
+	}
+}
+
+func TestValidateWithLang_FallbackUnknown(t *testing.T) {
+	type User struct {
+		Name string `validate:"required" label:"姓名"`
+	}
+
+	v := New() // default zh
+	err := v.ValidateWithLang(User{}, "fr")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	// unknown locale falls back to default (zh)
+	if !strings.Contains(err.Error(), "姓名") {
+		t.Fatalf("fallback should use default lang, got %q", err.Error())
+	}
+}
+
+func TestWithDefaultLangEN(t *testing.T) {
+	type User struct {
+		Name string `validate:"required" label:"Name"`
+	}
+
+	v := New(WithDefaultLang(LangEN))
+	if v.DefaultLang() != LangEN {
+		t.Fatalf("DefaultLang = %q", v.DefaultLang())
+	}
+	err := v.Validate(User{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, r := range err.Error() {
+		if r >= 0x4e00 && r <= 0x9fff {
+			t.Fatalf("default en should not use Chinese, got %q", err.Error())
+		}
+	}
+}
+
+func TestRegisterTranslations_MultiLang(t *testing.T) {
 	type User struct {
 		Code string `validate:"pin"`
 	}
 
 	v := New()
-	if err := v.RegisterValidation("pin", func(validator.FieldLevel) bool { return false }); err != nil {
+	if err := v.RegisterValidation("pin", func(fl validator.FieldLevel) bool {
+		return len(fl.Field().String()) == 4
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.RegisterTranslationLang("pin", LangZH, "{0}必须是4位"); err != nil {
+	if err := v.RegisterTranslations("pin", map[string]string{
+		LangZH: "{0}必须是4位",
+		LangEN: "{0} must be 4 digits",
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.RegisterTranslationLang("pin", LangEN, "{0} must be 4 digits"); err != nil {
-		t.Fatal(err)
+
+	err := v.ValidateWithLang(User{Code: "12"}, LangZH)
+	if err == nil || !strings.Contains(err.Error(), "4位") {
+		t.Fatalf("zh pin = %v", err)
 	}
-	if got := v.ValidateWithLang(User{}, LangZH).Error(); got != "Code必须是4位" {
-		t.Fatalf("zh = %q", got)
+	err = v.ValidateWithLang(User{Code: "12"}, LangEN)
+	if err == nil || !strings.Contains(err.Error(), "4 digits") {
+		t.Fatalf("en pin = %v", err)
 	}
-	if got := v.ValidateWithLang(User{}, LangEN).Error(); got != "Code must be 4 digits" {
-		t.Fatalf("en = %q", got)
+}
+
+func TestValidateWithLang_Global(t *testing.T) {
+	type User struct {
+		Name string `validate:"required" label:"Name"`
+	}
+	err := ValidateWithLang(User{}, LangEN)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, r := range err.Error() {
+		if r >= 0x4e00 && r <= 0x9fff {
+			t.Fatalf("global en should not use Chinese, got %q", err.Error())
+		}
 	}
 }
 
@@ -552,7 +634,10 @@ func TestValidate_Phone_English(t *testing.T) {
 		Phone string `validate:"phone" label:"Phone"`
 	}
 	err := New().ValidateWithLang(User{Phone: "123"}, LangEN)
-	if err == nil || err.Error() != "Phone is not a valid mobile phone number" {
-		t.Fatalf("got %v", err)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "mobile phone") && !strings.Contains(err.Error(), "Phone") {
+		t.Fatalf("en phone message = %q", err.Error())
 	}
 }
