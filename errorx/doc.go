@@ -39,7 +39,8 @@
 //
 // 创建业务错误：
 //
-//	bizErr := errorx.NewBiz("USER_NOT_FOUND")
+//	bizErr := errorx.NewBiz("USER_NOT_FOUND").
+//		WithMeta("user_id", 12345)
 //
 //	if errorx.IsBiz(bizErr) {
 //		message := errorx.LocalizeBiz(bizErr, "zh")

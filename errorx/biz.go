@@ -1,6 +1,11 @@
 package errorx
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"maps"
+	"strings"
+)
 
 // BizError 表示轻量级业务错误。
 //
@@ -12,6 +17,9 @@ type BizError struct {
 	Code string
 	// Message 默认错误消息，作为多语言查找失败时的 fallback
 	Message string
+	// Meta 包含用于消息参数化或传递额外上下文的元数据。
+	// 创建后不应直接修改；使用 WithMeta 返回附带新元数据的副本。
+	Meta map[string]any
 }
 
 // NewBiz 创建业务错误。
@@ -55,6 +63,51 @@ func NewBizLang(code, lang string) *BizError {
 	}
 }
 
+// WithMeta 返回添加了元数据的错误副本，以支持安全复用和链式调用。
+func (e *BizError) WithMeta(key string, value any) *BizError {
+	if e == nil {
+		return nil
+	}
+	meta := maps.Clone(e.Meta)
+	if meta == nil {
+		meta = make(map[string]any)
+	}
+	meta[key] = value
+	return &BizError{
+		Code:    e.Code,
+		Message: e.Message,
+		Meta:    meta,
+	}
+}
+
+// WithMetaMap 批量设置元数据，返回新的错误副本。
+func (e *BizError) WithMetaMap(meta map[string]any) *BizError {
+	if e == nil || len(meta) == 0 {
+		return e
+	}
+	newMeta := maps.Clone(e.Meta)
+	if newMeta == nil {
+		newMeta = make(map[string]any, len(meta))
+	}
+	for k, v := range meta {
+		newMeta[k] = v
+	}
+	return &BizError{
+		Code:    e.Code,
+		Message: e.Message,
+		Meta:    newMeta,
+	}
+}
+
+// GetMeta 获取指定元数据。
+func (e *BizError) GetMeta(key string) (any, bool) {
+	if e == nil {
+		return nil, false
+	}
+	value, ok := e.Meta[key]
+	return value, ok
+}
+
 // Localize 返回指定语言的业务错误消息。
 //
 // 如果指定语言没有注册消息，则返回业务错误的默认消息。
@@ -63,12 +116,12 @@ func (e *BizError) Localize(lang string) string {
 		return ""
 	}
 	if e.Code == "" {
-		return e.Message
+		return e.formatMessage(e.Message)
 	}
 	if msg, ok := getMessage(e.Code, lang); ok {
-		return msg
+		return e.formatMessage(msg)
 	}
-	return e.Message
+	return e.formatMessage(e.Message)
 }
 
 // Error 实现 error 接口，返回业务错误的默认消息。
@@ -76,7 +129,18 @@ func (e *BizError) Error() string {
 	if e == nil {
 		return ""
 	}
-	return e.Message
+	return e.formatMessage(e.Message)
+}
+
+func (e *BizError) formatMessage(message string) string {
+	if len(e.Meta) == 0 || !strings.Contains(message, "{") {
+		return message
+	}
+	pairs := make([]string, 0, len(e.Meta)*2)
+	for key, value := range e.Meta {
+		pairs = append(pairs, "{"+key+"}", fmt.Sprint(value))
+	}
+	return strings.NewReplacer(pairs...).Replace(message)
 }
 
 // IsBiz 判断错误链中是否包含业务错误。
@@ -85,7 +149,7 @@ func IsBiz(err error) bool {
 		return false
 	}
 	var e *BizError
-	return errors.As(err, &e)
+	return errors.As(err, &e) && e != nil
 }
 
 // GetBizCode 获取业务错误码。
@@ -93,10 +157,21 @@ func IsBiz(err error) bool {
 // 如果错误链中不包含业务错误，返回空字符串。
 func GetBizCode(err error) string {
 	var e *BizError
-	if errors.As(err, &e) {
+	if errors.As(err, &e) && e != nil {
 		return e.Code
 	}
 	return ""
+}
+
+// GetBizMeta 获取业务错误的元数据。
+//
+// 如果错误链中不包含业务错误，返回 nil。
+func GetBizMeta(err error) map[string]any {
+	var e *BizError
+	if errors.As(err, &e) && e != nil {
+		return maps.Clone(e.Meta)
+	}
+	return nil
 }
 
 // LocalizeBiz 本地化业务错误消息。
@@ -107,7 +182,7 @@ func LocalizeBiz(err error, lang string) string {
 		return ""
 	}
 	var e *BizError
-	if errors.As(err, &e) {
+	if errors.As(err, &e) && e != nil {
 		return e.Localize(lang)
 	}
 	return err.Error()
