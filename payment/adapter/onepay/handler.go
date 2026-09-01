@@ -47,11 +47,11 @@ func (s *Service) handleAlipay(w http.ResponseWriter, r *http.Request, payload t
 		s.writeError(w, http.StatusBadGateway, "支付服务暂时不可用，请稍后重试")
 		return
 	}
-	if !s.validCheckout(checkout, payment.ProviderAlipay) || checkout.WAP == nil || checkout.JSAPI != nil || !allowedAlipayURL(checkout.WAP.URL) {
+	if !s.validCheckout(checkout, payment.ProviderAlipay) || checkout.Payment == nil || checkout.JSAPI != nil || checkout.Payment.OrderID != checkout.OrderID || !allowedAlipayURL(checkout.Payment.PayURL) {
 		s.writeError(w, http.StatusBadGateway, "支付服务暂时不可用，请稍后重试")
 		return
 	}
-	http.Redirect(w, r, checkout.WAP.URL, http.StatusSeeOther)
+	http.Redirect(w, r, checkout.Payment.PayURL, http.StatusSeeOther)
 }
 
 func (s *Service) handleWechat(w http.ResponseWriter, r *http.Request, token string, payload tokenPayload) {
@@ -91,7 +91,7 @@ func (s *Service) handleWechat(w http.ResponseWriter, r *http.Request, token str
 		s.writeError(w, http.StatusBadGateway, "支付服务暂时不可用，请稍后重试")
 		return
 	}
-	if !s.validCheckout(checkout, payment.ProviderWechat) || checkout.JSAPI == nil || checkout.WAP != nil {
+	if !s.validCheckout(checkout, payment.ProviderWechat) || checkout.JSAPI == nil || checkout.Payment != nil {
 		s.writeError(w, http.StatusBadGateway, "支付服务暂时不可用，请稍后重试")
 		return
 	}
@@ -143,5 +143,5 @@ func allowedAlipayURL(raw string) bool {
 		return false
 	}
 	host := strings.ToLower(u.Host)
-	return host == "openapi.alipay.com" || host == "openapi-sandbox.dl.alipaydev.com"
+	return host == "qr.alipay.com"
 }

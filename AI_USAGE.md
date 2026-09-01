@@ -196,7 +196,7 @@ var _ cache.Store = store
 Use `payment` for shared order/status/callback types. Use
 `payment/adapter/alipay` or `payment/adapter/wechat` for direct provider QR
 payments. Use `payment/adapter/onepay` when one neutral HTTPS QR must route
-WeChat scans to OAuth + JSAPI and Alipay scans to WAP. Use
+WeChat scans to OAuth + JSAPI and Alipay scans to `Pay` / `TradePrecreate`. Use
 `payment/adapter/mock` for deterministic in-memory payment tests and local
 dev without merchant credentials. Prefer interface injection
 (`payment.Payment` / `PaymentNotifier`) and `PAYMENT_PROVIDER=mock|wechat|alipay`.

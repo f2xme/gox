@@ -24,8 +24,8 @@ type Checkout struct {
 	Provider payment.Provider
 	// OrderID 是平台商户订单号。
 	OrderID string
-	// WAP 是支付宝手机网站收银台结果。
-	WAP *payment.WAPResult
+	// Payment 是支付宝当面付预创建结果。
+	Payment *payment.PaymentResult
 	// JSAPI 是微信 JSAPI 调起参数。
 	JSAPI *payment.JSAPIResult
 	// ExpiresAt 是收银台结果过期时间。

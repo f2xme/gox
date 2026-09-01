@@ -49,8 +49,8 @@ adapter 先验签并解析通知。调用方仍须在数据库事务内核对订
 # 一码付
 
 onepay 创建的是中立 HTTPS URL 与 PNG。微信扫码后执行 OAuth snsapi_base 与
-JSAPI 支付；支付宝扫码后进入 WAP 收银台。业务必须实现 CheckoutResolver，
-持久化并复用完整 WAP 或 JSAPI artifact。同一 OpenID 重复微信扫码复用未过期
+JSAPI 支付；支付宝扫码后进入当面付预创建收银台。业务必须实现 CheckoutResolver，
+持久化并复用完整 Payment 或 JSAPI artifact。同一 OpenID 重复微信扫码复用未过期
 JSAPI 参数；不同 provider 使用不同订单号。首个成功回调应原子完成主支付意图，
 随后关闭另一平台仍待支付的订单。
 

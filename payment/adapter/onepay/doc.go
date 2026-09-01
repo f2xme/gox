@@ -1,7 +1,7 @@
 // Package onepay 实现支付宝与微信共用的中立支付二维码（一码付）。
 //
 // 同一 HTTPS 地址与 PNG 二维码，按扫码客户端 User-Agent 路由：
-// 微信走 OAuth + JSAPI，支付宝走 WAP 收银台。onepay 不直接向平台下单，
+// 微信走 OAuth + JSAPI，支付宝走当面付预创建。onepay 不直接向平台下单，
 // 收银台创建与幂等复用由业务实现的 CheckoutResolver 负责。
 //
 // # 功能特性
@@ -10,7 +10,7 @@
 //   - AES-256-GCM 加密 token（金额、订单号不进二维码）
 //   - 微信：OAuth snsapi_base → OpenID → JSAPI bridge HTML（CSP nonce）
 //   - 微信调起页文案/模板可配（WechatPage）；零值用 DefaultWechat* 与默认 HTML
-//   - 支付宝：WAP 收银台 HTTP 303（仅官方 gateway host）
+//   - 支付宝：TradePrecreate 二维码地址 HTTP 303（仅 qr.alipay.com）
 //   - 未知客户端返回安全提示页，不猜测渠道
 //   - 标准库 net/http.Handler，可挂载到任意 HTTP 框架
 //
@@ -64,7 +64,7 @@
 // Resolver 是业务持久化边界，onepay 不缓存订单。必须满足：
 //
 //   - 同一 intentID + provider 只允许一个活动平台订单
-//   - 支付宝：payerOpenID 为空，返回未过期 WAP
+//   - 支付宝：payerOpenID 为空，调用 Pay/TradePrecreate 并返回未过期 Payment
 //   - 微信：绑定 OpenID 摘要；同 OpenID 复用未过期 JSAPI；不同 OpenID 不得复用
 //   - 不同 provider 使用不同商户订单号，并保留映射到主支付意图
 //   - artifact 过期后先查原单状态；仍未支付则关单并换新单号重建

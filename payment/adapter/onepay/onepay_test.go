@@ -46,7 +46,7 @@ func (f *fakeResolver) ResolveOrCreate(_ context.Context, intent string, provide
 	f.creates++
 	checkout := &Checkout{Provider: provider, OrderID: string(provider) + "-1", ExpiresAt: time.Now().Add(time.Hour)}
 	if provider == payment.ProviderAlipay {
-		checkout.WAP = &payment.WAPResult{URL: "https://openapi.alipay.com/gateway.do?x=1"}
+		checkout.Payment = &payment.PaymentResult{OrderID: checkout.OrderID, PayURL: "https://qr.alipay.com/bax-demo"}
 	} else {
 		f.wechatPayer = payerOpenID
 		checkout.JSAPI = &payment.JSAPIResult{AppID: "app", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s"}
@@ -186,7 +186,7 @@ func TestHandlerAlipayAndUnknown(t *testing.T) {
 	req.Header.Set("User-Agent", "AlipayClient/10")
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != resolver.checkouts[payment.ProviderAlipay].WAP.URL {
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != resolver.checkouts[payment.ProviderAlipay].Payment.PayURL {
 		t.Fatalf("response = %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 	if resolver.provider != payment.ProviderAlipay || resolver.intent != "intent-1" {
@@ -199,13 +199,28 @@ func TestHandlerAlipayAndUnknown(t *testing.T) {
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "微信或支付宝") {
 		t.Fatalf("unknown response = %d %s", rec.Code, rec.Body.String())
 	}
-	resolver.checkouts[payment.ProviderAlipay].WAP.URL = "https://evil.example/steal"
+	alipayCheckout := resolver.checkouts[payment.ProviderAlipay]
+	alipayCheckout.Payment.OrderID = "another-order"
 	req = httptest.NewRequest(http.MethodGet, path, nil)
 	req.Header.Set("User-Agent", "AlipayClient")
 	rec = httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadGateway {
-		t.Fatalf("unsafe redirect status = %d", rec.Code)
+		t.Fatalf("mismatched order status = %d", rec.Code)
+	}
+	alipayCheckout.Payment.OrderID = alipayCheckout.OrderID
+	for _, payURL := range []string{
+		"https://openapi.alipay.com/gateway.do?method=alipay.trade.wap.pay",
+		"https://evil.example/steal",
+	} {
+		alipayCheckout.Payment.PayURL = payURL
+		req = httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("User-Agent", "AlipayClient")
+		rec = httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("unsafe redirect %q status = %d", payURL, rec.Code)
+		}
 	}
 }
 

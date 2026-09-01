@@ -57,7 +57,7 @@ func ExampleNew_createCodeAndMount() {
 // 生产仍须：真实 DB 事务、主意图 CAS、成功回调后关另一平台 pending。
 func ExampleCheckoutResolver() {
 	alipayPay := &staticAlipayCheckout{
-		url: "https://openapi.alipay.com/gateway.do?method=alipay.trade.wap.pay&sign=demo",
+		url: "https://qr.alipay.com/bax-demo",
 	}
 	wechatPay := &staticWechatCheckout{
 		jsapi: &payment.JSAPIResult{
@@ -118,7 +118,7 @@ func (s *staticWechatOAuth) ExchangeOAuthCode(context.Context, string) (string, 
 }
 
 type alipayCheckoutProvider interface {
-	WAPPay(ctx context.Context, order *payment.Order) (*payment.WAPResult, error)
+	Pay(ctx context.Context, order *payment.Order) (*payment.PaymentResult, error)
 }
 
 type wechatCheckoutProvider interface {
@@ -135,11 +135,11 @@ type staticAlipayCheckout struct {
 	err error
 }
 
-func (s *staticAlipayCheckout) WAPPay(context.Context, *payment.Order) (*payment.WAPResult, error) {
+func (s *staticAlipayCheckout) Pay(_ context.Context, order *payment.Order) (*payment.PaymentResult, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return &payment.WAPResult{URL: s.url}, nil
+	return &payment.PaymentResult{OrderID: order.OrderID, PayURL: s.url}, nil
 }
 
 type staticWechatCheckout struct {
@@ -275,7 +275,7 @@ func demoIntents() map[string]*intentRecord {
 
 func newMemoryResolver() *memoryResolver {
 	return newMemoryResolverWithProviders(
-		&staticAlipayCheckout{url: "https://openapi.alipay.com/gateway.do?x=1"},
+		&staticAlipayCheckout{url: "https://qr.alipay.com/bax-demo"},
 		&staticWechatCheckout{jsapi: &payment.JSAPIResult{
 			AppID: "app", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s",
 		}},
@@ -462,11 +462,11 @@ func (m *memoryResolver) createPlatformCheckout(ctx context.Context, provider pa
 	checkout := &onepay.Checkout{Provider: provider, OrderID: orderID, ExpiresAt: expires}
 	switch provider {
 	case payment.ProviderAlipay:
-		wap, err := m.alipay.WAPPay(ctx, order)
+		result, err := m.alipay.Pay(ctx, order)
 		if err != nil {
 			return nil, err
 		}
-		checkout.WAP = wap
+		checkout.Payment = result
 	case payment.ProviderWechat:
 		jsapi, err := m.wechat.JSAPIPay(ctx, order, payerOpenID)
 		if err != nil {
@@ -764,9 +764,9 @@ func cloneCheckout(c *onepay.Checkout) *onepay.Checkout {
 		return nil
 	}
 	out := *c
-	if c.WAP != nil {
-		wap := *c.WAP
-		out.WAP = &wap
+	if c.Payment != nil {
+		result := *c.Payment
+		out.Payment = &result
 	}
 	if c.JSAPI != nil {
 		js := *c.JSAPI
@@ -779,7 +779,7 @@ func cloneCheckout(c *onepay.Checkout) *onepay.Checkout {
 
 func TestMemoryResolverRetirePaidPersists(t *testing.T) {
 	life := &staticLifecycle{paidOrderIDs: map[string]struct{}{}}
-	ali := &staticAlipayCheckout{url: "https://openapi.alipay.com/gateway.do?x=1"}
+	ali := &staticAlipayCheckout{url: "https://qr.alipay.com/bax-demo"}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
 		AppID: "a", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s",
 	}})
@@ -813,7 +813,7 @@ func TestMemoryResolverCreateUncertainBlocksSameProvider(t *testing.T) {
 		queryErr: map[string]error{"intent-1-alipay-1": errors.New("query timeout")},
 	}
 	ali := &staticAlipayCheckout{
-		url: "https://openapi.alipay.com/gateway.do?x=1",
+		url: "https://qr.alipay.com/bax-demo",
 		err: errors.New("gateway timeout"),
 	}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
@@ -836,7 +836,7 @@ func TestMemoryResolverDualRailUncertainDoesNotBlockOtherProvider(t *testing.T) 
 		queryErr: map[string]error{"intent-1-alipay-1": errors.New("query timeout")},
 	}
 	ali := &staticAlipayCheckout{
-		url: "https://openapi.alipay.com/gateway.do?x=1",
+		url: "https://qr.alipay.com/bax-demo",
 		err: errors.New("gateway timeout"),
 	}
 	wx := &staticWechatCheckout{jsapi: &payment.JSAPIResult{
@@ -883,7 +883,7 @@ func TestMemoryResolverPaidNotDowngradedByUncertain(t *testing.T) {
 
 func TestMemoryResolverCtxCancelNoTombstone(t *testing.T) {
 	ali := &staticAlipayCheckout{
-		url: "https://openapi.alipay.com/gateway.do?x=1",
+		url: "https://qr.alipay.com/bax-demo",
 		err: context.DeadlineExceeded,
 	}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
@@ -912,7 +912,7 @@ func TestMemoryResolverCtxCancelNoTombstone(t *testing.T) {
 
 func TestMemoryResolverRetireClosedAllowsRebuild(t *testing.T) {
 	life := &staticLifecycle{queryStatus: map[string]payment.PaymentStatus{}}
-	ali := &staticAlipayCheckout{url: "https://openapi.alipay.com/gateway.do?x=1"}
+	ali := &staticAlipayCheckout{url: "https://qr.alipay.com/bax-demo"}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
 		AppID: "a", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s",
 	}})
@@ -943,7 +943,7 @@ func TestMemoryResolverRetireClosedAllowsRebuild(t *testing.T) {
 }
 
 func TestMemoryResolverConcurrentSingleFlight(t *testing.T) {
-	ali := &staticAlipayCheckout{url: "https://openapi.alipay.com/gateway.do?x=1"}
+	ali := &staticAlipayCheckout{url: "https://qr.alipay.com/bax-demo"}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
 		AppID: "a", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s",
 	}})
@@ -980,7 +980,7 @@ func TestMemoryResolverCreateQueryCtxAbortKeepsOrderID(t *testing.T) {
 		queryErr: map[string]error{"intent-1-alipay-1": context.DeadlineExceeded},
 	}
 	ali := &staticAlipayCheckout{
-		url: "https://openapi.alipay.com/gateway.do?x=1",
+		url: "https://qr.alipay.com/bax-demo",
 		err: errors.New("gateway timeout"),
 	}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
@@ -1023,7 +1023,7 @@ func TestMemoryResolverCreatePendingCloseCtxAbortKeepsOrderID(t *testing.T) {
 		closeErr:    context.DeadlineExceeded,
 	}
 	ali := &staticAlipayCheckout{
-		url: "https://openapi.alipay.com/gateway.do?x=1",
+		url: "https://qr.alipay.com/bax-demo",
 		err: errors.New("gateway timeout"),
 	}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
@@ -1047,7 +1047,7 @@ func TestMemoryResolverRetireCtxAbortReturnsNonNilError(t *testing.T) {
 	life := &staticLifecycle{
 		queryErr: map[string]error{},
 	}
-	ali := &staticAlipayCheckout{url: "https://openapi.alipay.com/gateway.do?x=1"}
+	ali := &staticAlipayCheckout{url: "https://qr.alipay.com/bax-demo"}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
 		AppID: "a", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s",
 	}})
@@ -1086,7 +1086,7 @@ func TestMemoryResolverRetireCtxAbortKeepsUncertainOrderID(t *testing.T) {
 		queryErr: map[string]error{"intent-1-alipay-1": errors.New("query timeout")},
 	}
 	ali := &staticAlipayCheckout{
-		url: "https://openapi.alipay.com/gateway.do?x=1",
+		url: "https://qr.alipay.com/bax-demo",
 		err: errors.New("gateway timeout"),
 	}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
@@ -1135,7 +1135,7 @@ func TestMemoryResolverRetireCtxAbortKeepsUncertainOrderID(t *testing.T) {
 
 func TestMemoryResolverRetireFailedAllowsRebuildWithoutClose(t *testing.T) {
 	life := &staticLifecycle{queryStatus: map[string]payment.PaymentStatus{}}
-	ali := &staticAlipayCheckout{url: "https://openapi.alipay.com/gateway.do?x=1"}
+	ali := &staticAlipayCheckout{url: "https://qr.alipay.com/bax-demo"}
 	m := newMemoryResolverWithProviders(ali, &staticWechatCheckout{jsapi: &payment.JSAPIResult{
 		AppID: "a", Timestamp: "1", NonceStr: "n", Package: "prepay_id=p", SignType: "RSA", PaySign: "s",
 	}})
