@@ -2,15 +2,19 @@ package alipay
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"math/big"
 	"net/http/httptest"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -29,8 +33,11 @@ var (
 // 测试密钥/证书只生成一次，避免重复 2048-bit RSA 拖慢套件。
 var (
 	testMaterialOnce sync.Once
+	testPrivateKey   *rsa.PrivateKey
 	testPrivatePEM   string
 	testPublicPEM    string
+	testPublicBase64 string
+	testRSAPublicPEM string
 	testCertPEM      string
 )
 
@@ -41,6 +48,7 @@ func initTestMaterial(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+		testPrivateKey = privateKey
 		privateDER, err := x509.MarshalPKCS8PrivateKey(privateKey)
 		if err != nil {
 			panic(err)
@@ -52,6 +60,8 @@ func initTestMaterial(t *testing.T) {
 			panic(err)
 		}
 		testPublicPEM = string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicDER}))
+		testPublicBase64 = base64.StdEncoding.EncodeToString(publicDER)
+		testRSAPublicPEM = string(pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: x509.MarshalPKCS1PublicKey(&privateKey.PublicKey)}))
 
 		tmpl := &x509.Certificate{
 			SerialNumber: big.NewInt(1),
@@ -202,6 +212,112 @@ func TestParsePaymentNotificationRejectsSignature(t *testing.T) {
 	if !errors.Is(err, payment.ErrInvalidSignature) {
 		t.Fatalf("expected ErrInvalidSignature, got %v", err)
 	}
+}
+
+func TestParsePaymentNotificationVerifiesRSA2(t *testing.T) {
+	initTestMaterial(t)
+	tests := []struct {
+		name   string
+		config Config
+	}{
+		{
+			name: "key mode public key PEM",
+			config: Config{
+				AppID: "app1", SellerID: "seller1", AlipayPublicKey: testPublicPEM,
+			},
+		},
+		{
+			name: "key mode raw Base64",
+			config: Config{
+				AppID: "app1", SellerID: "seller1", AlipayPublicKey: testPublicBase64,
+			},
+		},
+		{
+			name: "key mode RSA public key PEM",
+			config: Config{
+				AppID: "app1", SellerID: "seller1", AlipayPublicKey: testRSAPublicPEM,
+			},
+		},
+		{
+			name: "key mode certificate PEM",
+			config: Config{
+				AppID: "app1", SellerID: "seller1", AlipayPublicKey: testCertPEM,
+			},
+		},
+		{
+			name: "cert mode",
+			config: Config{
+				AppID: "app1", SellerID: "seller1", AppPublicCert: testCertPEM,
+				AlipayRootCert: testCertPEM, AlipayPublicCert: testCertPEM,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			form := url.Values{
+				"app_id":          {"app1"},
+				"seller_id":       {"seller1"},
+				"out_trade_no":    {"o1"},
+				"trade_no":        {"trade1"},
+				"trade_status":    {"TRADE_SUCCESS"},
+				"total_amount":    {"1.23"},
+				"gmt_payment":     {"2026-07-12 12:00:00"},
+				"subject":         {"商品 & 套餐 + 赠品"},
+				"passback_params": {"source=qr&campaign=秋季"},
+				"sign_type":       {"RSA2"},
+			}
+			form.Set("sign", signNotificationRSA2(t, form))
+			req := httptest.NewRequest("POST", "https://example.com/notify?tenant=modelup", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			notify, err := newWithGateway(tt.config, &fakeGateway{}).ParsePaymentNotification(context.Background(), req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if notify.OrderID != "o1" || notify.Amount != 123 || notify.Extra["subject"] != "商品 & 套餐 + 赠品" {
+				t.Fatalf("unexpected notification: %#v", notify)
+			}
+		})
+	}
+}
+
+func TestParsePaymentNotificationPreservesVerifyCause(t *testing.T) {
+	cause := errors.New("verify failed")
+	req := httptest.NewRequest("POST", "https://example.com/notify", strings.NewReader("app_id=app1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	client := newWithGateway(Config{}, &fakeGateway{})
+	client.verifyNotify = func(any) (bool, error) { return false, cause }
+
+	_, err := client.ParsePaymentNotification(context.Background(), req)
+	if !errors.Is(err, payment.ErrInvalidSignature) || !errors.Is(err, cause) {
+		t.Fatalf("expected ErrInvalidSignature and cause, got %v", err)
+	}
+}
+
+func signNotificationRSA2(t *testing.T, form url.Values) string {
+	t.Helper()
+	keys := make([]string, 0, len(form))
+	for key := range form {
+		if key != "sign" && key != "sign_type" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	var content strings.Builder
+	for i, key := range keys {
+		if i > 0 {
+			content.WriteByte('&')
+		}
+		content.WriteString(key)
+		content.WriteByte('=')
+		content.WriteString(form.Get(key))
+	}
+	digest := sha256.Sum256([]byte(content.String()))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, testPrivateKey, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return base64.StdEncoding.EncodeToString(signature)
 }
 
 func TestAmountConversion(t *testing.T) {

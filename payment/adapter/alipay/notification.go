@@ -2,10 +2,14 @@ package alipay
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 
 	"github.com/f2xme/gox/payment"
+	"github.com/go-pay/crypto/xpem"
 	aliyun "github.com/go-pay/gopay/alipay"
 )
 
@@ -21,9 +25,31 @@ const (
 )
 
 func verifySignKey(publicKey string) notifyVerifier {
+	publicKey, normalizeErr := normalizeNotifyPublicKey(publicKey)
 	return func(value any) (bool, error) {
+		if normalizeErr != nil {
+			return false, normalizeErr
+		}
 		return aliyun.VerifySign(publicKey, value)
 	}
+}
+
+func normalizeNotifyPublicKey(publicKey string) (string, error) {
+	if block, _ := pem.Decode([]byte(publicKey)); block == nil {
+		return publicKey, nil
+	}
+	key, err := xpem.DecodePublicKey([]byte(publicKey))
+	if err != nil {
+		return "", fmt.Errorf("decode alipay public key: %w", err)
+	}
+	if key == nil {
+		return "", fmt.Errorf("decode alipay public key: empty public key")
+	}
+	der, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		return "", fmt.Errorf("encode alipay public key: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(der), nil
 }
 
 func verifySignCert(publicCert []byte) notifyVerifier {
@@ -58,42 +84,46 @@ func (a *Alipay) ParsePaymentNotification(ctx context.Context, req *http.Request
 	if err := req.ParseForm(); err != nil {
 		return nil, fmt.Errorf("%w: parse alipay notification: %v", payment.ErrInvalidRequest, err)
 	}
-	if len(req.Form) == 0 {
+	form := req.PostForm
+	if len(form) == 0 {
 		return nil, fmt.Errorf("%w: empty alipay notification", payment.ErrInvalidRequest)
 	}
-	bm, err := aliyun.ParseNotifyByURLValues(req.Form)
+	bm, err := aliyun.ParseNotifyByURLValues(form)
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse alipay notification: %v", payment.ErrInvalidRequest, err)
 	}
 	ok, err := a.verifyNotify(bm)
-	if err != nil || !ok {
+	if err != nil {
+		return nil, fmt.Errorf("%w: verify alipay notification: %w", payment.ErrInvalidSignature, err)
+	}
+	if !ok {
 		return nil, fmt.Errorf("%w: alipay notification", payment.ErrInvalidSignature)
 	}
-	if req.Form.Get("app_id") != a.config.AppID || req.Form.Get("seller_id") != a.config.SellerID {
+	if form.Get("app_id") != a.config.AppID || form.Get("seller_id") != a.config.SellerID {
 		return nil, fmt.Errorf("%w: alipay notification merchant mismatch", payment.ErrInvalidSignature)
 	}
-	status, err := mapPaymentStatus(req.Form.Get("trade_status"))
+	status, err := mapPaymentStatus(form.Get("trade_status"))
 	if err != nil {
 		return nil, err
 	}
-	amount, err := yuanToCents(req.Form.Get("total_amount"))
+	amount, err := yuanToCents(form.Get("total_amount"))
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid notification amount", payment.ErrInvalidRequest)
 	}
-	paidAt, err := parseAlipayTime(req.Form.Get("gmt_payment"))
+	paidAt, err := parseAlipayTime(form.Get("gmt_payment"))
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid notification time", payment.ErrInvalidRequest)
 	}
-	extra := make(map[string]any, len(req.Form))
-	for key, values := range req.Form {
+	extra := make(map[string]any, len(form))
+	for key, values := range form {
 		if key != "sign" && len(values) > 0 {
 			extra[key] = values[0]
 		}
 	}
 	return &payment.PaymentNotification{
 		Provider:      payment.ProviderAlipay,
-		OrderID:       req.Form.Get("out_trade_no"),
-		TransactionID: req.Form.Get("trade_no"),
+		OrderID:       form.Get("out_trade_no"),
+		TransactionID: form.Get("trade_no"),
 		Status:        status,
 		Amount:        amount,
 		PaidAt:        paidAt,
