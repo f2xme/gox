@@ -214,6 +214,29 @@ func TestParsePaymentNotificationRejectsSignature(t *testing.T) {
 	}
 }
 
+func TestParsePaymentNotificationIdentifiesMerchantMismatch(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		form  string
+		field string
+	}{
+		{name: "app id", form: "app_id=wrong&seller_id=seller1", field: "app_id"},
+		{name: "seller id", form: "app_id=app1&seller_id=wrong", field: "seller_id"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "https://example.com/notify", strings.NewReader(tt.form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			client := newWithGateway(Config{AppID: "app1", SellerID: "seller1"}, &fakeGateway{})
+			client.verifyNotify = func(any) (bool, error) { return true, nil }
+
+			_, err := client.ParsePaymentNotification(context.Background(), req)
+			if !errors.Is(err, payment.ErrInvalidSignature) || !strings.Contains(err.Error(), tt.field+" mismatch") {
+				t.Fatalf("expected %s mismatch, got %v", tt.field, err)
+			}
+		})
+	}
+}
+
 func TestParsePaymentNotificationVerifiesRSA2(t *testing.T) {
 	initTestMaterial(t)
 	tests := []struct {
