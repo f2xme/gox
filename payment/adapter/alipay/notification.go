@@ -99,11 +99,11 @@ func (a *Alipay) ParsePaymentNotification(ctx context.Context, req *http.Request
 	if !ok {
 		return nil, fmt.Errorf("%w: alipay notification", payment.ErrInvalidSignature)
 	}
-	if form.Get("app_id") != a.config.AppID {
-		return nil, fmt.Errorf("%w: alipay notification app_id mismatch", payment.ErrInvalidSignature)
+	if got := form.Get("app_id"); got != a.config.AppID {
+		return nil, fmt.Errorf("%w: alipay notification app_id mismatch: got %q, want %q", payment.ErrInvalidSignature, got, a.config.AppID)
 	}
-	if form.Get("seller_id") != a.config.SellerID {
-		return nil, fmt.Errorf("%w: alipay notification seller_id mismatch", payment.ErrInvalidSignature)
+	if got := form.Get("seller_id"); got != a.config.SellerID {
+		return nil, fmt.Errorf("%w: alipay notification seller_id mismatch: got %q, want %q", payment.ErrInvalidSignature, got, a.config.SellerID)
 	}
 	status, err := mapPaymentStatus(form.Get("trade_status"))
 	if err != nil {
