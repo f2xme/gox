@@ -8,7 +8,7 @@ import (
 	"github.com/go-pay/gopay"
 )
 
-// Alipay 实现支付宝当面付、WAP、查询、退款、关单和回调验签。
+// Alipay 实现支付宝当面付、WAP、查询、退款、关单、转账和回调验签。
 // 支持密钥/证书加签，以及正式/沙箱网关环境。
 type Alipay struct {
 	config       Config

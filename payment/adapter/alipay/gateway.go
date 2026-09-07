@@ -18,6 +18,8 @@ type gateway interface {
 	query(context.Context, gopay.BodyMap) (*aliyun.TradeQueryResponse, error)
 	refund(context.Context, gopay.BodyMap) (*aliyun.TradeRefundResponse, error)
 	close(context.Context, gopay.BodyMap) (*aliyun.TradeCloseResponse, error)
+	transfer(context.Context, gopay.BodyMap) (*aliyun.FundTransUniTransferResponse, error)
+	queryTransfer(context.Context, gopay.BodyMap) (*aliyun.FundTransCommonQueryResponse, error)
 }
 
 type gopayGateway struct{ client *aliyun.Client }
@@ -88,6 +90,12 @@ func (g *gopayGateway) refund(ctx context.Context, bm gopay.BodyMap) (*aliyun.Tr
 }
 func (g *gopayGateway) close(ctx context.Context, bm gopay.BodyMap) (*aliyun.TradeCloseResponse, error) {
 	return g.client.TradeClose(ctx, bm)
+}
+func (g *gopayGateway) transfer(ctx context.Context, bm gopay.BodyMap) (*aliyun.FundTransUniTransferResponse, error) {
+	return g.client.FundTransUniTransfer(ctx, bm)
+}
+func (g *gopayGateway) queryTransfer(ctx context.Context, bm gopay.BodyMap) (*aliyun.FundTransCommonQueryResponse, error) {
+	return g.client.FundTransCommonQuery(ctx, bm)
 }
 
 type slogAdapter struct{ logger *slog.Logger }

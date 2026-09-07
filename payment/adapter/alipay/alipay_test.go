@@ -79,13 +79,15 @@ func initTestMaterial(t *testing.T) {
 }
 
 type fakeGateway struct {
-	precreateResp *aliyun.TradePrecreateResponse
-	wapURL        string
-	queryResp     *aliyun.TradeQueryResponse
-	refundResp    *aliyun.TradeRefundResponse
-	closeResp     *aliyun.TradeCloseResponse
-	err           error
-	lastBody      gopay.BodyMap
+	precreateResp     *aliyun.TradePrecreateResponse
+	wapURL            string
+	queryResp         *aliyun.TradeQueryResponse
+	refundResp        *aliyun.TradeRefundResponse
+	closeResp         *aliyun.TradeCloseResponse
+	transferResp      *aliyun.FundTransUniTransferResponse
+	transferQueryResp *aliyun.FundTransCommonQueryResponse
+	err               error
+	lastBody          gopay.BodyMap
 }
 
 func (f *fakeGateway) precreate(_ context.Context, bm gopay.BodyMap) (*aliyun.TradePrecreateResponse, error) {
@@ -107,6 +109,91 @@ func (f *fakeGateway) refund(_ context.Context, bm gopay.BodyMap) (*aliyun.Trade
 func (f *fakeGateway) close(_ context.Context, bm gopay.BodyMap) (*aliyun.TradeCloseResponse, error) {
 	f.lastBody = bm
 	return f.closeResp, f.err
+}
+func (f *fakeGateway) transfer(_ context.Context, bm gopay.BodyMap) (*aliyun.FundTransUniTransferResponse, error) {
+	f.lastBody = bm
+	return f.transferResp, f.err
+}
+func (f *fakeGateway) queryTransfer(_ context.Context, bm gopay.BodyMap) (*aliyun.FundTransCommonQueryResponse, error) {
+	f.lastBody = bm
+	return f.transferQueryResp, f.err
+}
+
+func TestTransfer(t *testing.T) {
+	gw := &fakeGateway{transferResp: &aliyun.FundTransUniTransferResponse{Response: &aliyun.TransUniTransfer{
+		OutBizNo: "t1", OrderId: "ali1", PayFundOrderId: "fund1", Status: "SUCCESS", TransDate: "2026-07-12 12:00:00",
+	}}}
+	client := newWithGateway(Config{}, gw)
+
+	result, err := client.Transfer(context.Background(), &TransferRequest{
+		TransferID: "t1", Amount: 123, PayeeIdentity: "2088000000000000", PayeeIdentityType: PayeeIdentityAlipayUserID,
+		PayeeName: "张三", Title: "佣金", Remark: "七月佣金",
+		TransferSceneName:        "佣金报酬",
+		TransferSceneReportInfos: []TransferSceneReportInfo{{InfoType: "佣金报酬说明", InfoContent: "七月佣金"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	payee, ok := gw.lastBody.GetAny("payee_info").(gopay.BodyMap)
+	if !ok {
+		t.Fatalf("unexpected payee_info: %#v", gw.lastBody.GetAny("payee_info"))
+	}
+	reports, ok := gw.lastBody.GetAny("transfer_scene_report_infos").([]TransferSceneReportInfo)
+	if !ok {
+		t.Fatalf("unexpected transfer_scene_report_infos: %#v", gw.lastBody.GetAny("transfer_scene_report_infos"))
+	}
+	if result.TransferID != "t1" || result.OrderID != "ali1" || result.FundOrderID != "fund1" || result.Amount != 123 || result.Status != "SUCCESS" || result.TransferredAt == nil ||
+		gw.lastBody.GetString("trans_amount") != "1.23" || gw.lastBody.GetString("biz_scene") != "DIRECT_TRANSFER" ||
+		gw.lastBody.GetString("transfer_scene_name") != "佣金报酬" || len(reports) != 1 || reports[0].InfoContent != "七月佣金" ||
+		payee.GetString("identity") != "2088000000000000" || payee.GetString("name") != "张三" {
+		t.Fatalf("unexpected transfer result=%#v body=%v", result, gw.lastBody)
+	}
+}
+
+func TestTransferValidation(t *testing.T) {
+	client := newWithGateway(Config{}, &fakeGateway{})
+	valid := TransferRequest{
+		TransferID: "t1", Amount: 10, PayeeIdentity: "2088000000000000", PayeeIdentityType: PayeeIdentityAlipayUserID,
+		TransferSceneName: "佣金报酬", TransferSceneReportInfos: []TransferSceneReportInfo{{InfoType: "佣金报酬说明", InfoContent: "七月佣金"}},
+	}
+	for _, tt := range []struct {
+		name   string
+		mutate func(*TransferRequest)
+	}{
+		{name: "amount below minimum", mutate: func(r *TransferRequest) { r.Amount = 9 }},
+		{name: "amount above maximum", mutate: func(r *TransferRequest) { r.Amount = 10_000_000_001 }},
+		{name: "unsupported identity type", mutate: func(r *TransferRequest) { r.PayeeIdentityType = "UNKNOWN" }},
+		{name: "logon ID without name", mutate: func(r *TransferRequest) { r.PayeeIdentityType = PayeeIdentityAlipayLogonID }},
+		{name: "missing scene", mutate: func(r *TransferRequest) { r.TransferSceneName = "" }},
+		{name: "missing scene infos", mutate: func(r *TransferRequest) { r.TransferSceneReportInfos = nil }},
+		{name: "empty scene info", mutate: func(r *TransferRequest) { r.TransferSceneReportInfos[0].InfoContent = "" }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := valid
+			req.TransferSceneReportInfos = append([]TransferSceneReportInfo(nil), valid.TransferSceneReportInfos...)
+			tt.mutate(&req)
+			_, err := client.Transfer(context.Background(), &req)
+			if !errors.Is(err, payment.ErrInvalidRequest) {
+				t.Fatalf("expected ErrInvalidRequest, got %v", err)
+			}
+		})
+	}
+}
+
+func TestQueryTransfer(t *testing.T) {
+	gw := &fakeGateway{transferQueryResp: &aliyun.FundTransCommonQueryResponse{Response: &aliyun.FundTransCommonQuery{
+		OutBizNo: "t1", OrderId: "ali1", PayFundOrderId: "fund1", TransAmount: "1.23", Status: "SUCCESS",
+		PayDate: "2026-07-12 12:00:00", ArrivalTimeEnd: "2026-07-12 12:01:00",
+	}}}
+	client := newWithGateway(Config{}, gw)
+	result, err := client.QueryTransfer(context.Background(), "t1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Amount != 123 || result.Status != "SUCCESS" || result.TransferredAt == nil || result.ArrivedAt == nil ||
+		gw.lastBody.GetString("out_biz_no") != "t1" || gw.lastBody.GetString("product_code") != "TRANS_ACCOUNT_NO_PWD" {
+		t.Fatalf("unexpected transfer query result=%#v body=%v", result, gw.lastBody)
+	}
 }
 
 func TestPayAndWAP(t *testing.T) {

@@ -1,10 +1,11 @@
-// Package alipay 为 payment 包提供支付宝当面付、WAP、查询、退款、关单与回调验签实现。
+// Package alipay 为 payment 包提供支付宝当面付、WAP、查询、退款、关单、转账与回调验签实现。
 //
 // # 功能特性
 //
 //   - 当面付预创建（TradePrecreate），返回 qr_code
 //   - 手机网站支付（TradeWapPay），返回收银台 URL
 //   - 订单查询、退款、关单
+//   - 支付宝账户单笔转账与状态查询（FundTransUniTransfer / FundTransCommonQuery）
 //   - 异步支付通知解析与验签
 //   - 密钥模式与公钥证书模式两种加签/验签方式
 //   - 可选 AESKey 透传（实验性；受 gopay 限制，非完整接口内容加密）
