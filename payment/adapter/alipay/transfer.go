@@ -45,9 +45,10 @@ type TransferRequest struct {
 	Title string
 	// Remark 是转账备注。
 	Remark string
-	// TransferSceneName 是商家平台申明的转账场景。
+	// TransferSceneName 是商家平台申明的转账场景；可选，为空时不发送。
 	TransferSceneName string
-	// TransferSceneReportInfos 是该转账场景要求的上报信息。
+	// TransferSceneReportInfos 是转账场景上报信息；可选，为空时不发送。
+	// 两个场景字段独立透传，是否需要及允许的值由支付宝商户场景决定。
 	TransferSceneReportInfos []TransferSceneReportInfo
 }
 
@@ -83,13 +84,17 @@ func (a *Alipay) Transfer(ctx context.Context, req *TransferRequest) (*TransferR
 		"identity_type": string(req.PayeeIdentityType),
 	}
 	bm := gopay.BodyMap{
-		"out_biz_no":                  req.TransferID,
-		"trans_amount":                centsToYuan(req.Amount),
-		"product_code":                "TRANS_ACCOUNT_NO_PWD",
-		"biz_scene":                   "DIRECT_TRANSFER",
-		"payee_info":                  payee,
-		"transfer_scene_name":         req.TransferSceneName,
-		"transfer_scene_report_infos": req.TransferSceneReportInfos,
+		"out_biz_no":   req.TransferID,
+		"trans_amount": centsToYuan(req.Amount),
+		"product_code": "TRANS_ACCOUNT_NO_PWD",
+		"biz_scene":    "DIRECT_TRANSFER",
+		"payee_info":   payee,
+	}
+	if req.TransferSceneName != "" {
+		bm.Set("transfer_scene_name", req.TransferSceneName)
+	}
+	if len(req.TransferSceneReportInfos) > 0 {
+		bm.Set("transfer_scene_report_infos", req.TransferSceneReportInfos)
 	}
 	if req.PayeeName != "" {
 		payee.Set("name", req.PayeeName)
@@ -192,12 +197,6 @@ func validateTransferRequest(ctx context.Context, req *TransferRequest) error {
 	}
 	if req.PayeeIdentityType == PayeeIdentityAlipayLogonID && req.PayeeName == "" {
 		return fmt.Errorf("%w: payee name is required for ALIPAY_LOGON_ID", payment.ErrInvalidRequest)
-	}
-	if req.TransferSceneName == "" {
-		return fmt.Errorf("%w: transfer scene name cannot be empty", payment.ErrInvalidRequest)
-	}
-	if len(req.TransferSceneReportInfos) == 0 {
-		return fmt.Errorf("%w: transfer scene report infos cannot be empty", payment.ErrInvalidRequest)
 	}
 	for _, info := range req.TransferSceneReportInfos {
 		if info.InfoType == "" || info.InfoContent == "" {

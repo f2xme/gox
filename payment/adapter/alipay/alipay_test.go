@@ -150,8 +150,47 @@ func TestTransfer(t *testing.T) {
 	}
 }
 
+func TestTransferOptionalScene(t *testing.T) {
+	reports := []TransferSceneReportInfo{{InfoType: "佣金报酬说明", InfoContent: "七月佣金"}}
+	for _, tt := range []struct {
+		name    string
+		scene   string
+		reports []TransferSceneReportInfo
+	}{
+		{name: "omitted"},
+		{name: "empty reports", reports: []TransferSceneReportInfo{}},
+		{name: "name only", scene: "佣金报酬"},
+		{name: "reports only", reports: reports},
+		{name: "both", scene: "佣金报酬", reports: reports},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := &fakeGateway{transferResp: &aliyun.FundTransUniTransferResponse{Response: &aliyun.TransUniTransfer{Status: "SUCCESS"}}}
+			_, err := newWithGateway(Config{}, gw).Transfer(context.Background(), &TransferRequest{
+				TransferID: "t1", Amount: 10, PayeeIdentity: "2088000000000000", PayeeIdentityType: PayeeIdentityAlipayUserID,
+				TransferSceneName: tt.scene, TransferSceneReportInfos: tt.reports,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			scene, hasScene := gw.lastBody["transfer_scene_name"]
+			if hasScene != (tt.scene != "") || (hasScene && scene != tt.scene) {
+				t.Fatalf("scene = %#v, present = %v", scene, hasScene)
+			}
+			gotReports, hasReports := gw.lastBody["transfer_scene_report_infos"]
+			if hasReports != (len(tt.reports) > 0) {
+				t.Fatalf("reports = %#v, present = %v", gotReports, hasReports)
+			}
+			if hasReports {
+				got, ok := gotReports.([]TransferSceneReportInfo)
+				if !ok || len(got) != 1 || got[0] != tt.reports[0] {
+					t.Fatalf("reports = %#v", gotReports)
+				}
+			}
+		})
+	}
+}
+
 func TestTransferValidation(t *testing.T) {
-	client := newWithGateway(Config{}, &fakeGateway{})
 	valid := TransferRequest{
 		TransferID: "t1", Amount: 10, PayeeIdentity: "2088000000000000", PayeeIdentityType: PayeeIdentityAlipayUserID,
 		TransferSceneName: "佣金报酬", TransferSceneReportInfos: []TransferSceneReportInfo{{InfoType: "佣金报酬说明", InfoContent: "七月佣金"}},
@@ -164,17 +203,22 @@ func TestTransferValidation(t *testing.T) {
 		{name: "amount above maximum", mutate: func(r *TransferRequest) { r.Amount = 10_000_000_001 }},
 		{name: "unsupported identity type", mutate: func(r *TransferRequest) { r.PayeeIdentityType = "UNKNOWN" }},
 		{name: "logon ID without name", mutate: func(r *TransferRequest) { r.PayeeIdentityType = PayeeIdentityAlipayLogonID }},
-		{name: "missing scene", mutate: func(r *TransferRequest) { r.TransferSceneName = "" }},
-		{name: "missing scene infos", mutate: func(r *TransferRequest) { r.TransferSceneReportInfos = nil }},
+		{name: "empty scene info type", mutate: func(r *TransferRequest) { r.TransferSceneReportInfos[0].InfoType = "" }},
 		{name: "empty scene info", mutate: func(r *TransferRequest) { r.TransferSceneReportInfos[0].InfoContent = "" }},
+		{name: "invalid report without scene", mutate: func(r *TransferRequest) { r.TransferSceneName = ""; r.TransferSceneReportInfos[0].InfoContent = "" }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			gw := &fakeGateway{}
+			client := newWithGateway(Config{}, gw)
 			req := valid
 			req.TransferSceneReportInfos = append([]TransferSceneReportInfo(nil), valid.TransferSceneReportInfos...)
 			tt.mutate(&req)
 			_, err := client.Transfer(context.Background(), &req)
 			if !errors.Is(err, payment.ErrInvalidRequest) {
 				t.Fatalf("expected ErrInvalidRequest, got %v", err)
+			}
+			if gw.lastBody != nil {
+				t.Fatal("invalid request reached gateway")
 			}
 		})
 	}
