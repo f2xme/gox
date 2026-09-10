@@ -1,12 +1,51 @@
 package memory
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"runtime/pprof"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/f2xme/gox/captcha"
 )
+
+func TestCaptchaLifecycle(t *testing.T) {
+	cleanupCount := func() int {
+		var stacks bytes.Buffer
+		_ = pprof.Lookup("goroutine").WriteTo(&stacks, 2)
+		return strings.Count(stacks.String(), "captcha/adapter/memory.(*memoryStore).cleanupLoop(")
+	}
+	before := cleanupCount()
+	for range 10 {
+		if _, err := NewCaptcha(WithCaptchaTTL(0)); !errors.Is(err, captcha.ErrInvalidTTL) {
+			t.Fatalf("NewCaptcha() = %v, want ErrInvalidTTL", err)
+		}
+	}
+	deadline := time.Now().Add(time.Second)
+	for cleanupCount() > before {
+		if time.Now().After(deadline) {
+			t.Fatal("failed constructors leaked cleanup goroutines")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	c, err := NewCaptcha()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := c.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	select {
+	case <-c.store.stopCh:
+	default:
+		t.Fatal("Close did not stop owned store")
+	}
+}
 
 type existsStore interface {
 	Exists(ctx context.Context, id string) (bool, error)

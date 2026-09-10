@@ -6,12 +6,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/f2xme/gox/captcha"
 	"github.com/f2xme/gox/captcha/adapter/memory"
 	"github.com/f2xme/gox/captcha/generator/base64"
 )
 
-func mustCaptcha(c captcha.Service, err error) captcha.Service {
+func mustCaptcha(c *memory.Captcha, err error) *memory.Captcha {
 	if err != nil {
 		log.Fatalf("创建验证码实例失败: %v", err)
 	}
@@ -35,6 +34,7 @@ func Example() {
 
 	// 使用便捷构造函数创建验证码实例
 	c := mustCaptcha(memory.NewCaptcha())
+	defer c.Close()
 
 	// 生成验证码
 	challenge, err := c.Generate(ctx)
@@ -52,6 +52,7 @@ func Example() {
 func ExampleNewCaptcha() {
 	// 使用默认配置
 	c := mustCaptcha(memory.NewCaptcha())
+	defer c.Close()
 	printfln("验证码实例类型: %T", c)
 }
 
@@ -63,6 +64,7 @@ func ExampleNewCaptcha_withOptions() {
 		memory.WithSize(300, 100),
 		memory.WithCaptchaTTL(10*time.Minute),
 	))
+	defer c.Close()
 	printfln("验证码实例类型: %T", c)
 }
 
@@ -79,21 +81,25 @@ func ExampleWithCaptchaType() {
 
 	// 数字验证码
 	digitCaptcha := mustCaptcha(memory.NewCaptcha(memory.WithCaptchaType(base64.TypeDigit)))
+	defer digitCaptcha.Close()
 	challenge1, _ := digitCaptcha.Generate(ctx)
 	printfln("数字验证码 ID: %s", challenge1.ID)
 
 	// 字母验证码
 	stringCaptcha := mustCaptcha(memory.NewCaptcha(memory.WithCaptchaType(base64.TypeString)))
+	defer stringCaptcha.Close()
 	challenge2, _ := stringCaptcha.Generate(ctx)
 	printfln("字母验证码 ID: %s", challenge2.ID)
 
 	// 算术验证码
 	mathCaptcha := mustCaptcha(memory.NewCaptcha(memory.WithCaptchaType(base64.TypeMath)))
+	defer mathCaptcha.Close()
 	challenge3, _ := mathCaptcha.Generate(ctx)
 	printfln("算术验证码 ID: %s", challenge3.ID)
 
 	// 音频验证码
 	audioCaptcha := mustCaptcha(memory.NewCaptcha(memory.WithCaptchaType(base64.TypeAudio)))
+	defer audioCaptcha.Close()
 	challenge4, _ := audioCaptcha.Generate(ctx)
 	printfln("音频验证码 ID: %s", challenge4.ID)
 }
@@ -102,22 +108,26 @@ func ExampleWithCaptchaType() {
 func ExampleWithLength() {
 	// 4 位验证码
 	c4 := mustCaptcha(memory.NewCaptcha(memory.WithLength(4)))
+	defer c4.Close()
 	printfln("4 位验证码: %T", c4)
 
 	// 6 位验证码
 	c6 := mustCaptcha(memory.NewCaptcha(memory.WithLength(6)))
+	defer c6.Close()
 	printfln("6 位验证码: %T", c6)
 }
 
 // ExampleWithSize 演示如何设置验证码尺寸
 func ExampleWithSize() {
 	c := mustCaptcha(memory.NewCaptcha(memory.WithSize(300, 100)))
+	defer c.Close()
 	printfln("验证码实例: %T", c)
 }
 
 // ExampleWithNoiseCount 演示如何设置噪点数量
 func ExampleWithNoiseCount() {
 	c := mustCaptcha(memory.NewCaptcha(memory.WithNoiseCount(5)))
+	defer c.Close()
 	printfln("验证码实例: %T", c)
 }
 
@@ -125,6 +135,7 @@ func ExampleWithNoiseCount() {
 func Example_generate() {
 	ctx := context.Background()
 	c := mustCaptcha(memory.NewCaptcha())
+	defer c.Close()
 
 	challenge, err := c.Generate(ctx)
 	mustNoError(err)
@@ -137,6 +148,7 @@ func Example_generate() {
 func Example_verify() {
 	ctx := context.Background()
 	c := mustCaptcha(memory.NewCaptcha())
+	defer c.Close()
 
 	// 生成验证码
 	challenge, err := c.Generate(ctx)
@@ -151,6 +163,7 @@ func Example_verify() {
 func Example_delete() {
 	ctx := context.Background()
 	c := mustCaptcha(memory.NewCaptcha())
+	defer c.Close()
 
 	// 生成验证码
 	challenge, err := c.Generate(ctx)
@@ -167,6 +180,7 @@ func Example_delete() {
 func Example_regenerate() {
 	ctx := context.Background()
 	c := mustCaptcha(memory.NewCaptcha())
+	defer c.Close()
 
 	// 生成验证码
 	challenge, err := c.Generate(ctx)

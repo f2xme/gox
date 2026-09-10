@@ -2,7 +2,7 @@ package captcha
 
 import "fmt"
 
-// New 创建 Service 实例（通用构造函数）。
+// New 创建 Service 实例；store 必须实现 AtomicStore，生命周期由调用方管理。
 func New(store Store, opts ...Option) (Service, error) {
 	options := defaultOptions()
 	for _, opt := range opts {
@@ -18,9 +18,13 @@ func New(store Store, opts ...Option) (Service, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
 	}
+	atomicStore, ok := store.(AtomicStore)
+	if !ok {
+		return nil, ErrAtomicStoreRequired
+	}
 
 	return &service{
-		store:     store,
+		store:     atomicStore,
 		generator: options.Generator,
 		opts:      options,
 	}, nil

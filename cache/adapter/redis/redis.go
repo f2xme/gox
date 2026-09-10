@@ -349,6 +349,55 @@ func (r *redisCache) Swap(ctx context.Context, key string, value []byte, ttl tim
 	return []byte(result.(string)), nil
 }
 
+// Take 原子读取并删除未过期的值。
+func (r *redisCache) Take(ctx context.Context, key string) ([]byte, error) {
+	// Lua 兼容不支持 GETDEL 的 Redis 版本。
+	value, err := r.client.Eval(ctx, `
+		local value = redis.call("GET", KEYS[1])
+		if value ~= false then redis.call("DEL", KEYS[1]) end
+		return value
+	`, []string{key}).Text()
+	if errors.Is(err, redis.Nil) {
+		return nil, cache.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return []byte(value), nil
+}
+
+// CompareAndDelete 原子比较并删除未过期的值。
+func (r *redisCache) CompareAndDelete(ctx context.Context, key string, expected []byte) (bool, error) {
+	result, err := r.client.Eval(ctx, unlockScript, []string{key}, expected).Int64()
+	return result == 1, err
+}
+
+// CompareAndSwap 原子比较并更新未过期的值。
+func (r *redisCache) CompareAndSwap(ctx context.Context, key string, expected, value []byte, ttl time.Duration) (bool, error) {
+	if ttl < cache.KeepTTL {
+		return false, cache.ErrInvalidTTL
+	}
+	ttlMs := ttl.Milliseconds()
+	if ttl == cache.KeepTTL {
+		ttlMs = -1
+	} else if ttl > 0 && ttlMs == 0 {
+		ttlMs = 1
+	}
+	result, err := r.client.Eval(ctx, `
+		if redis.call("GET", KEYS[1]) ~= ARGV[1] then return 0 end
+		local ttl = tonumber(ARGV[3])
+		if ttl > 0 then
+			redis.call("SET", KEYS[1], ARGV[2], "PX", ttl)
+		elseif ttl == -1 then
+			redis.call("SET", KEYS[1], ARGV[2], "KEEPTTL")
+		else
+			redis.call("SET", KEYS[1], ARGV[2])
+		end
+		return 1
+	`, []string{key}, expected, value, ttlMs).Int64()
+	return result == 1, err
+}
+
 // Expire 实现对应能力接口。
 func (r *redisCache) Expire(ctx context.Context, key string, ttl time.Duration) error {
 	if ttl == cache.KeepTTL || ttl < cache.KeepTTL {

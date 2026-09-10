@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>滑动验证示例</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; color: #262626; }
+  main { min-height: 100dvh; display: grid; place-items: center; }
+  button { font: inherit; cursor: pointer; }
+  .launch { padding: 12px 24px; border: 1px solid #ddd; border-radius: 8px; background: white; }
+  body:has(dialog[open]) .launch { visibility: hidden; }
+  dialog { width: min(564px, calc(100% - 24px)); margin: auto; padding: 30px 38px 32px; border: 0; border-radius: 8px; }
+  dialog::backdrop { background: rgb(0 0 0 / 32%); }
+  h1 { margin: 0; font-size: 24px; font-weight: 600; line-height: 34px; }
+  .subtitle { margin: 12px 0 30px; color: #737373; font-size: 16px; }
+  .icon { display: grid; place-items: center; width: 32px; height: 32px; border: 0; background: transparent; color: #666; border-radius: 5px; }
+  .close { position: absolute; top: 25px; right: 26px; font-size: 28px; font-weight: 300; }
+  .icon:hover { background: #f3f3f3; }
+  button:focus-visible { outline: 2px solid #26774d; outline-offset: 3px; }
+  button:disabled { cursor: default; opacity: .45; }
+  .track { position: relative; height: 68px; padding: 5px; overflow: hidden; border-radius: 11px; background: #f3f3f3; }
+  .track:focus-within { outline: 2px solid #26774d; outline-offset: 3px; }
+  .fill { position: absolute; inset: 0 auto 0 0; width: calc(var(--progress, 0) * 1%); background: #dcefe3; pointer-events: none; }
+  .track label { position: absolute; inset: 0 0 0 58px; display: grid; place-items: center; font-size: 17px; color: #666; pointer-events: none; }
+  .track.success { background: #edf7f0; }
+  .track.success label { inset: 0 58px 0 0; color: #26774d; }
+  input[type=range] { appearance: none; position: relative; display: block; margin: 0; width: 100%; height: 58px; background: transparent; outline: none; cursor: grab; touch-action: none; }
+  input[type=range]:active { cursor: grabbing; }
+  input[type=range]:disabled { cursor: default; }
+  input[type=range]::-webkit-slider-runnable-track { height: 58px; background: transparent; }
+  input[type=range]::-moz-range-track { height: 58px; background: transparent; }
+  input[type=range]::-webkit-slider-thumb { appearance: none; width: 58px; height: 58px; border: 0; border-radius: 10px; background: white var(--icon) center / 24px no-repeat; }
+  input[type=range]::-moz-range-thumb { width: 58px; height: 58px; border: 0; border-radius: 10px; background: white var(--icon) center / 24px no-repeat; }
+  .track { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 6 6 6-6 6m6-12 6 6-6 6'/%3E%3C/svg%3E"); }
+  .track.success { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2326774d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E"); }
+  footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; min-height: 32px; }
+  #status { margin: 0; font-size: 14px; color: #737373; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  @media (max-width: 420px) {
+    dialog { padding: 28px 22px; }
+    .close { right: 16px; }
+    .track label { font-size: 15px; }
+  }
+</style>
+<main><button class="launch" id="open">打开滑动验证</button></main>
+<dialog aria-labelledby="title" aria-describedby="subtitle">
+  <button class="icon close" id="close" aria-label="关闭验证">×</button>
+  <h1 id="title">安全验证</h1>
+  <p class="subtitle" id="subtitle">请完成下方滑动验证</p>
+  <div class="track" id="track">
+    <div class="fill"></div>
+    <label for="slider" id="label">按住滑块，向右拖动</label>
+    <input id="slider" type="range" min="0" max="100" step="1" value="0" disabled aria-label="滑动验证" aria-describedby="keyboard-help" aria-valuetext="尚未开始">
+  </div>
+  <p class="sr-only" id="keyboard-help">平稳拖动到最右侧；键盘先用方向键移动几次，再按 End 键完成。</p>
+  <footer>
+    <p id="status" role="status" aria-live="polite">正在加载…</p>
+    <button class="icon" id="refresh" aria-label="刷新验证" disabled>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2 7M20 4v7h-7"/></svg>
+    </button>
+  </footer>
+</dialog>
+<script>
+  const dialog = document.querySelector('dialog');
+  const slider = document.querySelector('#slider');
+  const track = document.querySelector('#track');
+  const label = document.querySelector('#label');
+  const status = document.querySelector('#status');
+  const refresh = document.querySelector('#refresh');
+  let challenge;
+  let busy = false;
+  let passed = false;
+  let startedAt = null;
+  let points = [];
+  let controller;
+
+  function progress(value) {
+    slider.value = value;
+    const percent = Math.round(Number(value) / Number(slider.max) * 100);
+    track.style.setProperty('--progress', percent);
+    slider.setAttribute('aria-valuetext', `已滑动 ${percent}%`);
+  }
+
+  async function load() {
+    if (busy || !dialog.open) return;
+    controller?.abort();
+    controller = new AbortController();
+    const { signal } = controller;
+    busy = true;
+    passed = false;
+    const previous = challenge;
+    startedAt = null;
+    points = [];
+    slider.disabled = refresh.disabled = true;
+    track.classList.remove('success');
+    progress(0);
+    label.textContent = '正在加载…';
+    status.textContent = '正在准备验证';
+    try {
+      if (previous) {
+        const removed = await fetch(`/api/captcha/${encodeURIComponent(previous.token)}`, { method: 'DELETE', signal });
+        if (!removed.ok) throw new Error('刷新失败');
+      }
+      if (signal.aborted) return;
+      challenge = null;
+      const response = await fetch('/api/captcha/generate', { signal });
+      if (!response.ok) throw new Error('加载失败，请刷新重试');
+      const result = await response.json();
+      if (signal.aborted) return;
+      challenge = result.data;
+      slider.max = challenge.distance;
+      slider.disabled = false;
+      label.textContent = '按住滑块，向右拖动';
+      status.textContent = '拖至最右侧完成验证';
+    } catch {
+      if (signal.aborted) return;
+      label.textContent = '加载失败';
+      status.textContent = '加载失败，请刷新重试';
+    } finally {
+      if (!signal.aborted) {
+        busy = false;
+        refresh.disabled = false;
+      }
+    }
+  }
+
+  async function verify() {
+    if (busy || passed || !challenge) return;
+    const { signal } = controller;
+    recordPoint(true);
+    const data = {
+      token: challenge.token,
+      distance: Number(slider.value),
+      duration: points[points.length - 1].t,
+      track: points,
+    };
+    busy = true;
+    slider.disabled = refresh.disabled = true;
+    label.textContent = '正在验证…';
+    status.textContent = '正在确认结果';
+    try {
+      const response = await fetch('/api/captcha/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        signal,
+      });
+      if (!response.ok) throw new Error('验证失败，请刷新重试');
+      const result = await response.json();
+      if (signal.aborted) return;
+      if (!result.success) throw new Error(result.message);
+      passed = true;
+      track.classList.add('success');
+      label.textContent = '验证通过';
+      status.textContent = '验证成功';
+      slider.setAttribute('aria-valuetext', '验证通过');
+    } catch (error) {
+      if (signal.aborted) return;
+      progress(0);
+      label.textContent = '请刷新重试';
+      status.textContent = error instanceof TypeError ? '网络异常，请刷新重试' : error.message;
+    } finally {
+      if (!signal.aborted) {
+        busy = false;
+        refresh.disabled = false;
+        if (dialog.open) refresh.focus();
+      }
+    }
+  }
+
+  function startTrack() {
+    if (startedAt === null && !slider.disabled) {
+      startedAt = performance.now();
+      points = [{ x: 0, t: 0 }];
+    }
+  }
+
+  function recordPoint(force = false) {
+    if (startedAt === null) return;
+    const point = { x: Number(slider.value), t: Math.round(performance.now() - startedAt) };
+    const last = points[points.length - 1];
+    if (point.t <= last.t) {
+      if (force && points.length > 1) last.x = point.x;
+    } else if (force || (point.t - last.t >= 20 && points.length < 511)) {
+      points.push(point);
+    }
+  }
+
+  // 原生 range 支持鼠标、触屏和键盘；阻止点击轨道直接跳到终点。
+  function preventTrackJump(event) {
+    const bounds = slider.getBoundingClientRect();
+    const thumbLeft = bounds.left + Number(slider.value) / Number(slider.max) * (bounds.width - 58);
+    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+    if ((event.button !== undefined && event.button !== 0) ||
+        (event.touches && event.touches.length !== 1) ||
+        clientX < thumbLeft || clientX > thumbLeft + 58) {
+      event.preventDefault();
+      return;
+    }
+    startTrack();
+  }
+  slider.addEventListener('pointerdown', preventTrackJump);
+  // 触屏的原生 range 拖动由 touchstart 驱动，单独取消 pointerdown 不够。
+  slider.addEventListener('touchstart', preventTrackJump, { passive: false });
+  slider.addEventListener('keydown', event => {
+    if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) startTrack();
+  });
+  slider.addEventListener('input', () => {
+    progress(slider.value);
+    if (Number(slider.value) === Number(slider.max)) verify();
+    else recordPoint();
+  });
+  function resetIncomplete() {
+    if (!busy && !passed) {
+      progress(0);
+      startedAt = null;
+      points = [];
+    }
+  }
+  window.addEventListener('pointerup', resetIncomplete);
+  window.addEventListener('pointercancel', resetIncomplete);
+  slider.addEventListener('blur', resetIncomplete);
+  refresh.addEventListener('click', load);
+  function closeDialog() {
+    // 每次打开独立使用一个 signal，旧请求的回调和 finally 不能修改新弹窗。
+    controller?.abort();
+    busy = false;
+    dialog.close();
+  }
+  document.querySelector('#close').addEventListener('click', closeDialog);
+  dialog.addEventListener('cancel', event => {
+    event.preventDefault();
+    closeDialog();
+  });
+  document.querySelector('#open').addEventListener('click', () => {
+    dialog.showModal();
+    load();
+  });
+  dialog.showModal();
+  load();
+</script>
+</html>

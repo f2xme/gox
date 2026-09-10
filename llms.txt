@@ -42,6 +42,7 @@ SMS providers, queues, and similar integrations.
 | Time formatting, parsing, duration helpers | `timex` |
 | Cache abstraction | `cache`, `cache/adapter/memory`, `cache/adapter/redis` |
 | CAPTCHA | `captcha`, `captcha/generator/*`, `captcha/adapter/*` |
+| Slide verification (one-time token, duration, distance, track heuristics) | `captcha.NewSlide`, runnable `captcha/example/slider` |
 | Configuration loading | `config`, `config/adapter/env`, `config/adapter/viper` |
 | Database setup | `database/adapter/mysqldb`, `database/adapter/pgsqldb`, `database/adapter/sqlitedb` |
 | Elasticsearch search, writes, indices, aliases, reindex | `elasticsearch` |

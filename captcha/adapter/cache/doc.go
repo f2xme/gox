@@ -8,7 +8,7 @@
 //   - 复用 gox/cache：支持多种缓存后端
 //   - 支持 key 前缀：便于隔离不同业务的验证码数据
 //   - 支持默认 TTL：未传入过期时间时使用适配器默认值
-//   - 实现 captcha.Store：可直接传入 captcha.New
+//   - 后端实现 cache.AtomicStore 时提供 captcha.AtomicStore，可传入 captcha.New 和 NewSlide
 //
 // # 快速开始
 //

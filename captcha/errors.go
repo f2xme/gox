@@ -3,6 +3,9 @@ package captcha
 import "errors"
 
 var (
+	// ErrAtomicStoreRequired 表示存储缺少验证所需的原子操作能力。
+	ErrAtomicStoreRequired = errors.New("captcha: store lacks required atomic operations")
+
 	// ErrNotFound 表示验证码不存在或已过期
 	ErrNotFound = errors.New("captcha: not found")
 

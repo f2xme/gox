@@ -29,7 +29,7 @@ type Service interface {
 }
 
 type service struct {
-	store     Store
+	store     AtomicStore
 	generator Generator
 	opts      Options
 }
@@ -62,6 +62,9 @@ func (s *service) Generate(ctx context.Context) (Challenge, error) {
 
 // Verify 验证验证码答案。
 func (s *service) Verify(ctx context.Context, id string, answer string) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	if id == "" || answer == "" {
 		return false, nil
 	}
@@ -76,10 +79,8 @@ func (s *service) Verify(ctx context.Context, id string, answer string) (bool, e
 
 	// 比较答案（忽略大小写和空格）
 	ok := compareAnswer(stored, answer)
-	if s.shouldDelete(ok) {
-		if err := s.store.Delete(ctx, id); err != nil {
-			return false, err
-		}
+	if ok && s.opts.ConsumeMode == ConsumeOnSuccess {
+		return s.store.CompareAndDelete(ctx, id, stored)
 	}
 
 	return ok, nil
@@ -98,7 +99,8 @@ func (s *service) Regenerate(ctx context.Context, id string) (Challenge, error) 
 	if id == "" {
 		return Challenge{}, ErrInvalidID
 	}
-	if _, err := s.store.Get(ctx, id); err != nil {
+	stored, err := s.store.Get(ctx, id)
+	if err != nil {
 		return Challenge{}, err
 	}
 
@@ -109,8 +111,12 @@ func (s *service) Regenerate(ctx context.Context, id string) (Challenge, error) 
 	}
 
 	// 更新答案
-	if err := s.store.Set(ctx, id, data.Answer, s.opts.TTL); err != nil {
+	updated, err := s.store.CompareAndSwap(ctx, id, stored, data.Answer, s.opts.TTL)
+	if err != nil {
 		return Challenge{}, err
+	}
+	if !updated {
+		return Challenge{}, ErrNotFound
 	}
 
 	return Challenge{
@@ -123,26 +129,9 @@ func (s *service) Regenerate(ctx context.Context, id string) (Challenge, error) 
 // getAnswer 根据消费策略获取答案。
 func (s *service) getAnswer(ctx context.Context, id string) (string, error) {
 	if s.opts.ConsumeMode == ConsumeAlways {
-		if taker, ok := s.store.(Taker); ok {
-			return taker.Take(ctx, id)
-		}
+		return s.store.Take(ctx, id)
 	}
 	return s.store.Get(ctx, id)
-}
-
-// shouldDelete 判断当前验证结果是否需要删除验证码。
-func (s *service) shouldDelete(ok bool) bool {
-	switch s.opts.ConsumeMode {
-	case ConsumeAlways:
-		if _, supportsTake := s.store.(Taker); supportsTake {
-			return false
-		}
-		return true
-	case ConsumeOnSuccess:
-		return ok
-	default:
-		return false
-	}
 }
 
 // generateID 生成随机 ID。

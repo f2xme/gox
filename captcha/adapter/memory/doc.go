@@ -29,6 +29,7 @@
 //	if err != nil {
 //		return err
 //	}
+//	defer c.Close()
 //
 // # 注意事项
 //

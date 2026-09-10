@@ -2,7 +2,11 @@ package base64
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
+
+	upstream "github.com/mojocn/base64Captcha"
 )
 
 func TestGenerate(t *testing.T) {
@@ -38,6 +42,68 @@ func TestGenerate(t *testing.T) {
 
 			if gen.Type() != "base64" {
 				t.Errorf("Type() = %v, want base64", gen.Type())
+			}
+		})
+	}
+}
+
+type questionDriver struct {
+	upstream.Driver
+	drawn string
+}
+
+func (*questionDriver) GenerateIdQuestionAnswer() (string, string, string) {
+	return "id", "1+2=?", "3"
+}
+
+func (d *questionDriver) DrawCaptcha(question string) (upstream.Item, error) {
+	d.drawn = question
+	return d.Driver.DrawCaptcha(question)
+}
+
+func TestDrawQuestion(t *testing.T) {
+	opts := defaultOptions()
+	opts.Type = TypeMath
+	driver := &questionDriver{Driver: createDriver(opts)}
+	gen := &base64Generator{driver: driver}
+	data, err := gen.Generate(context.Background())
+	if err != nil || driver.drawn != "1+2=?" || data.Answer != "3" {
+		t.Fatalf("question=%q answer=%q error=%v", driver.drawn, data.Answer, err)
+	}
+}
+
+func TestImageLayoutValidation(t *testing.T) {
+	for _, tc := range []struct {
+		typ                   CaptchaType
+		width, height, length int
+		valid                 bool
+	}{
+		{TypeDigit, 1, 1, 4, false},
+		{TypeDigit, 10, 80, 4, false},
+		{TypeDigit, 240, 10, 4, false},
+		{TypeDigit, 240, 80, 1000, false},
+		{TypeDigit, 240, 80, 4, true},
+		{TypeDigit, 300, 100, 6, true},
+		{TypeString, 19, 80, 4, false},
+		{TypeString, 240, 15, 4, false},
+		{TypeMath, 19, 80, 4, false},
+		{TypeMath, 240, 15, 4, false},
+		{TypeString, 20, 16, 4, true},
+		{TypeMath, 20, 16, 4, true},
+	} {
+		t.Run(fmt.Sprintf("%s/%dx%d/%d", tc.typ, tc.width, tc.height, tc.length), func(t *testing.T) {
+			gen, err := New(WithType(tc.typ), WithSize(tc.width, tc.height), WithLength(tc.length))
+			if !tc.valid {
+				if !errors.Is(err, ErrInvalidSize) {
+					t.Fatalf("New() = %v, want ErrInvalidSize", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := gen.Generate(context.Background()); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

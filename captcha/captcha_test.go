@@ -45,6 +45,22 @@ func (s *mockStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+func (s *mockStore) CompareAndDelete(ctx context.Context, id, expected string) (bool, error) {
+	if value, ok := s.data[id]; !ok || value != expected {
+		return false, nil
+	}
+	delete(s.data, id)
+	return true, nil
+}
+
+func (s *mockStore) CompareAndSwap(ctx context.Context, id, expected, answer string, ttl time.Duration) (bool, error) {
+	if value, ok := s.data[id]; !ok || value != expected {
+		return false, nil
+	}
+	s.data[id] = answer
+	return true, nil
+}
+
 func (s *mockStore) Exists(id string) bool {
 	_, ok := s.data[id]
 	return ok

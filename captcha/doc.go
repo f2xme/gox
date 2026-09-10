@@ -36,6 +36,7 @@
 //		if err != nil {
 //			log.Fatalf("创建验证码服务失败: %v", err)
 //		}
+//		defer c.Close()
 //
 //		challenge, err := c.Generate(ctx)
 //		if err != nil {
@@ -67,8 +68,24 @@
 //		return err
 //	}
 //
-// 自定义存储需要实现 Store 接口。Get 应返回验证码答案，Delete 应保持幂等，
-// 验证码不存在或已过期时返回 ErrNotFound。需要原子消费能力时可以额外实现 Taker。
+// 自定义存储需要实现 AtomicStore，包括原子 Take、CompareAndDelete、CompareAndSwap；
+// 缺少能力时 New 返回 ErrAtomicStoreRequired。Get 应返回验证码答案，Delete 应保持幂等，
+// 验证码不存在或已过期时返回 ErrNotFound。刷新过程中被消费、删除或更新时，
+// Regenerate 返回 ErrNotFound，不会恢复旧验证码。存储生命周期由调用方管理。
+//
+// # 滑动验证
+//
+// 使用 NewSlide(store) 创建滑动验证器，store 必须同时实现 Store 和原子 Taker。
+// Generate 返回一次性 token 和目标距离；前端提交 SlideVerifyData，包含距离、
+// 毫秒时长和 TrackPoint 轨迹。默认检查 300ms–10s 时长、终点容差、轨迹起终点、
+// 时间顺序和速度方差；Duration 必须等于轨迹最后一点的 T。
+// 验证成功或失败都会消费 token。默认有效期为 5 分钟。
+// 示例页面：在仓库根目录运行 go run ./captcha/example/slider，打开 http://127.0.0.1:8080。
+//
+// 前端将轨道的完整可滑动距离映射到 SlideChallenge.Distance，适配不同屏幕尺寸。
+// WithSlideDistance、WithSlideDuration 和 WithSlideMinSpeedVariance 可调整行为规则。
+// 轨迹来自客户端，启发式校验不能证明是真人。发送短信等业务操作应在服务端
+// Verify 成功后执行；已消费的 token 不能作为另一个业务接口的通行凭证。
 //
 // # 注意事项
 //

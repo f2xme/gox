@@ -2,11 +2,55 @@ package memory
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/f2xme/gox/cache"
 )
+
+func TestConcurrentReadsUpdateEviction(t *testing.T) {
+	for _, policy := range []string{"lru", "lfu"} {
+		t.Run(policy, func(t *testing.T) {
+			c, err := New(WithMaxSize(2), WithEvictionPolicy(policy))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.(cache.Closer).Close()
+			ctx := context.Background()
+			for _, key := range []string{"hot", "cold"} {
+				if err := c.Set(ctx, key, []byte("value"), time.Minute); err != nil {
+					t.Fatal(err)
+				}
+			}
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			for range 4 {
+				wg.Go(func() {
+					<-start
+					for range 50 {
+						got, err := c.Get(ctx, "hot")
+						if err != nil || string(got) != "value" {
+							t.Errorf("Get(hot) = %q, %v", got, err)
+							return
+						}
+						got[0] = 'x' // 返回值必须是副本。
+					}
+				})
+			}
+			close(start)
+			wg.Wait()
+			if err := c.Set(ctx, "new", nil, time.Minute); err != nil {
+				t.Fatal(err)
+			}
+			for key, want := range map[string]bool{"hot": true, "cold": false, "new": true} {
+				if exists, err := c.Exists(ctx, key); err != nil || exists != want {
+					t.Errorf("Exists(%q) = %v, %v, want %v", key, exists, err, want)
+				}
+			}
+		})
+	}
+}
 
 // TestLRUEviction 验证 LRU 淘汰策略淘汰最近最少使用的条目
 func TestLRUEviction(t *testing.T) {

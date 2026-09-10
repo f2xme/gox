@@ -17,6 +17,9 @@ var (
 
 	// ErrInvalidType 表示验证码类型无效。
 	ErrInvalidType = errors.New("captcha/base64: invalid captcha type")
+
+	// ErrInvalidSize 表示图片尺寸无法容纳当前验证码或驱动的随机绘制区域。
+	ErrInvalidSize = errors.New("captcha/base64: image size is too small for captcha layout")
 )
 
 // CaptchaType 定义验证码类型。
@@ -96,6 +99,27 @@ func (o Options) validate() error {
 	}
 	if o.NoiseCount < 0 {
 		return ErrInvalidNoiseCount
+	}
+	if o.Type == TypeDigit {
+		// base64Captcha v1.3.6 的数字字体为 11×18，字符间距为 1 点。
+		// 按驱动的布局计算两个 Intn 的范围，避免合法正数尺寸仍触发 panic。
+		border := min(o.Width, o.Height) / 4
+		width := float64(o.Width-border*2) / float64(o.Length)
+		height := width * 18 / 12
+		if limit := float64(o.Height - border*2); height > limit {
+			height = limit
+			width = 12.0 / 18 * height
+		}
+		dot := max(1, int(height/18))
+		padding := min(o.Width, o.Height) / 5 * 2
+		if height < 18 || o.Width-int(width)*o.Length-dot-padding <= 0 ||
+			o.Height-int(height)-dot*2-padding <= 0 {
+			return ErrInvalidSize
+		}
+	}
+	// 字符驱动的空心线需要 width/20 > 0，文字定位需要 height/16 > 0。
+	if (o.Type == TypeString || o.Type == TypeMath) && (o.Width < 20 || o.Height < 16) {
+		return ErrInvalidSize
 	}
 	return nil
 }

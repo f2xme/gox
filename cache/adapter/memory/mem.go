@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"math"
@@ -89,39 +90,28 @@ type memCache struct {
 // Get 从缓存中获取值。
 // 如果键不存在或已过期则返回 cache.ErrNotFound。
 func (c *memCache) Get(ctx context.Context, key string) ([]byte, error) {
-	c.mu.RLock()
+	// ponytail: Get 与淘汰策略共用写锁；读取吞吐成为瓶颈时再拆分无淘汰路径。
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	item, exists := c.items[key]
 	if !exists {
-		c.mu.RUnlock()
 		return nil, cache.ErrNotFound
 	}
 
 	if item.isExpired() {
-		c.mu.RUnlock()
-		// 升级为写锁
-		c.mu.Lock()
-		// 获取写锁后重新检查（双重检查模式）
-		if item, exists := c.items[key]; exists && item.isExpired() {
-			delete(c.items, key)
-			if c.eviction != nil {
-				c.eviction.remove(key)
-			}
+		delete(c.items, key)
+		if c.eviction != nil {
+			c.eviction.remove(key)
 		}
-		c.mu.Unlock()
 		return nil, cache.ErrNotFound
 	}
-
-	// 返回副本以防止外部修改
-	result := make([]byte, len(item.value))
-	copy(result, item.value)
 
 	// 成功获取后更新淘汰策略
 	if c.eviction != nil {
 		c.eviction.onAccess(key)
 	}
 
-	c.mu.RUnlock()
-	return result, nil
+	return copyBytes(item.value), nil
 }
 
 // Set 使用给定的 TTL 在缓存中存储值。
@@ -196,6 +186,71 @@ func (c *memCache) Delete(ctx context.Context, key string) error {
 		c.eviction.remove(key)
 	}
 	return nil
+}
+
+// Take 原子读取并删除未过期的值。
+func (c *memCache) Take(ctx context.Context, key string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	item, exists := c.items[key]
+	delete(c.items, key)
+	if c.eviction != nil {
+		c.eviction.remove(key)
+	}
+	if !exists || item.isExpired() {
+		return nil, cache.ErrNotFound
+	}
+	return copyBytes(item.value), nil
+}
+
+// CompareAndDelete 原子比较并删除未过期的值。
+func (c *memCache) CompareAndDelete(ctx context.Context, key string, expected []byte) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	item, exists := c.items[key]
+	if !exists || item.isExpired() || !bytes.Equal(item.value, expected) {
+		return false, nil
+	}
+	delete(c.items, key)
+	if c.eviction != nil {
+		c.eviction.remove(key)
+	}
+	return true, nil
+}
+
+// CompareAndSwap 原子比较并更新未过期的值。
+func (c *memCache) CompareAndSwap(ctx context.Context, key string, expected, value []byte, ttl time.Duration) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	var expiration int64
+	if ttl != cache.KeepTTL {
+		var err error
+		expiration, err = expirationFromTTL(ttl)
+		if err != nil {
+			return false, err
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	previous, exists := c.items[key]
+	if !exists || previous.isExpired() || !bytes.Equal(previous.value, expected) {
+		return false, nil
+	}
+	if ttl == cache.KeepTTL {
+		expiration = previous.expiration
+	}
+	c.items[key] = &item{value: copyBytes(value), expiration: expiration}
+	if c.eviction != nil {
+		c.eviction.onAccess(key)
+	}
+	return true, nil
 }
 
 // Exists 检查键是否存在于缓存中且未过期。

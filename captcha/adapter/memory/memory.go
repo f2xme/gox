@@ -36,7 +36,11 @@ type memoryStore struct {
 func (s *memoryStore) Set(ctx context.Context, id string, answer string, ttl time.Duration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.setLocked(id, answer, ttl)
+	return nil
+}
 
+func (s *memoryStore) setLocked(id, answer string, ttl time.Duration) {
 	// 使用传入的 TTL，如果为 0 则使用默认值
 	if ttl == 0 {
 		ttl = s.opts.TTL
@@ -56,7 +60,30 @@ func (s *memoryStore) Set(ctx context.Context, id string, answer string, ttl tim
 		expiration: expiration,
 	}
 	s.enforceMaxSize()
-	return nil
+}
+
+// CompareAndDelete 原子比较并删除未过期的答案。
+func (s *memoryStore) CompareAndDelete(ctx context.Context, id, expected string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, exists := s.items[id]
+	if !exists || item.isExpired() || item.answer != expected {
+		return false, nil
+	}
+	s.deleteLocked(id)
+	return true, nil
+}
+
+// CompareAndSwap 原子比较并更新未过期的答案。
+func (s *memoryStore) CompareAndSwap(ctx context.Context, id, expected, answer string, ttl time.Duration) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, exists := s.items[id]
+	if !exists || item.isExpired() || item.answer != expected {
+		return false, nil
+	}
+	s.setLocked(id, answer, ttl)
+	return true, nil
 }
 
 // Get 获取验证码答案。

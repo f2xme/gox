@@ -46,11 +46,10 @@ func (g *base64Generator) Generate(ctx context.Context) (captcha.ChallengeData, 
 		return captcha.ChallengeData{}, err
 	}
 
-	// 先生成答案
-	_, _, answer := g.driver.GenerateIdQuestionAnswer()
+	// 题目用于绘制，答案仅用于服务端验证。
+	_, question, answer := g.driver.GenerateIdQuestionAnswer()
 
-	// 使用答案生成图片
-	item, err := g.driver.DrawCaptcha(answer)
+	item, err := g.driver.DrawCaptcha(question)
 	if err != nil {
 		return captcha.ChallengeData{}, err
 	}

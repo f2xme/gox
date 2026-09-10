@@ -15,6 +15,31 @@ type cacheStore struct {
 	opts  Options
 }
 
+// 仅在后端支持原子操作时提供该能力，避免把 Get/Delete 伪装成原子消费。
+type atomicCacheStore struct {
+	*cacheStore
+	atomic cache.AtomicStore
+}
+
+func (s *atomicCacheStore) Take(ctx context.Context, id string) (string, error) {
+	value, err := s.atomic.Take(ctx, s.opts.Prefix+id)
+	if errors.Is(err, cache.ErrNotFound) {
+		return "", captcha.ErrNotFound
+	}
+	return string(value), err
+}
+
+func (s *atomicCacheStore) CompareAndDelete(ctx context.Context, id, expected string) (bool, error) {
+	return s.atomic.CompareAndDelete(ctx, s.opts.Prefix+id, []byte(expected))
+}
+
+func (s *atomicCacheStore) CompareAndSwap(ctx context.Context, id, expected, answer string, ttl time.Duration) (bool, error) {
+	if ttl == 0 {
+		ttl = s.opts.TTL
+	}
+	return s.atomic.CompareAndSwap(ctx, s.opts.Prefix+id, []byte(expected), []byte(answer), ttl)
+}
+
 // Backend 定义 cache 适配器需要的最小缓存后端能力。
 type Backend interface {
 	// Get 获取指定键的值。

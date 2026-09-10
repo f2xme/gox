@@ -9,6 +9,7 @@ Package cache 提供统一的缓存能力接口，支持内存缓存、Redis 缓
   - BatchStore：GetMany、SetMany、DeleteMany、ExistsMany。
   - Expirer：TTL、Expire、Persist。
   - ConditionalStore：SetNX、SetXX、Swap。
+  - AtomicStore：Take、CompareAndDelete、CompareAndSwap。
   - Counter：整数和浮点原子计数。
   - Scanner：游标式 key 扫描。
   - Locker：锁能力。

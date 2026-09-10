@@ -22,6 +22,7 @@ func TestIntegration_MemoryAdapter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCaptcha() error = %v", err)
 	}
+	defer c.Close()
 
 	// 生成验证码
 	challenge, err := c.Generate(ctx)
@@ -145,6 +146,7 @@ func TestIntegration_MultipleTypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewCaptcha() error = %v", err)
 			}
+			defer c.Close()
 
 			challenge, err := c.Generate(ctx)
 			if err != nil {

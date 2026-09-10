@@ -86,6 +86,17 @@ type ConditionalStore interface {
 	Swap(ctx context.Context, key string, value []byte, ttl time.Duration) ([]byte, error)
 }
 
+// AtomicStore 提供原子读取删除和按值比较的条件修改能力。
+type AtomicStore interface {
+	// Take 原子读取并删除，键不存在或已过期时返回 ErrNotFound。
+	Take(ctx context.Context, key string) ([]byte, error)
+	// CompareAndDelete 仅在未过期的值等于 expected 时删除，返回是否删除。
+	CompareAndDelete(ctx context.Context, key string, expected []byte) (bool, error)
+	// CompareAndSwap 仅在未过期的值等于 expected 时更新，返回是否更新。
+	// ttl 支持 NoExpiration 和 KeepTTL；键不存在时不创建。
+	CompareAndSwap(ctx context.Context, key string, expected, value []byte, ttl time.Duration) (bool, error)
+}
+
 // Locker 提供分布式锁功能。
 type Locker interface {
 	// Lock 为指定的键获取锁，使用指定的 TTL。

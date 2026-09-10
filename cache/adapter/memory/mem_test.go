@@ -2,11 +2,55 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/f2xme/gox/cache"
 )
+
+func TestAtomicOperations(t *testing.T) {
+	c, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.(cache.Closer).Close()
+	ctx := context.Background()
+	a := c.(cache.AtomicStore)
+	if err := c.Set(ctx, "key", []byte("old"), time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := a.CompareAndDelete(ctx, "key", []byte("wrong")); err != nil || ok {
+		t.Fatalf("mismatched delete = %v, %v", ok, err)
+	}
+	value := []byte("new")
+	if ok, err := a.CompareAndSwap(ctx, "key", []byte("old"), value, cache.KeepTTL); err != nil || !ok {
+		t.Fatalf("CAS = %v, %v", ok, err)
+	}
+	value[0] = 'x'
+	if ttl, err := c.(cache.Expirer).TTL(ctx, "key"); err != nil || ttl <= 0 || ttl > time.Minute {
+		t.Fatalf("TTL = %v, %v", ttl, err)
+	}
+	if got, err := a.Take(ctx, "key"); err != nil || string(got) != "new" {
+		t.Fatalf("Take = %q, %v", got, err)
+	}
+	if _, err := a.Take(ctx, "key"); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("second Take = %v", err)
+	}
+	if ok, err := a.CompareAndSwap(ctx, "key", nil, value, time.Minute); err != nil || ok {
+		t.Fatalf("CAS created absent key = %v, %v", ok, err)
+	}
+	if err := c.Set(ctx, "key", value, time.Nanosecond); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Millisecond)
+	if ok, err := a.CompareAndDelete(ctx, "key", value); err != nil || ok {
+		t.Fatalf("deleted expired value = %v, %v", ok, err)
+	}
+	if ok, err := a.CompareAndSwap(ctx, "key", value, nil, time.Minute); err != nil || ok {
+		t.Fatalf("revived expired value = %v, %v", ok, err)
+	}
+}
 
 // TestMemCacheBasicOperations 测试内存缓存的基本操作
 func TestMemCacheBasicOperations(t *testing.T) {
