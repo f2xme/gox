@@ -3,6 +3,7 @@ package gin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -34,6 +35,10 @@ type TestRequestNoValidator struct {
 	Name string `json:"name"`
 	Age  int    `json:"age"`
 }
+
+type customValidationRequest struct{ err error }
+
+func (r customValidationRequest) Validate() error { return r.err }
 
 type adapterValidateRequest struct {
 	Name string `json:"name" validate:"required"`
@@ -235,6 +240,9 @@ func TestBindJSONWithValidator(t *testing.T) {
 				if tt.wantErr && err.Error() != tt.errMsg {
 					t.Errorf("BindJSON() error message = %v, want %v", err.Error(), tt.errMsg)
 				}
+				if tt.wantErr && !errors.Is(err, goxvalidator.ErrValidation) {
+					t.Errorf("BindJSON() error = %v, want ErrValidation", err)
+				}
 			})
 
 			body, _ := json.Marshal(tt.body)
@@ -243,6 +251,21 @@ func TestBindJSONWithValidator(t *testing.T) {
 			w := httptest.NewRecorder()
 			gin.ServeHTTP(w, req)
 		})
+	}
+}
+
+func TestCustomValidationErrorKeepsCauseAndMarksValidation(t *testing.T) {
+	cause := errors.New("custom validation failed")
+	err := callCustomValidate(customValidationRequest{err: cause})
+
+	if err.Error() != cause.Error() {
+		t.Fatalf("error = %q, want %q", err, cause)
+	}
+	if !errors.Is(err, cause) {
+		t.Fatal("custom validation cause was lost")
+	}
+	if !errors.Is(err, goxvalidator.ErrValidation) {
+		t.Fatal("custom error is not marked as validation error")
 	}
 }
 

@@ -2,12 +2,19 @@ package gin
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/f2xme/gox/httpx"
+	goxvalidator "github.com/f2xme/gox/validator"
 	ginframework "github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
+
+type customValidationError struct{ err error }
+
+func (e customValidationError) Error() string   { return e.err.Error() }
+func (e customValidationError) Unwrap() []error { return []error{goxvalidator.ErrValidation, e.err} }
 
 type ginContext struct {
 	c *ginframework.Context
@@ -59,7 +66,11 @@ func (ctx *ginContext) BindForm(v any) error {
 // callCustomValidate 调用自定义 Validate 方法（如果实现了 httpx.Validator 接口）
 func callCustomValidate(v any) error {
 	if validator, ok := v.(httpx.Validator); ok {
-		return validator.Validate()
+		err := validator.Validate()
+		if err != nil && !errors.Is(err, goxvalidator.ErrValidation) {
+			return customValidationError{err: err}
+		}
+		return err
 	}
 	return nil
 }

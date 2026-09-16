@@ -111,11 +111,13 @@ label tag 用于自定义验证错误消息中的字段名(支持中文)。
 		var req CreateUserRequest
 		// BindJSON 会先执行 validate tag 验证，再调用 req.Validate()
 		if err := c.BindJSON(&req); err != nil {
-			return httpx.ErrBadRequest(err.Error())
+			return err
 		}
 		// 此时 req 已通过所有验证
 		return c.JSON(200, req)
 	}
+
+自定义 Validate 返回的错误会保留原消息，并可通过 errors.Is(err, validator.ErrValidation) 识别。
 
 所有 Bind 方法(Bind/BindJSON/BindQuery/BindForm)都支持自动验证。
 
