@@ -2,10 +2,14 @@ package ratelimit
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/f2xme/gox/httpx"
+	"golang.org/x/time/rate"
 )
+
+const limiterIdleTTL = 5 * time.Minute
 
 // New 创建限流中间件
 // 默认策略为令牌桶，每秒 100 个请求
@@ -31,19 +35,13 @@ func New(opts ...Option) httpx.Middleware {
 
 	return func(next httpx.Handler) httpx.Handler {
 		return func(ctx httpx.Context) error {
-			// Extract key for rate limiting
 			key := o.KeyFunc(ctx)
-
-			// Check rate limit
-			allowed := limiter.Allow(key)
-			if !allowed {
+			if !limiter.Allow(key) {
 				if o.Handler != nil {
 					o.Handler(ctx)
 					return ErrRateLimitExceeded
 				}
 
-				// Default rate limit response
-				ctx.Status(429)
 				ctx.JSON(429, map[string]any{
 					"error":   "Too Many Requests",
 					"message": "Rate limit exceeded, please try again later",
@@ -61,147 +59,130 @@ type Limiter interface {
 	Allow(key string) bool
 }
 
-// tokenBucket 实现令牌桶算法
-type tokenBucket struct {
-	rate     int
-	burst    int
-	buckets  map[string]*bucket
-	mu       sync.RWMutex
-	cleanupT *time.Ticker
-	stopCh   chan struct{}
+// keyedStore 保存每个限流键的独立状态，并在请求到来时清理长期未使用的键。
+// 惰性清理避免为每个中间件启动常驻 goroutine。
+type keyedStore[T any] struct {
+	mu          sync.RWMutex
+	values      map[string]*keyedValue[T]
+	newValue    func() T
+	idleTTL     time.Duration
+	nextCleanup atomic.Int64
 }
 
-type bucket struct {
-	tokens    float64
-	lastRefill time.Time
-	mu        sync.Mutex
+type keyedValue[T any] struct {
+	value    T
+	lastUsed atomic.Int64
 }
 
-func newTokenBucket(rate, burst int) *tokenBucket {
-	tb := &tokenBucket{
-		rate:    rate,
-		burst:   burst,
-		buckets: make(map[string]*bucket),
-		stopCh:  make(chan struct{}),
+func newKeyedStore[T any](idleTTL time.Duration, newValue func() T) *keyedStore[T] {
+	store := &keyedStore[T]{
+		values:   make(map[string]*keyedValue[T]),
+		newValue: newValue,
+		idleTTL:  idleTTL,
+	}
+	store.nextCleanup.Store(time.Now().Add(idleTTL).UnixNano())
+	return store
+}
+
+func (s *keyedStore[T]) get(key string) T {
+	now := time.Now()
+
+	s.mu.RLock()
+	storedValue, ok := s.values[key]
+	if ok {
+		storedValue.lastUsed.Store(now.UnixNano())
+	}
+	s.mu.RUnlock()
+
+	if !ok {
+		s.mu.Lock()
+		storedValue, ok = s.values[key]
+		if !ok {
+			storedValue = &keyedValue[T]{value: s.newValue()}
+			s.values[key] = storedValue
+		}
+		storedValue.lastUsed.Store(now.UnixNano())
+		s.mu.Unlock()
 	}
 
-	// Cleanup expired buckets every minute
-	tb.cleanupT = time.NewTicker(time.Minute)
-	go tb.cleanup()
+	s.cleanup(now)
+	return storedValue.value
+}
 
-	return tb
+func (s *keyedStore[T]) cleanup(now time.Time) {
+	nextCleanup := s.nextCleanup.Load()
+	if now.UnixNano() < nextCleanup ||
+		!s.nextCleanup.CompareAndSwap(nextCleanup, now.Add(s.idleTTL).UnixNano()) {
+		return
+	}
+
+	idleBefore := now.Add(-s.idleTTL).UnixNano()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key, value := range s.values {
+		if value.lastUsed.Load() <= idleBefore {
+			delete(s.values, key)
+		}
+	}
+}
+
+// tokenBucket 使用 x/time/rate 实现令牌桶算法。
+type tokenBucket struct {
+	buckets *keyedStore[*rate.Limiter]
+}
+
+func newTokenBucket(requestsPerSecond, burst int) *tokenBucket {
+	idleTTL := limiterIdleTTL
+	if requestsPerSecond > 0 && burst > 0 {
+		refillDuration := time.Duration(float64(burst) / float64(requestsPerSecond) * float64(time.Second))
+		idleTTL = max(idleTTL, refillDuration)
+	}
+
+	return &tokenBucket{
+		buckets: newKeyedStore(idleTTL, func() *rate.Limiter {
+			return rate.NewLimiter(rate.Limit(requestsPerSecond), burst)
+		}),
+	}
 }
 
 func (tb *tokenBucket) Allow(key string) bool {
-	tb.mu.RLock()
-	b, exists := tb.buckets[key]
-	tb.mu.RUnlock()
-
-	if !exists {
-		tb.mu.Lock()
-		b = &bucket{
-			tokens:    float64(tb.burst),
-			lastRefill: time.Now(),
-		}
-		tb.buckets[key] = b
-		tb.mu.Unlock()
-	}
-
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	now := time.Now()
-	elapsed := now.Sub(b.lastRefill).Seconds()
-
-	// Refill tokens
-	b.tokens += elapsed * float64(tb.rate)
-	if b.tokens > float64(tb.burst) {
-		b.tokens = float64(tb.burst)
-	}
-	b.lastRefill = now
-
-	// Check if we have tokens
-	if b.tokens >= 1 {
-		b.tokens--
-		return true
-	}
-
-	return false
-}
-
-func (tb *tokenBucket) cleanup() {
-	for {
-		select {
-		case <-tb.cleanupT.C:
-			tb.mu.Lock()
-			now := time.Now()
-			for key, b := range tb.buckets {
-				b.mu.Lock()
-				if now.Sub(b.lastRefill) > 5*time.Minute {
-					delete(tb.buckets, key)
-				}
-				b.mu.Unlock()
-			}
-			tb.mu.Unlock()
-		case <-tb.stopCh:
-			tb.cleanupT.Stop()
-			return
-		}
-	}
+	return tb.buckets.get(key).Allow()
 }
 
 // leakyBucket 实现漏桶算法
 type leakyBucket struct {
 	rate    int
-	buckets map[string]*leakyBucketState
-	mu      sync.RWMutex
+	buckets *keyedStore[*leakyBucketState]
 }
 
 type leakyBucketState struct {
 	lastLeak time.Time
-	count    int
+	level    float64
 	mu       sync.Mutex
 }
 
 func newLeakyBucket(rate int) *leakyBucket {
 	return &leakyBucket{
-		rate:    rate,
-		buckets: make(map[string]*leakyBucketState),
+		rate: rate,
+		buckets: newKeyedStore(limiterIdleTTL, func() *leakyBucketState {
+			return &leakyBucketState{lastLeak: time.Now()}
+		}),
 	}
 }
 
 func (lb *leakyBucket) Allow(key string) bool {
-	lb.mu.RLock()
-	state, exists := lb.buckets[key]
-	lb.mu.RUnlock()
-
-	if !exists {
-		lb.mu.Lock()
-		state = &leakyBucketState{
-			lastLeak: time.Now(),
-			count:    0,
-		}
-		lb.buckets[key] = state
-		lb.mu.Unlock()
-	}
+	state := lb.buckets.get(key)
 
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
 	now := time.Now()
 	elapsed := now.Sub(state.lastLeak).Seconds()
-
-	// Leak tokens
-	leaked := int(elapsed * float64(lb.rate))
-	state.count -= leaked
-	if state.count < 0 {
-		state.count = 0
-	}
+	state.level = max(0, state.level-elapsed*float64(lb.rate))
 	state.lastLeak = now
 
-	// Check capacity
-	if state.count < lb.rate {
-		state.count++
+	if state.level+1 <= float64(lb.rate) {
+		state.level++
 		return true
 	}
 
@@ -212,51 +193,38 @@ func (lb *leakyBucket) Allow(key string) bool {
 type fixedWindow struct {
 	rate    int
 	window  time.Duration
-	windows map[string]*windowState
-	mu      sync.RWMutex
+	windows *keyedStore[*windowState]
 }
 
 type windowState struct {
-	count      int
+	count       int
 	windowStart time.Time
-	mu         sync.Mutex
+	mu          sync.Mutex
 }
 
 func newFixedWindow(rate int, window time.Duration) *fixedWindow {
 	return &fixedWindow{
-		rate:    rate,
-		window:  window,
-		windows: make(map[string]*windowState),
+		rate:   rate,
+		window: window,
+		windows: newKeyedStore(max(limiterIdleTTL, window), func() *windowState {
+			return &windowState{windowStart: time.Now()}
+		}),
 	}
 }
 
 func (fw *fixedWindow) Allow(key string) bool {
-	fw.mu.RLock()
-	state, exists := fw.windows[key]
-	fw.mu.RUnlock()
-
-	if !exists {
-		fw.mu.Lock()
-		state = &windowState{
-			count:      0,
-			windowStart: time.Now(),
-		}
-		fw.windows[key] = state
-		fw.mu.Unlock()
-	}
+	state := fw.windows.get(key)
 
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
 	now := time.Now()
 
-	// Check if window expired
 	if now.Sub(state.windowStart) >= fw.window {
 		state.count = 0
 		state.windowStart = now
 	}
 
-	// Check rate limit
 	if state.count < fw.rate {
 		state.count++
 		return true
@@ -269,8 +237,7 @@ func (fw *fixedWindow) Allow(key string) bool {
 type slidingWindow struct {
 	rate    int
 	window  time.Duration
-	windows map[string]*slidingWindowState
-	mu      sync.RWMutex
+	windows *keyedStore[*slidingWindowState]
 }
 
 type slidingWindowState struct {
@@ -280,25 +247,16 @@ type slidingWindowState struct {
 
 func newSlidingWindow(rate int, window time.Duration) *slidingWindow {
 	return &slidingWindow{
-		rate:    rate,
-		window:  window,
-		windows: make(map[string]*slidingWindowState),
+		rate:   rate,
+		window: window,
+		windows: newKeyedStore(max(limiterIdleTTL, window), func() *slidingWindowState {
+			return &slidingWindowState{requests: make([]time.Time, 0, rate)}
+		}),
 	}
 }
 
 func (sw *slidingWindow) Allow(key string) bool {
-	sw.mu.RLock()
-	state, exists := sw.windows[key]
-	sw.mu.RUnlock()
-
-	if !exists {
-		sw.mu.Lock()
-		state = &slidingWindowState{
-			requests: make([]time.Time, 0),
-		}
-		sw.windows[key] = state
-		sw.mu.Unlock()
-	}
+	state := sw.windows.get(key)
 
 	state.mu.Lock()
 	defer state.mu.Unlock()
@@ -306,7 +264,6 @@ func (sw *slidingWindow) Allow(key string) bool {
 	now := time.Now()
 	cutoff := now.Add(-sw.window)
 
-	// Remove expired requests
 	i := 0
 	for i < len(state.requests) && !state.requests[i].After(cutoff) {
 		i++
@@ -316,7 +273,6 @@ func (sw *slidingWindow) Allow(key string) bool {
 		state.requests = state.requests[:n]
 	}
 
-	// Check rate limit
 	if len(state.requests) < sw.rate {
 		state.requests = append(state.requests, now)
 		return true
