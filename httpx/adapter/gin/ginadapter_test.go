@@ -81,6 +81,32 @@ func TestGET_JSON(t *testing.T) {
 	}
 }
 
+func TestSetCookiePreservesAttributes(t *testing.T) {
+	e := ginadapter.New()
+	e.GET("/cookie", func(ctx httpx.Context) error {
+		ctx.SetCookie(&http.Cookie{
+			Name:     "session",
+			Value:    "token",
+			Path:     "/",
+			MaxAge:   3600,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
+		})
+		return ctx.NoContent(http.StatusNoContent)
+	})
+
+	cookies := doRequest(e, http.MethodGet, "/cookie").Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("cookies = %v, want one", cookies)
+	}
+	cookie := cookies[0]
+	if cookie.Name != "session" || cookie.Value != "token" || cookie.Path != "/" ||
+		cookie.MaxAge != 3600 || !cookie.HttpOnly || !cookie.Secure || cookie.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("cookie attributes not preserved: %+v", cookie)
+	}
+}
+
 func TestData(t *testing.T) {
 	e := ginadapter.New()
 	e.GET("/ok", func(ctx httpx.Context) error {

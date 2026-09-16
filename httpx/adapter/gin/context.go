@@ -108,10 +108,7 @@ func (ctx *ginContext) Redirect(code int, url string) error {
 func (ctx *ginContext) SetHeader(key, value string) { ctx.c.Header(key, value) }
 
 func (ctx *ginContext) SetCookie(cookie *http.Cookie) {
-	ctx.c.SetCookie(
-		cookie.Name, cookie.Value, cookie.MaxAge,
-		cookie.Path, cookie.Domain, cookie.Secure, cookie.HttpOnly,
-	)
+	http.SetCookie(ctx.c.Writer, cookie)
 }
 
 func (ctx *ginContext) Status(code int) { ctx.c.Status(code) }
