@@ -273,9 +273,12 @@ func (s *Storage) SignURL(ctx context.Context, key string, opts ...oss.SignOptio
 
 	options := oss.ApplySignOptions(opts...)
 
-	sdkOpts := make([]aliyunoss.Option, 0, 1)
+	sdkOpts := make([]aliyunoss.Option, 0, 2)
 	if options.ContentType != "" {
 		sdkOpts = append(sdkOpts, aliyunoss.ContentType(options.ContentType))
+	}
+	if options.ContentDisposition != "" {
+		sdkOpts = append(sdkOpts, aliyunoss.ResponseContentDisposition(options.ContentDisposition))
 	}
 	var url string
 	var err error

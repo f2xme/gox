@@ -171,6 +171,8 @@ type SignOptions struct {
 	Expires time.Duration
 	// ContentType PUT 预签名时使用的内容类型
 	ContentType string
+	// ContentDisposition GET 预签名时覆盖响应的 Content-Disposition
+	ContentDisposition string
 }
 
 func defaultSignOptions() SignOptions {
@@ -210,6 +212,17 @@ func WithExpires(expires time.Duration) SignOption {
 func WithSignContentType(contentType string) SignOption {
 	return func(o *SignOptions) {
 		o.ContentType = contentType
+	}
+}
+
+// WithSignContentDisposition 设置 GET 预签名响应的 Content-Disposition。
+//
+// 示例：
+//
+//	storage.SignURL(ctx, key, oss.WithMethod(oss.MethodGet), oss.WithSignContentDisposition(`attachment; filename="pack.zip"`))
+func WithSignContentDisposition(value string) SignOption {
+	return func(o *SignOptions) {
+		o.ContentDisposition = value
 	}
 }
 

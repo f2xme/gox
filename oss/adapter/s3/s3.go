@@ -156,6 +156,7 @@ func (s *Storage) List(ctx context.Context, opts ...oss.ListOption) (*oss.ListRe
 
 // SignURL 生成 GET、PUT 或 DELETE 预签名 URL，有效期为 1 秒至 7 天。
 // PUT 指定 ContentType 后，使用 URL 时必须发送相同的 Content-Type 请求头。
+// GET 指定 ContentDisposition 后，响应会带上对应的 Content-Disposition。
 func (s *Storage) SignURL(ctx context.Context, key string, opts ...oss.SignOption) (string, error) {
 	if err := validateKey(ctx, key); err != nil {
 		return "", err
@@ -169,7 +170,11 @@ func (s *Storage) SignURL(ctx context.Context, key string, opts ...oss.SignOptio
 	var err error
 	switch o.Method {
 	case oss.MethodGet:
-		out, err = s.presigner.PresignGetObject(ctx, &awss3.GetObjectInput{Bucket: &s.bucket, Key: &key}, presignOpts)
+		in := &awss3.GetObjectInput{Bucket: &s.bucket, Key: &key}
+		if o.ContentDisposition != "" {
+			in.ResponseContentDisposition = &o.ContentDisposition
+		}
+		out, err = s.presigner.PresignGetObject(ctx, in, presignOpts)
 	case oss.MethodPut:
 		in := &awss3.PutObjectInput{Bucket: &s.bucket, Key: &key}
 		if o.ContentType != "" {

@@ -54,8 +54,9 @@ func TestApplySignOptions(t *testing.T) {
 		WithMethod(MethodPut),
 		WithExpires(time.Hour),
 		WithSignContentType("image/png"),
+		WithSignContentDisposition(`attachment; filename="pack.zip"`),
 	)
-	if options.Method != MethodPut || options.Expires != time.Hour || options.ContentType != "image/png" {
+	if options.Method != MethodPut || options.Expires != time.Hour || options.ContentType != "image/png" || options.ContentDisposition != `attachment; filename="pack.zip"` {
 		t.Fatalf("SignOptions = %+v", options)
 	}
 }

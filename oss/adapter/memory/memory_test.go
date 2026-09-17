@@ -255,6 +255,7 @@ func TestStorageSignURL(t *testing.T) {
 		oss.WithMethod(oss.MethodPut),
 		oss.WithExpires(time.Hour),
 		oss.WithSignContentType("text/plain"),
+		oss.WithSignContentDisposition(`attachment; filename="read me.txt"`),
 	)
 	if err != nil {
 		t.Fatalf("SignURL() error = %v", err)
@@ -268,7 +269,7 @@ func TestStorageSignURL(t *testing.T) {
 		t.Fatalf("url = %q", raw)
 	}
 	query := parsed.Query()
-	if query.Get("method") != oss.MethodPut || query.Get("expires") != "3600" || query.Get("content-type") != "text/plain" {
+	if query.Get("method") != oss.MethodPut || query.Get("expires") != "3600" || query.Get("content-type") != "text/plain" || query.Get("content-disposition") != `attachment; filename="read me.txt"` {
 		t.Fatalf("query = %#v", query)
 	}
 

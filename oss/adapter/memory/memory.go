@@ -345,6 +345,9 @@ func (s *Storage) SignURL(ctx context.Context, key string, opts ...oss.SignOptio
 	if options.ContentType != "" {
 		values.Set("content-type", options.ContentType)
 	}
+	if options.ContentDisposition != "" {
+		values.Set("content-disposition", options.ContentDisposition)
+	}
 
 	return s.options.SignURLBase + "/" + url.PathEscape(key) + "?" + values.Encode(), nil
 }

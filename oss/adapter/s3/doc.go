@@ -38,6 +38,7 @@
 //
 // SignURL 支持 GET、PUT、DELETE，有效期为 1 秒至 7 天；临时凭证到期后链接也会失效。
 // PUT 使用 oss.WithSignContentType 后，客户端必须发送相同的 Content-Type 请求头。
+// GET 使用 oss.WithSignContentDisposition 后，响应会带上对应的 Content-Disposition。
 // R2 预签名 URL 必须使用 S3 API 域名，不能替换成自定义公开域名。
 //
 // # 测试

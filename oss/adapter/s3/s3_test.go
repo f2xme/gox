@@ -202,7 +202,7 @@ func TestSignURL(t *testing.T) {
 	for _, method := range []string{oss.MethodGet, oss.MethodPut, oss.MethodDelete} {
 		t.Run(method, func(t *testing.T) {
 			s := testStorage(t, "https://account.r2.cloudflarestorage.com", WithSecurityToken("session-token"))
-			raw, err := s.SignURL(context.Background(), "目录/a +%.txt", oss.WithMethod(method), oss.WithExpires(time.Hour), oss.WithSignContentType("text/plain"))
+			raw, err := s.SignURL(context.Background(), "目录/a +%.txt", oss.WithMethod(method), oss.WithExpires(time.Hour), oss.WithSignContentType("text/plain"), oss.WithSignContentDisposition(`attachment; filename="a.txt"`))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -216,6 +216,9 @@ func TestSignURL(t *testing.T) {
 			}
 			if method == oss.MethodPut && !strings.Contains(q.Get("X-Amz-SignedHeaders"), "content-type") {
 				t.Fatal("Content-Type is not signed")
+			}
+			if method == oss.MethodGet && q.Get("response-content-disposition") != `attachment; filename="a.txt"` {
+				t.Fatalf("response-content-disposition: %s", raw)
 			}
 		})
 	}
