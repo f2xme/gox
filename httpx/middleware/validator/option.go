@@ -28,7 +28,9 @@ func defaultErrorHandler(ctx httpx.Context, code int, message string) {
 }
 
 // WithMaxBodySize 设置允许的最大请求体大小（字节）
-// 如果 Content-Length 头超过此限制，请求将被拒绝并返回 413
+// 已知 Content-Length 超限时立即返回 413；否则通过 http.MaxBytesReader 限制实际读取量。
+// 自定义验证器或 Handler 应在写入响应前返回读取错误；MaxBytesError（含包装错误）统一返回 413。
+// 不预读请求体，未读取的内容不会触发超限检查。
 // 值为 0 表示无限制
 func WithMaxBodySize(size int64) Option {
 	return func(c *Options) {

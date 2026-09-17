@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/f2xme/gox/httpx"
@@ -17,12 +18,17 @@ func New(opts ...Option) httpx.Middleware {
 		return func(ctx httpx.Context) error {
 			// Check max body size
 			if cfg.MaxBodySize > 0 {
-				if contentLength := ctx.Header("Content-Length"); contentLength != "" {
-					size, err := contentLength.Int64()
-					if err == nil && size > cfg.MaxBodySize {
-						cfg.ErrorHandler(ctx, http.StatusRequestEntityTooLarge, "Request body too large")
-						return nil
-					}
+				req := ctx.Request()
+				contentLength := req.ContentLength
+				if size, err := ctx.Header("Content-Length").Int64(); err == nil && size > contentLength {
+					contentLength = size
+				}
+				if contentLength > cfg.MaxBodySize {
+					cfg.ErrorHandler(ctx, http.StatusRequestEntityTooLarge, "Request body too large")
+					return nil
+				}
+				if req.Body != nil {
+					req.Body = http.MaxBytesReader(ctx.ResponseWriter(), req.Body, cfg.MaxBodySize)
 				}
 			}
 
@@ -50,12 +56,23 @@ func New(opts ...Option) httpx.Middleware {
 			// Run custom validators
 			for _, validator := range cfg.CustomValidators {
 				if err := validator(ctx); err != nil {
-					cfg.ErrorHandler(ctx, http.StatusBadRequest, err.Error())
+					var size *http.MaxBytesError
+					if errors.As(err, &size) {
+						cfg.ErrorHandler(ctx, http.StatusRequestEntityTooLarge, "Request body too large")
+					} else {
+						cfg.ErrorHandler(ctx, http.StatusBadRequest, err.Error())
+					}
 					return nil
 				}
 			}
 
-			return next(ctx)
+			err := next(ctx)
+			var size *http.MaxBytesError
+			if errors.As(err, &size) {
+				cfg.ErrorHandler(ctx, http.StatusRequestEntityTooLarge, "Request body too large")
+				return nil
+			}
+			return err
 		}
 	}
 }

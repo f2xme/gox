@@ -49,8 +49,10 @@ validator 中间件用于在请求到达业务逻辑之前进行预验证，支�
 			validator.WithMaxBodySize(5 * 1024 * 1024), // 5MB
 		))
 
-	  - 基于 Content-Length 请求头进行检查
-	  - 超过限制返回 413 Payload Too Large
+	  - 已知 Content-Length 超限时立即返回 413 Payload Too Large
+	  - 使用 http.MaxBytesReader 限制实际读取量，支持未知长度及 chunked 请求
+	  - 自定义验证器或 Handler 返回 MaxBytesError（含包装错误）时，通过 WithErrorHandler 返回 413
+	  - 不预读请求体；调用方须在写入响应前返回读取错误，未读取的内容不会触发超限检查
 	  - 设置为 0 表示不限制（默认）
 
 ## WithAllowedContentTypes - Content-Type 白名单
@@ -106,7 +108,7 @@ validator 中间件用于在请求到达业务逻辑之前进行预验证，支�
 		))
 
 	  - 可以添加多个自定义验证器，按顺序执行
-	  - 返回 error 时请求被拒绝，返回 400 Bad Request
+	  - 返回 error 时请求被拒绝，返回 400 Bad Request；MaxBytesError 返回 413
 	  - 错误信息会作为响应消息返回
 
 ## WithErrorHandler - 自定义错误处理
@@ -142,12 +144,12 @@ validator 中间件用于在请求到达业务逻辑之前进行预验证，支�
 	))
 
 验证顺序：
- 1. 请求体大小检查
+ 1. Content-Length 检查并安装请求体限长读取器
  2. Content-Type 检查
  3. 必需请求头检查
  4. 自定义验证器（按添加顺序）
 
-任何一步失败都会立即返回错误，不再执行后续验证。
+任何一步失败都会立即返回错误，不再执行后续验证。实际读取超限在读取请求体时触发。
 
 # 使用场景
 
@@ -216,13 +218,16 @@ validator 中间件用于在请求到达业务逻辑之前进行预验证，支�
 
 根据接口类型设置不同的限制：
 
-	// JSON API: 1MB
-	app.Use(validator.New(validator.WithMaxBodySize(1024 * 1024)))
+	// JSON API 路由组: 1MB
+	api := app.Group("/api", validator.New(validator.WithMaxBodySize(1024 * 1024)))
+	api.POST("/users", createUser)
 
 	// 文件上传: 50MB
 	app.POST("/upload", uploadHandler, validator.New(
 		validator.WithMaxBodySize(50 * 1024 * 1024),
 	))
+
+多个限长中间件叠加时，更小的上限生效；路由级设置不能放大全局上限。
 
 ## 3. 自定义验证器保持简单
 
@@ -258,6 +263,7 @@ validator 中间件用于在请求到达业务逻辑之前进行预验证，支�
 
   - 验证在请求处理的最早阶段进行，可以快速拒绝不合法请求
   - Content-Length 检查不需要读取请求体，开销极小
+  - 实际限长按需读取，不预先缓存整个请求体
   - 自定义验证器应避免阻塞操作（如数据库查询）
   - 验证失败后立即返回，不会执行后续中间件和处理器
 
