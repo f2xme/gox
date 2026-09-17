@@ -50,7 +50,7 @@ github.com/f2xme/gox/<package>
 | JWT | `jwt` | `github.com/f2xme/gox/jwt` |
 | 队列 | `queue`, `queue/adapter/*` | `github.com/f2xme/gox/queue` |
 | 短信 | `sms`, `sms/adapter/*` | `github.com/f2xme/gox/sms` |
-| 对象存储 | `oss`, `oss/adapter/aliyun` | `github.com/f2xme/gox/oss` |
+| 对象存储 | `oss`, `oss/adapter/aliyun`, `oss/adapter/s3` | `github.com/f2xme/gox/oss` |
 | IP 地区查询 | `geo`, `geo/adapter/*` | `github.com/f2xme/gox/geo` |
 
 ### 可用包
@@ -87,6 +87,7 @@ github.com/f2xme/gox/<package>
 - **metrics** - 指标监控封装
 - **email** - 邮件服务封装
 - **oss** - 对象存储封装
+  - `oss/adapter/s3` - AWS S3、Cloudflare R2、MinIO 适配器（[用法](oss/adapter/s3/doc.go)）
 - **pager** - 分页工具
 - **payment** - 统一支付领域接口（订单、状态、回调模型）
   - `payment/adapter/alipay` - 支付宝当面付/WAP/查询/退款/关单/回调；支持密钥与公钥证书加签，正式/沙箱环境

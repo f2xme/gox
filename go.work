@@ -15,6 +15,7 @@ use (
 	./geo/adapter/ip2region
 	./logx/adapter/zap
 	./oss/adapter/aliyun
+	./oss/adapter/s3
 	./payment/adapter/alipay
 	./payment/adapter/onepay
 	./payment/adapter/wechat

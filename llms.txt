@@ -56,7 +56,7 @@ SMS providers, queues, and similar integrations.
 | Logging | `logx`, `logx/adapter/zap` |
 | Metrics | `metrics`, `metrics/adapter/*` |
 | Email | `email` |
-| Object storage | `oss`, `oss/adapter/aliyun` |
+| Object storage (Aliyun, AWS S3, Cloudflare R2, MinIO) | `oss`, `oss/adapter/aliyun`, `oss/adapter/s3` |
 | IP geolocation / region lookup | `geo`, `geo/adapter/memory`, `geo/adapter/http`, `geo/adapter/amap`, `geo/adapter/baidu`, `geo/adapter/ip2region` |
 | Queue abstraction | `queue`, `queue/adapter/mem`, `queue/adapter/rocketmq` |
 | Rate limiting | `ratelimit` |
