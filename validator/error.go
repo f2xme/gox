@@ -21,8 +21,11 @@ func errUnknownLocale(lang string) error {
 
 // FieldError 表示单个字段的验证错误。
 type FieldError struct {
-	// Namespace 是字段的完整命名空间。
+	// Namespace 是字段的完整命名空间，受 WithFieldNameTag 配置影响。
 	Namespace string
+	// StructNamespace 是使用 Go 类型名和原始字段名的完整路径，不受字段名标签和语言影响。
+	// 例如 Request.Billing.Name、Request.Items[0].Name；集合索引或键由底层验证器保留。
+	StructNamespace string
 	// Field 是字段名，受 WithFieldNameTag 配置影响。
 	Field string
 	// StructField 是结构体原始字段名。

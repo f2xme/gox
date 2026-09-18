@@ -62,6 +62,15 @@ validator 包提供结构体标签验证、自定义验证规则和多语言错�
 
 	// 错误消息会显示：姓名为必填字段
 
+# 业务层翻译
+
+通过 AsValidationError(err) 和 Fields() 获取结构化错误。
+StructNamespace 保留原始 Go 字段完整路径，例如 Request.Billing.Name，
+不受 label、json 字段名配置或消息语言影响；可结合 Tag、Param 映射业务语言包。
+Namespace 则保留用于展示的字段路径。
+集合路径包含索引或键，例如 Request.Items[0].Name；业务按需归一化为翻译键。
+Go 类型或字段重命名会改变 StructNamespace，业务映射需同步更新。
+
 # 创建自定义验证器
 
 	v := validator.New()

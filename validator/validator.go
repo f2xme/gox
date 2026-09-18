@@ -175,12 +175,13 @@ func (v *Validator) formatErrors(errs validator.ValidationErrors, lang string) e
 	fields := make([]FieldError, 0, len(errs))
 	for _, fe := range errs {
 		fields = append(fields, FieldError{
-			Namespace:   fe.Namespace(),
-			Field:       fe.Field(),
-			StructField: fe.StructField(),
-			Tag:         fe.Tag(),
-			Param:       fe.Param(),
-			Message:     fe.Translate(trans),
+			Namespace:       fe.Namespace(),
+			StructNamespace: fe.StructNamespace(),
+			Field:           fe.Field(),
+			StructField:     fe.StructField(),
+			Tag:             fe.Tag(),
+			Param:           fe.Param(),
+			Message:         fe.Translate(trans),
 		})
 	}
 	return &ValidationError{fields: fields}

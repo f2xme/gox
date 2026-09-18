@@ -148,6 +148,45 @@ func TestValidate_ReturnsValidationError(t *testing.T) {
 	}
 }
 
+func TestFieldErrorStructNamespace(t *testing.T) {
+	type Address struct {
+		Name string `json:"name" label:"名称" validate:"required"`
+	}
+	type Request struct {
+		Billing  Address   `json:"billing" label:"账单"`
+		Shipping Address   `json:"shipping" label:"收货"`
+		Items    []Address `json:"items" label:"条目" validate:"dive"`
+	}
+	wantPaths := []string{"Request.Billing.Name", "Request.Shipping.Name", "Request.Items[0].Name"}
+	for _, tt := range []struct {
+		tag            string
+		wantNamespaces []string
+	}{
+		{"label", []string{"Request.账单.名称", "Request.收货.名称", "Request.条目[0].名称"}},
+		{"json", []string{"Request.billing.name", "Request.shipping.name", "Request.items[0].name"}},
+	} {
+		for _, lang := range []string{LangZH, LangEN} {
+			t.Run(tt.tag+"/"+lang, func(t *testing.T) {
+				v := New(WithFieldNameTag(tt.tag))
+				err := v.ValidateWithLang(Request{Items: []Address{{}}}, lang)
+				validationErr, ok := AsValidationError(err)
+				if !ok {
+					t.Fatalf("expected ValidationError, got %v", err)
+				}
+				fields := validationErr.Fields()
+				if len(fields) != len(wantPaths) {
+					t.Fatalf("fields = %#v", fields)
+				}
+				for i, field := range fields {
+					if field.StructNamespace != wantPaths[i] || field.Namespace != tt.wantNamespaces[i] || field.StructField != "Name" || field.Tag != "required" {
+						t.Errorf("field[%d] = %#v, want StructNamespace=%q Namespace=%q", i, field, wantPaths[i], tt.wantNamespaces[i])
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestValidationErrorFieldsReturnsCopy(t *testing.T) {
 	type User struct {
 		Name string `validate:"required"`
