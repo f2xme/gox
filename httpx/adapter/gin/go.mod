@@ -11,6 +11,7 @@ require (
 	github.com/f2xme/gox v0.14.2
 	github.com/f2xme/gox/validator v0.3.0
 	github.com/gin-gonic/gin v1.12.0
+	golang.org/x/text v0.36.0
 )
 
 require (
@@ -41,6 +42,5 @@ require (
 	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

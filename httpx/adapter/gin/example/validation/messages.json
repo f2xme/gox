@@ -1,0 +1,12 @@
+{
+  "zh": {
+    "CreateUserRequest.Name.required": "名称为必填字段",
+    "CreateUserRequest.Name.min": "名称至少需要 {param} 个字符",
+    "validation.failed": "参数校验失败"
+  },
+  "en": {
+    "CreateUserRequest.Name.required": "Name is required",
+    "CreateUserRequest.Name.min": "Name must contain at least {param} characters",
+    "validation.failed": "Invalid request parameters"
+  }
+}

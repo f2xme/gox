@@ -58,6 +58,13 @@
 //		c.JSON(500, map[string]string{"error": err.Error()})
 //	})
 //
+// 多语言校验的完整示例见 example/validation：BindJSON 自动校验，
+// SetErrorHandler 通过 validator.AsValidationError 提取字段错误，
+// 再按 Accept-Language 和 StructNamespace + "." + Tag 查找业务语言包。
+// 在仓库根目录运行：
+//
+//	go run ./httpx/adapter/gin/example/validation
+//
 // # 路由分组
 //
 // 创建路由组：
