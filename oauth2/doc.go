@@ -4,7 +4,7 @@ Package oauth2 提供标准 OAuth2 授权码流程和第三方登录 Provider �
 oauth2 核心层提供 Endpoint、AuthCodeClient、Token、授权地址生成、授权码换 token、
 刷新 token 和统一 HTTP 错误处理。登录层通过 Provider 接口扩展 UserInfo 能力，
 具体平台实现放在 adapter 子包中，业务代码可以依赖 Provider 接口，在微信、QQ、
-支付宝、抖音、Google、Facebook 等登录服务之间切换，也可以直接使用标准 AuthCodeClient 对接普通 OAuth2 服务。
+支付宝、抖音、Google、Facebook、X 等登录服务之间切换，也可以直接使用标准 AuthCodeClient 对接普通 OAuth2 服务。
 
 # 功能特性
 
@@ -95,6 +95,7 @@ oauth2 核心层提供 Endpoint、AuthCodeClient、Token、授权地址生成、
   - douyin：抖音开放平台网站应用登录
   - google：Google 网站应用 OpenID Connect 登录
   - facebook：Facebook 网站应用授权码登录
+  - x：X 网站应用 OAuth 2.0 授权码加 PKCE 登录
 
 # 注意事项
 
